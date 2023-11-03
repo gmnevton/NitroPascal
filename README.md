@@ -5,7 +5,7 @@ NewPascal is concept of new programming language based on Pascal. Maybe in futur
 
 ### Project files (extension: '.npp'):
 
-```
+```Pascal
 project 'Project_name';
 
 // program-type defines what type of compilation can be done:
@@ -44,7 +44,7 @@ end.
 
 ### Source code files (extension: '.npc'):
 
-```
+```Pascal
 code 'Source_code_name';
 
 {$defines 'Name for defines'
@@ -95,7 +95,7 @@ end.
 7. 'begin' is only allowed in project body definition, 'end.' is required as project body or source code file termination.
 8. Body of methods defined in type declaration can be:
    a) declared inline with method declaration, eg.:
-```
+```Pascal
 type
   TExampleType = class {
   public
@@ -105,7 +105,7 @@ type
   };
 ```
    b) declared later in the body of source code file, eg.:
-```
+```Pascal
 type
   TExampleType = class {
   public
@@ -127,7 +127,7 @@ TSecondExampleType.MyOtherExample: String {
 };
 ```
 9. Class or record methods can be defined as class methods by using prefix '@class:', eg.:
-```
+```Pascal
 type
   TExampleType = class {
   public
@@ -135,7 +135,7 @@ type
   };
 ```
 10. Class or record methods can be defined as inline methods by using prefix '@inline:', eg.:
-```
+```Pascal
 type
   TExampleType = class {
   public
@@ -154,12 +154,12 @@ type
 ### Procedure/function declaration and implementation rules:
 
 1. Procedure/function declaration contains procedure/function name, set of parameters enclosed by '(' and ')', eventual result with type, eg.:
-```
+```Pascal
 MyProcedure(const Param1: Int32, const Param2: Int16, const Param3: Boolean, const Param4: String);
 MyFunction(const A, B: UInt16): Int32;
 ```
 2. Function declaration can return multiple named results, by declaring them as implicit record, eg.:
-```
+```Pascal
 MyFunction(const A, B: UInt16, const C: String): (OK: Boolean, Value: String) {
   Result.OK := True;
   Result.Value := C + ' = ' + IntToStr(A) + ', ' + IntToStr(B);
@@ -167,7 +167,7 @@ MyFunction(const A, B: UInt16, const C: String): (OK: Boolean, Value: String) {
 ```
 3. Const and variable declarations inside of body of procedure/function implementation, can be:
    a) like in traditional Pascal, declaration on top of procedure/function body:
-```
+```Pascal
 MyExample(var C: String) {
   // on top const/var declaration
   const i_max: Int32 = 123_456_789;
@@ -180,7 +180,7 @@ MyExample(var C: String) {
 };
 ```
    b) can be inlined with declaration of instructions to do:
-```
+```Pascal
 MyExample(var C: String) {
   // on top const declaration
   const i_max: Int32 = 123_456_789;
