@@ -82,52 +82,62 @@ Rules:
 1. All source code files are local scope oriented, it means that everything that is defined in source code file is containd in its scope.
 2. Any type, const, var or procedure/function defined can be set to be included in global scope, which means that it can be accessed by other source code files.
 3. There is no need for existance of interface and implementation sections as in traditional Pascal.
-4. Source code file is implicitly threated as implementation section, that defines what can be interfaced by declaring specifier ':global'.
+4. Source code file is implicitly threated as implementation section, that defines what can be interfaced by declaring specifier suffix ':global'.
 5. Type definition can be extended.
 6. 'begin' and 'end' key-words for method body declaration are history, for speed of typing we use brackets '{', '}' with ';' for declaration termination sign.
 7. 'begin' is only allowed in project body definition, 'end.' is required as project body or source code file termination.
 8. Body of methods defined in type declaration can be:
    a) declared inline with method declaration, eg.:
-     type
-       TExampleType = class {
-       public
-         MyExample(const A, B: Int32): Int32 {
-           Result := A + B;
-         };
-       };
+```
+type
+  TExampleType = class {
+  public
+    MyExample(const A, B: Int32): Int32 {
+      Result := A + B;
+    };
+  };
+```
    b) declared later in the body of source code file, eg.:
-     type
-       TExampleType = class {
-       public
-         MyExample(const A, B: Int32): Int32;
-       };
-   
-       TSecondExampleType = class(TExampleType) {
-       public
-         MyOtherExample: String;
-       };
-       ...
-   
-       TExampleType.MyExample(const A, B: Int32): Int32; {
-         Result := A + B;
-       };
+```
+type
+  TExampleType = class {
+  public
+    MyExample(const A, B: Int32): Int32;
+  };
 
-       TSecondExampleType.MyOtherExample: String; {
-         Result := 'output value';
-       };
+  TSecondExampleType = class(TExampleType) {
+  public
+    MyOtherExample: String;
+  };
+  ...
+   
+TExampleType.MyExample(const A, B: Int32): Int32; {
+  Result := A + B;
+};
+
+TSecondExampleType.MyOtherExample: String; {
+  Result := 'output value';
+};
+```
 9. Class or record methods can be defined as class methods by using prefix 'class:', eg.:
-       TExampleType = class {
-       public
-         class:MyExample(const A, B: Int32): Int32;
-       };
+```
+type
+  TExampleType = class {
+  public
+    class:MyExample(const A, B: Int32): Int32;
+  };
+```
 10. Class or record methods can be defined as inline methods by using suffix ':inline', eg.:
-       TExampleType = class {
-       public
-         MyExample(const A, B: Int32): Int32:inline;
-       };
-11. Const and variable declarations inside method body can be inlined.
-12. Acces to globaly declared types, consts, variables require using prefix 'global:'.
-13. If type, const, variable section defines many globaly accessible definitions, suffix ':global' can be added to such section definition, eg: type:global. But any other section key-word use without such suffix sets the scope to local.
-14. All project and source code files are case-sensitive, meaning that variable 'a' and 'A' are two different declarations.
-15. Some names can have spaces it them, to declare that use quotes ''.
-16. Numbers can be declared with '_' for better readability, eg: 1_000_000.
+```
+type
+  TExampleType = class {
+  public
+    MyExample(const A, B: Int32): Int32:inline;
+  };
+```
+13. Const and variable declarations inside method body can be inlined.
+14. Acces to globaly declared types, consts, variables require using prefix 'global:'.
+15. If type, const, variable section defines many globaly accessible definitions, suffix ':global' can be added to such section definition, eg: type:global. But any other section key-word use without such suffix sets the scope to local.
+16. All project and source code files are case-sensitive, meaning that variable 'a' and 'A' are two different declarations.
+17. Some names can have spaces it them, to declare that use quotes ''.
+18. Numbers can be declared with '_' for better readability, eg: 1_000_000.
