@@ -8,9 +8,15 @@ Project files (extension: '.npp'):
 ```
 project 'Project_name';
 
-// program-type defines what extension will be given to output of compiler, eg.:
-//   if +Windows is defined than extension will be '.exe'
-{$program-type GUI+Windows} or {$program-type CONSOLE+Windows} 
+// program-type defines what type of compilation can be done:
+//   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,
+//   - CONSOLE - means program that outputs to the operating system console (if available),
+// extension will be given to output of compiler, eg.:
+//   if +Windows(32/64) is defined than extension will be '.exe'
+//   if +Linux(32/64) is defined than extension will be '.elf'
+//   if +Android(32/64) id defined than extension will be '.apk'
+// custom extension can be set by declaring {$extension '.ext'}
+{$program-type GUI+Windows32}
 
 {$resources 'Name for resurces'
   {@import 'resurces-file-name'}
@@ -136,14 +142,14 @@ type
     @inline:MyExample(const A, B: Int32): Int32;
   };
 ```
-13. Prefixes can be concatenated together like: @global:@inline:@class:.
-14. Const and variable declarations inside method body can be inlined.
-15. Access to globally declared types, consts, variables require using prefix '@global:'.
-16. If type, const, variable section defines many globally accessible definitions, prefix '@global:' can be added to such section definition, eg: @global:type. But any other section key-word use without such prefix sets the scope back to local.
-17. All project and source code files are case-sensitive, meaning that variable 'a' and 'A' are two different declarations.
-18. Some names can have spaces it them, to declare that use quotes, eg.: 'name with spaces'.
-19. Numbers can be declared with '_' for better readability, eg: 1_000_000.
-20. Procedures/functions are defined without differentiating key-words like in traditional Pascal.
+11. Prefixes can be concatenated together like: @global:@inline:@class:.
+12. Const and variable declarations inside method body can be inlined.
+13. Access to globally declared types, consts, variables require using prefix '@global:'.
+14. If type, const, variable section defines many globally accessible definitions, prefix '@global:' can be added to such section definition, eg: @global:type. But any other section key-word use without such prefix sets the scope back to local.
+15. All project and source code files are case-sensitive, meaning that variable 'a' and 'A' are two different declarations.
+16. Some names can have spaces it them, to declare that use quotes, eg.: 'name with spaces'.
+17. Numbers can be declared with '_' for better readability, eg: 1_000_000.
+18. Procedures/functions are defined without differentiating key-words like in traditional Pascal.
 
 Procedure/function declaration and implementation rules:
 
@@ -171,7 +177,7 @@ MyExample(var C: String) {
   for i :=0 to i_max - 1 {
     C:=C + IntToStr(i) + ' ';
   }
-}
+};
 ```
    b) can be inlined with declaration of instructions to do:
 ```
@@ -183,5 +189,5 @@ MyExample(var C: String) {
   for var i: Int32 := 0 to i_max - 1 {
     C:=C + IntToStr(i) + ' ';
   }
-}
+};
 ```
