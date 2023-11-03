@@ -3,7 +3,7 @@ NewPascal is concept of new programming language based on Pascal. Maybe in futur
 
 ---
 
-Project files (extension: '.npp'):
+### Project files (extension: '.npp'):
 
 ```
 project 'Project_name';
@@ -42,7 +42,7 @@ begin
 end.
 ```
 
-Source code files (extension: '.npc'):
+### Source code files (extension: '.npc'):
 
 ```
 code 'Source_code_name';
@@ -84,7 +84,7 @@ finalization
 end.
 ```
 
-Rules:
+### Language rules:
 
 1. All source code files are local scope oriented, it means that everything that is defined in source code file is containd in its scope.
 2. Any type, const, variable or procedure/function defined can be set to be included in global scope, which means that it can be accessed by other source code files.
@@ -151,7 +151,7 @@ type
 17. Numbers can be declared with '_' for better readability, eg: 1_000_000.
 18. Procedures/functions are defined without differentiating key-words like in traditional Pascal.
 
-Procedure/function declaration and implementation rules:
+### Procedure/function declaration and implementation rules:
 
 1. Procedure/function declaration contains procedure/function name, set of parameters enclosed by '(' and ')', eventual result with type, eg.:
 ```
