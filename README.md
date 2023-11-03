@@ -14,12 +14,12 @@ project 'Project_name';
 // extension will be given to output of compiler, eg.:
 //   if +Windows(32/64) is defined than extension will be '.exe'
 //   if +Linux(32/64) is defined than extension will be '.elf'
-//   if +Android(32/64) id defined than extension will be '.apk'
+//   if +Android(32/64) is defined than extension will be '.apk'
 // custom extension can be set by declaring {$extension '.ext'}
 {$program-type GUI+Windows32}
 
-{$resources 'Name for resurces'
-  {@import 'resurces-file-name'}
+{$resources 'Name for resources section'
+  {@import 'resources-file-name.rc'}
   {@define 'resource-name' type:string:mapping-type:'resurce text'}
   {@define 'resource-name' type:base64:mapping-type:'base64data'}
 }
@@ -47,7 +47,7 @@ end.
 ```Pascal
 code 'Source_code_name';
 
-{$defines 'Name for defines'
+{$defines 'Name for defines section'
   {@condition 'Name for condition' = 'Value for condition'}
   {@if 'compiler_version' == '1.0'
     {@define 'define-name' type:string = 'define value'}
