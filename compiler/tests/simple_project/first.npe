@@ -1,0 +1,25 @@
+﻿project 'First_Test_Project';
+
+// program-type defines what type of compilation can be done:
+//   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,
+//   - CONSOLE - means program that outputs to the operating system console (if available),
+//   - DLL     - dynamically loaded library
+// extension will be given to output of compiler, eg.:
+//   if +Windows(32/64) is defined than extension will be '.exe'
+//   if +Linux(32/64) is defined than extension will be '.elf'
+//   if +Android(32/64) is defined than extension will be '.apk'
+// custom extension can be set by declaring {$extension '.ext'}
+{$program-type GUI+Windows32}
+
+import
+  first_main;
+
+initialization
+  // initialization code
+
+finalization
+  // finalization code
+
+begin
+  // program initialization code
+end.

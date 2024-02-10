@@ -1,0 +1,5 @@
+* text=auto !eol
+*.npe gitlab-language=pascal
+*.npc gitlab-language=pascal
+*.npe diff=pascal
+*.npc diff=pascal

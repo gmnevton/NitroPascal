@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{A877A583-CA01-4428-B2E7-09D1B3CE4931}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="lib\npc_lib.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="app\npc.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="npc_lib">
+        <MSBuild Projects="lib\npc_lib.dproj"/>
+    </Target>
+    <Target Name="npc_lib:Clean">
+        <MSBuild Projects="lib\npc_lib.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="npc_lib:Make">
+        <MSBuild Projects="lib\npc_lib.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="npc">
+        <MSBuild Projects="app\npc.dproj"/>
+    </Target>
+    <Target Name="npc:Clean">
+        <MSBuild Projects="app\npc.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="npc:Make">
+        <MSBuild Projects="app\npc.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="npc_lib;npc"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="npc_lib:Clean;npc:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="npc_lib:Make;npc:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

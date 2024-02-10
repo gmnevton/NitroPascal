@@ -1,16 +1,24 @@
-# NewPascal
-NewPascal is concept of new programming language based on Pascal. Maybe in future there will be a compiler and debugger.
+# NitroPascal
+NitroPascal is a concept of new OOP programming language based on Pascal / Delphi.  
+The goal is to make this lannguage the best Pascal version there is.  
+To eliminate annoying bariers and old habits.  
+To give programmers the freedom to create without doubling down on old schemas.  
+Maybe in the future there will be a compiler and debugger.  
 
 ---
 
-### Project files (extension: '.npp'):
+### Project files (extension: '.npe'):
 
 ```Pascal
-project 'Project_name';
+project 'Project name';
 
+// all project parameters and declarations, switches, compiler output instructions goes right in this file,
+// we don't need project configuration files separated from the project itself.
+//
 // program-type defines what type of compilation can be done:
 //   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,
 //   - CONSOLE - means program that outputs to the operating system console (if available),
+//   - DLL     - dynamically loaded library
 // extension will be given to output of compiler, eg.:
 //   if +Windows(32/64) is defined than extension will be '.exe'
 //   if +Linux(32/64) is defined than extension will be '.elf'
@@ -24,11 +32,11 @@ project 'Project_name';
   {@define 'resource-name' type:base64:mapping-type:'base64data'}
 }
 
-import
+imports
   list-of-source-code-files;
 
 //if it is a dynamic loaded library, specify which source files declare exported code
-export
+exports
   list-of-source-code-files;
 
 initialization

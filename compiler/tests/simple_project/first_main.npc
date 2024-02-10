@@ -1,0 +1,36 @@
+﻿code 'Source_code_name';
+
+{$defines 'Name for defines section'
+  {@condition 'Name for condition' = 'Value for condition'}
+  {@if 'compiler_version' == '1.0'
+    {@define 'define-name' type:string = 'define value'}
+  } else {
+    {@define 'define-name' type:string = 'define value'}
+  }
+}
+
+import;
+
+@global:type
+  TSomeType = predefined-type;
+  TSomeType = class('Ancestor class name');
+  // if there is no '@global:' prefix defined, than the scope of this type is local for the source code file;
+  TSomeType = predefined-type;
+
+const
+  // consts are protected (read only) and can not be modified at any time
+  SomeConst: UInt8 = 123;
+  SomeConst = '';
+
+var
+  // variables are read/write and can be modified at any time
+  SomeVariable: Float = value;
+  SomeVariable = value;
+
+initialization
+  // initialization code
+
+finalization
+  // finalization code
+
+end.
