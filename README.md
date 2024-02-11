@@ -25,41 +25,46 @@ For now there is no external dependencies - but this can change at any time.
 ```Pascal
 project 'Project name';
 
-// all project parameters and declarations, switches, compiler output instructions goes right in this file,
+// all project parameters and declarations, switches, compiler output instructions or directives  
+// goes right in this file.
 // we don't need project configuration files separated from the project itself.
-//
-// program-type defines what type of compilation can be done:
-//   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,
-//   - CONSOLE - means program that outputs to the operating system console (if available),
-//   - DLL     - dynamically loaded library
-// extension will be given to output of compiler, eg.:
-//   if +Windows(32/64) is defined than extension will be '.exe'
-//   if +Linux(32/64) is defined than extension will be '.elf'
-//   if +Android(32/64) is defined than extension will be '.apk'
-// custom extension can be set by declaring {$extension '.ext'}
-{$program-type GUI+Windows32}
+//  
+// program-type directive defines what type of compilation should be done:  
+//   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,  
+//   - CONSOLE - means program that outputs to the operating system console (if available),  
+//   - DLL     - dynamically loaded library  
+// extension will be given to output of compiler, eg.:  
+//   if +Windows(32/64) is defined than extension will be '.exe' or '.dll'  
+//   if +Linux(32/64) is defined than extension will be '.elf' or '.so'  
+//   if +Android(32/64) is defined than extension will be '.apk'  
+// custom extension can be set by declaring {$extension '.ext'}  
+{$program-type GUI+Windows32}  
 
-{$resources 'Name for resources section'
-  {@import 'resources-file-name.rc'}
-  {@define 'resource-name' type:string:mapping-type:'resurce text'}
-  {@define 'resource-name' type:base64:mapping-type:'base64data'}
-}
+{$resources 'Name for resources section'  
+  {@import 'resources-file-name.rc'}  
+  {@define 'resource-name' type:data-type:optional-mapping-type:'resurce text or file'}  
+  {@define 'resource-name' type:string:'resurce text'}  
+  {@define 'resource-name' type:string:base64:'base64data'}  
+}  
 
-imports
-  list-of-source-code-files;
+// this section defines the list of files that must be imported and linked into the output binary  
+// in order to successfully compile the project  
+imports  
+  list-of-source-code-files;  
 
-//if it is a dynamic loaded library, specify which source files declare exported code
-exports
-  list-of-source-code-files;
+// if it is a dynamically loaded library type project, specify which source files declare exported code  
+// every file of this list must contain export directive, otherwise the compiler returns an error  
+exports  
+  list-of-source-code-files;  
 
-initialization
-  // initialization code
+initialization  
+  // initialization code  
 
-finalization
-  // finalization code
+finalization  
+  // finalization code  
 
-begin
-  // program initialization code
+begin  
+  // program initialization code  
 end.
 ```
 
