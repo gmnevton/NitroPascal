@@ -100,6 +100,45 @@ import
   // variables are read/write and can be modified at any time
   [@global:]SomeVariable:type = value;
   SomeVariable = value;
+  
+// some examples of string variable declarations
+var
+  ExampleString1: String = 'One line test string';  
+  ExampleString2: String = 'One line test string with "text in double quotes".';  
+  ExampleString3: String = 'One line test string with \' inside. This example shows that you can escape some characters.';  
+  ExampleString4: String = 'One line test string with\rmultiple lines of text in it, braked by return escape.';  
+
+  ExampleString5: String = 'Multi-line test string.  
+                            This and every other line must start exactly where first line starts.  
+                            To end this string, put \' character where first \' was.  
+                           ';  
+  ExampleString6: String = '  Multi-line test string.  
+                              This shows that text can be indented.
+                              This and every other line must start exactly where first line starts.  
+                              To end this string, put \' character where first \' was.  
+                           ';  
+  ExampleString7: String = '  
+Multi-line test string.  
+This shows that text can be written like this.  
+This and every other line must start exactly where first line starts.  
+To end this string, put \' character where first \' was.  
+';  
+
+  ExampleString8: String = '  
+    Multi-line test string.  
+    This shows that text can be indented and last \' specifies beginning of line and where text ends in the same time.  
+    This and every other line must start exactly where first line starts.  
+    To end this string, put \' character where first \' was.  
+  ';  
+
+  ExampleString9: String = 
+  '  
+      Multi-line test string.  
+      This shows that text can be indented with n-th indent and first \' specifies beginning of line and  
+      last \' must match the beginning of line indicating text end.  
+      This and every other line must start exactly where first line starts.  
+      To end this string, put \' character where first \' was.  
+  ';  
 
 initialization
   // initialization code
