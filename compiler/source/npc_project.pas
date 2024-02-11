@@ -86,6 +86,7 @@ begin
   Project := TNPCProject.Create(AProjectFileName, AProjectOutputPath);
   try
     Result := Project.Compile;
+    Project.Parser.OutputTokens;
     if not Result then
       Project.ReportErrors;
   finally
@@ -134,7 +135,7 @@ begin
   //
   Settings.InputPath := '';
   Settings.OutputPath := '';
-  Settings.ProjectEncoding := Nil;
+//  Settings.ProjectEncoding := Nil;
   Settings.ProjectFormatSettings := Nil;
   Settings.ProjectName := '';
   Settings.ProjectType := [];
@@ -174,8 +175,9 @@ initialization
   gFormatSettings := Nil;
 
 finalization
-  if Assigned(gEncoding) then
-    gEncoding.Free;
+//  gEncoding := Nil;
+//  if Assigned(gEncoding) then
+//    gEncoding.Free;
   gFormatSettings := Nil;
 
 end.

@@ -24,6 +24,7 @@ type
     constructor Create(const AFileName: String; const ARow, ACol: Integer);
     destructor Destroy; override;
     //
+    function Copy: TNPCLocation;
     function ToString: String;
   end;
 
@@ -66,14 +67,48 @@ const
   tokResource  = TNPCTokenType(29); // {$resources ...}
   tokSpecifier = TNPCTokenType(30); // {@...}
 
+  NPCTokensType: Array[0..30] of String = (
+    'end of file',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'literal',
+    'identifier',
+    'number',
+    'string',
+    'comment',
+    'setting',
+    'resource',
+    'specifier'
+  );
+
 type
-  TLiteralToken = record
+  TNPCLiteralToken = record
     Literal: Char;
     TokenType: TNPCTokenType;
   end;
 
 const
-  LiteralTokens: Array[0..20] of TLiteralToken = (
+  NPCLiteralTokens: Array[0..20] of TNPCLiteralToken = (
     (Literal: '(';  TokenType: tokOParen),
     (Literal: ')';  TokenType: tokCParen),
     (Literal: '{';  TokenType: tokOCurly),
@@ -190,6 +225,11 @@ begin
   inherited;
 end;
 
+function TNPCLocation.Copy: TNPCLocation;
+begin
+  Result := TNPCLocation.Create(FileName, Row, Col);
+end;
+
 function TNPCLocation.ToString: String;
 begin
   Result := Format('%s (%d:%d)', [ExtractFileName(FileName), Row, Col]);
@@ -297,7 +337,7 @@ begin
   SetLength(FSource, 0);
   PSource := Nil;
 //  SetLength(FTokens, 0);
-  FEncoding.Free;
+//  FEncoding.Free;
   inherited;
 end;
 
@@ -458,7 +498,7 @@ var
   stemp: String;
   md5: TNPCMD5;
   reserved: Boolean;
-  token: TLiteralToken;
+  token: TNPCLiteralToken;
 begin
   Result := Nil;
   SkipWhitespace;
@@ -484,8 +524,8 @@ begin
     EatChar;
     while IsNotEmpty and (GetChar.IsLetterOrDigit or (Char(cur^) = '_')) do
       EatChar;
-    stemp := LowerCase(TokenString(start, cur));
-    md5 := TokenMD5(stemp);
+    stemp := TokenString(start, cur);
+    md5 := TokenMD5(LowerCase(stemp));
     reserved := TokenIsReserved(md5);
     Result := TNPCToken.Create(tokIdent, loc, reserved, False, stemp, md5);
     stemp := '';
@@ -493,7 +533,7 @@ begin
   end;
 
   if first in ['(', ')', '{', '}', '[', ']', '.', ',', ':', ';', '@', '$', '^', '&', '*', '-', '+', '=', '<', '>', '/'] then begin
-    for token in LiteralTokens do begin
+    for token in NPCLiteralTokens do begin
       if first = token.Literal then begin
         EatChar;
         Result := TNPCToken.Create(token.TokenType, loc, False, True, first, EmptyTokenMD5);

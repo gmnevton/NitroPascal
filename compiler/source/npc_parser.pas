@@ -16,6 +16,11 @@ uses
   npc_reserved_words;
 
 type
+  TNPCSettingType = (
+    setProgram,
+    setResources
+  );
+
   NPCParserException = class(Exception);
 
   TNPCParser = class
@@ -32,6 +37,11 @@ type
     procedure ParseProjectBody;
     procedure ParseSettingDefineCondition;
     procedure ParseSettingOrDefineDirective;
+    procedure ParseSettings(const AToken: TNPCToken; const ASettingType: TNPCSettingType);
+    procedure ParseSettingProgram(const AToken: TNPCToken);
+    procedure ParseSettingProgramType(AToken: TNPCToken);
+    procedure ParseDefines();
+    procedure ParseDirectives();
     procedure ParseComment;
     procedure ParseImports;
     procedure ParseExports;
@@ -44,6 +54,7 @@ type
     destructor Destroy; override;
     //
     procedure ParseProject;
+    procedure OutputTokens;
     //
     property Tokens: TNPCTokens read TokensArray;
   end;
@@ -52,7 +63,8 @@ implementation
 
 uses
   npc_consts,
-  npc_project;
+  npc_project,
+  npc_md5;
 
 { TNPCParser }
 
@@ -65,6 +77,7 @@ end;
 
 destructor TNPCParser.Destroy;
 begin
+  Clear;
   inherited;
 end;
 
@@ -84,7 +97,7 @@ var
 begin
   idx := Length(TokensArray);
   SetLength(TokensArray, idx + 1);
-  TokensArray[idx]:=AToken;
+  TokensArray[idx] := AToken;
 end;
 
 function TNPCParser.TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean;
@@ -142,15 +155,19 @@ var
 begin
   while Lexer.IsNotEmpty do begin
     token := Lexer.NextToken;
-    AddToken(token);
-    if TokenIsReservedSymbol(token, '$') then begin
-      ParseSettingOrDefineDirective;
-    end
-    else if TokenIsReservedSymbol(token, '}') then begin
-      Break;
-    end
-    else
-      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+    try
+      //AddToken(token);
+      if TokenIsReservedSymbol(token, '$') then begin
+        ParseSettingOrDefineDirective;
+      end
+      else if TokenIsReservedSymbol(token, '}') then begin
+        Break;
+      end
+      else
+        raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+    finally
+      token.Free;
+    end;
   end;
 end;
 
@@ -160,63 +177,124 @@ var
 begin
   while Lexer.IsNotEmpty do begin
     token := Lexer.NextToken;
-    AddToken(token);
-    if (token.&Type = tokIdent) and SameText(token.Value, 'program') then begin
-      AddToken(Lexer.ExpectToken([tokMinus]));
-      token := Lexer.ExpectToken([tokIdent]);
-      AddToken(token);
-      if SameText(token.Value, 'type') then begin
-        TNPCProjectSettings(Settings^).ProjectType := [];
-        token := Lexer.ExpectToken([tokIdent]);
-        AddToken(token);
-        if SameText(token.Value, 'GUI') then
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptGUI]
-        else if SameText(token.Value, 'CONSOLE') then
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptCONSOLE]
-        else if SameText(token.Value, 'DLL') then
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptDLL]
-        else
-          raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
-        //
-        AddToken(Lexer.ExpectToken([tokPlus]));
-        token := Lexer.ExpectToken([tokIdent]);
-        AddToken(token);
-        if SameText(token.Value, 'Windows32') then begin
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptWindows];
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt32Bit];
-        end
-        else if SameText(token.Value, 'Windows64') then begin
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptWindows];
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt64Bit];
-        end
-        else if SameText(token.Value, 'Linux32') then begin
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptLinux];
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt32Bit];
-        end
-        else if SameText(token.Value, 'Linux64') then begin
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptLinux];
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt64Bit];
-        end
-        else if SameText(token.Value, 'Android32') then begin
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptAndroid];
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt32Bit];
-        end
-        else if SameText(token.Value, 'Android64') then begin
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptAndroid];
-          TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt64Bit];
-        end
-        else
-          raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+    try
+      if (token.&Type = tokIdent) and SameText(token.Value, 'program') then begin
+        ParseSettings(token, setProgram);
+      end
+      else if TokenIsReservedSymbol(token, '}') then begin
+        Break;
       end
       else
         raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
-    end
-    else if TokenIsReservedSymbol(token, '}') then begin
-      Break;
+    finally
+      token.Free;
+    end;
+  end;
+end;
+
+procedure TNPCParser.ParseSettings(const AToken: TNPCToken; const ASettingType: TNPCSettingType);
+begin
+  case ASettingType of
+    setProgram: ParseSettingProgram(AToken);
+    setResources: ;
+  end;
+end;
+
+procedure TNPCParser.ParseSettingProgram(const AToken: TNPCToken);
+var
+  token: TNPCToken;
+begin
+  Lexer.ExpectToken([tokMinus]).Free;
+  token := Lexer.NextToken;
+  try
+    if (token.&Type = tokIdent) and SameText(token.Value, 'type') then begin
+      ParseSettingProgramType(AToken);
     end
     else
-      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [AToken.Location.ToString, AToken.Value + '-' + token.Value]);
+  finally
+    token.Free;
   end;
+end;
+
+procedure TNPCParser.ParseSettingProgramType(AToken: TNPCToken);
+var
+  token: TNPCToken;
+  stemp: String;
+begin
+  Assert(Assigned(AToken), 'no token passed');
+  TNPCProjectSettings(Settings^).ProjectType := [];
+  AddToken(TNPCToken.Create(tokSetting, AToken.Location.Copy, False, False, '$program-type', EmptyTokenMD5));
+  stemp := '';
+  //
+  token := Lexer.ExpectToken([tokIdent]);
+  AToken := token;
+  try
+    if SameText(token.Value, 'GUI') then
+      TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptGUI]
+    else if SameText(token.Value, 'CONSOLE') then
+      TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptCONSOLE]
+    else if SameText(token.Value, 'DLL') then
+      TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptDLL]
+    else
+      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+    stemp := stemp + token.Value;
+    //
+    Lexer.ExpectToken([tokPlus]).Free;
+    stemp := stemp + '+';
+    token := Lexer.ExpectToken([tokIdent]);
+    try
+      if SameText(token.Value, 'Windows32') then
+      begin
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptWindows];
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt32Bit];
+      end
+      else if SameText(token.Value, 'Windows64') then
+      begin
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptWindows];
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt64Bit];
+      end
+      else if SameText(token.Value, 'Linux32') then
+      begin
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptLinux];
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt32Bit];
+      end
+      else if SameText(token.Value, 'Linux64') then
+      begin
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptLinux];
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt64Bit];
+      end
+      else if SameText(token.Value, 'Android32') then
+      begin
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptAndroid];
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt32Bit];
+      end
+      else if SameText(token.Value, 'Android64') then
+      begin
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptAndroid];
+        TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt64Bit];
+      end
+      else
+        raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+      stemp := stemp + token.Value;
+    finally
+      token.Free;
+    end;
+    AddToken(TNPCToken.Create(tokIdent, AToken.Location.Copy, False, False, stemp, EmptyTokenMD5));
+    stemp := '';
+  finally
+    AToken.Free;
+  end;
+end;
+
+procedure TNPCParser.ParseDefines;
+begin
+
+end;
+
+procedure TNPCParser.ParseDirectives;
+begin
+
 end;
 
 procedure TNPCParser.ParseComment;
@@ -292,6 +370,30 @@ begin
   // go collect the rest of the project body
   //
   ParseProjectBody;
+end;
+
+procedure TNPCParser.OutputTokens;
+var
+  i: Integer;
+  tf: TStreamWriter;
+  token: TNPCToken;
+begin
+  try
+    tf := TStreamWriter.Create(TNPCProjectSettings(Settings^).ProjectName + '.tokens', False, TEncoding.UTF8, 32768);
+    try
+      tf.BaseStream.Position := 0;
+      tf.BaseStream.Size := 0;
+      //
+      for i:=0 to Length(TokensArray) - 1 do begin
+        token := TokensArray[i];
+        if Assigned(token) then
+          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"', [ExtractFileName(token.Location.FileName), token.Location.Row, token.Location.Col, NPCTokensType[Ord(token.&Type)], token.Value ]));
+      end;
+    finally
+      tf.Free;
+    end;
+  except
+  end;
 end;
 
 end.
