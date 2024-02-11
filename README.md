@@ -1,9 +1,13 @@
 # NitroPascal
-NitroPascal is a concept of new OOP programming language based on Pascal / Delphi.  
-The goal is to make this lannguage the best Pascal version there is.  
-To eliminate annoying bariers and old habits.  
-To give programmers the freedom to create without doubling down on old schemas.  
-Maybe in the future there will be a compiler and debugger.  
+NitroPascal is a concept of new OOP programming language based on Pascal / Delphi.
+
+The goal is to make this lannguage the best Pascal version there is.
+Because we believe that a programing language is only as good as the experience of writing it.
+To eliminate annoying bariers and old habits.
+To give programmers the freedom to create without doubling down on old schemas.
+And produce blazingly fast compiler with in memory compile and execution feature.
+
+Maybe in the future there will be a compiler and debugger.
 
 ---
 
