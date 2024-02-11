@@ -14,7 +14,7 @@ Maybe in the future there will be a compiler and debugger.
 ## About compiler
 
 >> 2024-02-10  
-This is "work in progres" type repo for the time being.  
+This is "work in progress" type repo for the time being.  
 All projects are made using Delphi 10.2.3.  
 For now there is no external dependencies - but this can change at any time.  
 
