@@ -68,7 +68,7 @@ begin
       total_time := total_time + 3600.0 * 24;
     if Round(Frac(Total_time) * 1000) >= 1000 then
       total_time := Trunc(total_time) + 1;
-    Writeln(Format('Total time: %d:%d.%.3d ms', [Trunc(total_time) div 60, Trunc(total_time) mod 60, Round(Frac(total_time) * 1000)]));
+    Writeln(Format('Total time (m:s.ms): %d:%d.%.3d', [Trunc(total_time) div 60, Trunc(total_time) mod 60, Round(Frac(total_time) * 1000)]));
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);

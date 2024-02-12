@@ -16,7 +16,7 @@ Maybe in the future there will be a compiler and debugger.
 >> 2024-02-10  
 This is "work in progress" type repo for the time being.  
 All projects are made using Delphi 10.2.3.  
-Project uses madExcept to track bugs and memory leaks.
+Project uses madExcept to track bugs and memory leaks.  
 For now there is no other external dependencies - but this can change at any time.  
 
 ---
