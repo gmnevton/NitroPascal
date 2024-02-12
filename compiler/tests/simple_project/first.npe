@@ -11,7 +11,7 @@
 // custom extension can be set by declaring {$extension '.ext'}
 {$program-type GUI+Windows32}
 
-import
+imports
   first_main;
 
 initialization

@@ -12,27 +12,14 @@ uses
   Windows,
   npc_lexer,
   npc_parser,
-  npc_project;
+  npc_project,
+  npc_utils;
 
 var
   input_path: String;
   output_path: String;
   start_time: Real;
   total_time: Real;
-
-function getRealTime: Real;
-var
-  st: TSystemTime;
-begin
-  GetLocalTime(st); // get local system time
-  // in st struct there is:
-  // .wHour   - actual hour; not used by us, but needed in case of hour change
-  // .wMinute - actual minute
-  // .wSecond - actual second
-  // .wMilliseconds - how many milisecond in a second there was
-  // now we make sum of it, where whole side of the real number is seconds and fractional side is miliseconds
-  Result := st.wHour * 3600.0 + st.wMinute * 60.0 + st.wSecond + (st.wMilliseconds / 1000.0);
-end;
 
 begin
   try
@@ -68,6 +55,7 @@ begin
       total_time := total_time + 3600.0 * 24;
     if Round(Frac(Total_time) * 1000) >= 1000 then
       total_time := Trunc(total_time) + 1;
+    Writeln;
     Writeln(Format('Total time (m:s.ms): %d:%d.%.3d', [Trunc(total_time) div 60, Trunc(total_time) mod 60, Round(Frac(total_time) * 1000)]));
   except
     on E: Exception do
