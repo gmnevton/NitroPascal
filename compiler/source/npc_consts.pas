@@ -13,15 +13,18 @@ uses
   Types;
 
 const
+  sErrorBase = '%s: %s';
+  sErrorBaseEx = '%s - %s: %s';
+
   sLexerStreamNotSpecified = 'Stream not specified while trying to read from file "%s".';
-  sLexerError = '%s - LexerError: %s';
+  sLexerStreamNotSpecifiedStream = 'Stream not specified while trying to read from stream.';
 
-  sParserErrorBase = '%s - ParserError: ';
-  sParserError = sParserErrorBase + '%s';
-  sParserUnexpectedTokenInProject = sParserErrorBase + 'unexpected token "%s" in project file';
-  sParserUnexpectedType = sParserErrorBase + 'unexpected type "%s", expected "%s"';
+  sParserUnexpectedTokenInProject = 'unexpected token "%s" in project file';
+  sParserUnexpectedType           = 'unexpected type "%s", expected "%s"';
+  sParserSectionHasNoBody         = '"%s" section has no body';
 
-  sProjectError = '%s - Error(%s): %s';
+  sProjectError = '%s - ProjectError(%s): %s';
+
 
 function ArrayOfCharToArrayOfString(const Values: Array of Char): TStringDynArray;
 

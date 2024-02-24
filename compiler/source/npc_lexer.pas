@@ -12,22 +12,11 @@ interface
 uses
   SysUtils,
   Classes,
-  npc_md5;
+  npc_md5,
+  npc_location,
+  npc_error;
 
 type
-  TNPCLocation = class
-  public
-    FileName: String;
-    Row: Integer;
-    Col: Integer;
-    //
-    constructor Create(const AFileName: String; const ARow, ACol: Integer);
-    destructor Destroy; override;
-    //
-    function Copy: TNPCLocation;
-    function ToString: String;
-  end;
-
   TNPCTokenType = Char;
 
 const
@@ -152,7 +141,7 @@ type
 
   TNPCTokens = Array of TNPCToken;
 
-  NPCLexerException = class(Exception);
+  NPCLexerException = class(TNPCError);
 
   TNPCLexer = class
   private
@@ -190,6 +179,8 @@ type
     constructor Create(const AStream: TStringStream; const AFileName: String; const AEncoding: TEncoding); overload;
     constructor Create(const AStream: TStringStream; const AFileName: String; const AFormatSettings: TFormatSettings); overload;
     constructor Create(const AStream: TStringStream; const AFileName: String; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload;
+    constructor Create(const AStream: TMemoryStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload;
+    constructor Create(const AStream: TStringStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload;
     destructor Destroy; override;
     //
     function IsNotEmpty: Boolean; inline;
@@ -209,31 +200,6 @@ uses
   Hash,
   npc_consts,
   npc_reserved_words;
-
-{ TNPCLocation }
-
-constructor TNPCLocation.Create(const AFileName: String; const ARow, ACol: Integer);
-begin
-  FileName := AFileName;
-  Row := ARow;
-  Col := ACol;
-end;
-
-destructor TNPCLocation.Destroy;
-begin
-  FileName := '';
-  inherited;
-end;
-
-function TNPCLocation.Copy: TNPCLocation;
-begin
-  Result := TNPCLocation.Create(FileName, Row, Col);
-end;
-
-function TNPCLocation.ToString: String;
-begin
-  Result := Format('%s (%d:%d)', [ExtractFileName(FileName), Row, Col]);
-end;
 
 { TNPCToken }
 
@@ -319,6 +285,45 @@ begin
   //
   if AStream = Nil then
     raise Exception.CreateFmt(sLexerStreamNotSpecified, [FFileName]);
+  //
+  FSource := Copy(AStream.Bytes, 0, AStream.Size);
+  PSource := PByte(FSource);
+  FLines := 1;
+//  SetLength(FTokens, 0);
+  cur := PSource;
+  bol := PSource;
+  row := 1;
+  //
+  SkipPreamble;
+end;
+
+constructor TNPCLexer.Create(const AStream: TMemoryStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding);
+var
+  reader: TStringStream;
+begin
+  reader := TStringStream.Create('', AEncoding);
+  try
+    reader.LoadFromStream(AStream);
+    reader.Position := 0;
+    AStream.Clear;
+    //
+    Create(reader, AFormatSettings, AEncoding);
+  finally
+    reader.Free;
+  end;
+end;
+
+constructor TNPCLexer.Create(const AStream: TStringStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding);
+begin
+  FFileName := '';
+  FFormatSettings := AFormatSettings;
+  if AEncoding = Nil then
+    FEncoding := TEncoding.UTF8
+  else
+    FEncoding := AEncoding;
+  //
+  if AStream = Nil then
+    raise Exception.Create(sLexerStreamNotSpecifiedStream);
   //
   FSource := Copy(AStream.Bytes, 0, AStream.Size);
   PSource := PByte(FSource);
@@ -553,7 +558,7 @@ begin
         '\': begin // escaping string
           EatChar;
           if IsEmpty then
-            raise NPCLexerException.CreateFmt(sLexerError, [loc.ToString, 'unfinished escape sequence']);
+            raise NPCLexerException.LexerError(loc, 'unfinished escape sequence');
 
           escape := GetChar;
           case escape of
@@ -570,7 +575,7 @@ begin
               EatChar;
             end;
           else
-            raise NPCLexerException.CreateFmt(sLexerError, [loc.ToString, 'unknown escape sequence starts with \' + escape]);
+            raise NPCLexerException.LexerError(loc, 'unknown escape sequence starts with \' + escape);
           end;
         end;
       else
@@ -586,7 +591,7 @@ begin
       Exit;
     end
     else
-      raise NPCLexerException.CreateFmt(sLexerError, [loc.ToString, Format('unclosed string literal "%s"', [stemp])]);
+      raise NPCLexerException.LexerError(loc, Format('unclosed string literal "%s"', [stemp]));
   end;
 
   if first.IsNumber then begin
@@ -600,7 +605,7 @@ begin
     Exit;
   end;
 
-  raise NPCLexerException.CreateFmt(sLexerError, [loc.ToString, Format('unknown token starts with "%s"', [first])]);
+  raise NPCLexerException.LexerError(loc, Format('unknown token starts with "%s"', [first]));
 end;
 
 function TNPCLexer.ExpectToken(const ATokens: Array of TNPCTokenType): TNPCToken;
@@ -609,7 +614,7 @@ var
 begin
   Result := NextToken;
   if Result = Nil then begin
-    raise NPCLexerException.CreateFmt(sLexerError, [Location.ToString, Format('expected "%s" but got end of file', [String.Join(' or ', ArrayOfCharToArrayOfString(ATokens))])]);
+    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join(' or ', ArrayOfCharToArrayOfString(ATokens))]));
   end;
 
   for token in ATokens do begin
@@ -617,7 +622,7 @@ begin
       Exit;
   end;
 
-  raise NPCLexerException.CreateFmt(sLexerError, [Location.ToString, Format('expected "%s" but got "%s"', [String.Join(' or ', ArrayOfCharToArrayOfString(ATokens)), Result.&Type])]);
+  raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [String.Join(' or ', ArrayOfCharToArrayOfString(ATokens)), Result.&Type]));
 end;
 
 function TNPCLexer.Lines: Integer;

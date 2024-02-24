@@ -13,7 +13,9 @@ uses
   SysUtils,
   Classes,
   npc_lexer,
-  npc_reserved_words;
+  npc_reserved_words,
+  npc_utils,
+  npc_error;
 
 type
   TNPCSettingType = (
@@ -21,16 +23,28 @@ type
     setResources
   );
 
-  NPCParserException = class(Exception);
+  TNPCImportType = (itCode, itExternalObject, itDLL);
+
+  TNPCImport = packed record
+    &Type: TNPCImportType;
+    Name: String;
+    Path: String;
+    Resolved: Boolean;
+  end;
+  TNPCImportArray = Array of TNPCImport;
+
+  NPCParserException = class(TNPCError);
 
   TNPCParser = class
   private
     Lexer: TNPCLexer;
     Settings: Pointer;
     TokensArray: TNPCTokens;
+    Imports: TNPCImportArray;
   protected
     procedure Clear;
     procedure AddToken(const AToken: TNPCToken);
+    procedure AddImport(const AImportType: TNPCImportType; const AImportName: String; const AImportPath: String);
     function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean;
     function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: Char): Boolean;
     //
@@ -54,6 +68,10 @@ type
     destructor Destroy; override;
     //
     procedure ParseProject;
+    procedure ParseImportFile(const ASourceFile: String); overload;
+    procedure ParseImportFile(const ASourceFile: TStringStream); overload;
+    procedure ParseSourceCode(const ASourceCode: String); overload;
+    procedure ParseSourceCode(const ASourceCode: TStringStream); overload;
     procedure OutputTokens;
     //
     property Tokens: TNPCTokens read TokensArray;
@@ -65,8 +83,7 @@ uses
   StrUtils,
   npc_consts,
   npc_project,
-  npc_md5,
-  npc_utils;
+  npc_md5;
 
 { TNPCParser }
 
@@ -75,10 +92,14 @@ begin
   Lexer := ALexer;
   Settings := PSettings;
   SetLength(TokensArray, 0);
+  //Imports := TFastStringList.Create;
+  SetLength(Imports, 0);
 end;
 
 destructor TNPCParser.Destroy;
 begin
+//  Imports.Clear;
+//  Imports.Free;
   Clear;
   inherited;
 end;
@@ -91,6 +112,14 @@ begin
     FreeAndNil(TokensArray[i]);
   //
   SetLength(TokensArray, 0);
+  //
+  //
+  for i:=0 to High(Imports) do begin
+    Imports[i].Name := '';
+    Imports[i].Path := '';
+  end;
+  //
+  SetLength(Imports, 0);
 end;
 
 procedure TNPCParser.AddToken(const AToken: TNPCToken);
@@ -100,6 +129,18 @@ begin
   idx := Length(TokensArray);
   SetLength(TokensArray, idx + 1);
   TokensArray[idx] := AToken;
+end;
+
+procedure TNPCParser.AddImport(const AImportType: TNPCImportType; const AImportName, AImportPath: String);
+var
+  idx: Integer;
+begin
+  idx := Length(Imports);
+  SetLength(Imports, idx + 1);
+  Imports[idx].&Type := AImportType;
+  Imports[idx].Name := AImportName;
+  Imports[idx].Path := AImportPath;
+  Imports[idx].Resolved := False;
 end;
 
 function TNPCParser.TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean;
@@ -123,7 +164,7 @@ begin
       if Lexer.IsCurrentSymbol('$') then
         ParseSettingDefineCondition
       else if Lexer.IsCurrentSymbol('@') then
-        raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value])
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]))
       else
         ParseComment;
     end
@@ -147,7 +188,7 @@ begin
       Break;
     end
     else
-      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
   end;
 end;
 
@@ -170,7 +211,7 @@ begin
         Break;
       end
       else
-        raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
     finally
       if free_token then
         token.Free;
@@ -193,7 +234,7 @@ begin
 //        Break;
 //      end
       else
-        raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
     finally
       token.Free;
     end;
@@ -219,7 +260,7 @@ begin
       ParseSettingProgramType(AToken);
     end
     else
-      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [AToken.Location.ToString, AToken.Value + '-' + token.Value]);
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
   finally
     token.Free;
   end;
@@ -245,7 +286,7 @@ begin
     else if SameText(token.Value, 'DLL') then
       TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [ptDLL]
     else
-      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
     stemp := stemp + token.Value;
     //
     Lexer.ExpectToken([tokPlus]).Free;
@@ -283,7 +324,7 @@ begin
         TNPCProjectSettings(Settings^).ProjectType := TNPCProjectSettings(Settings^).ProjectType + [pt64Bit];
       end
       else
-        raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
       stemp := stemp + token.Value;
     finally
       token.Free;
@@ -324,7 +365,7 @@ begin
       ParseImports;
     end
     else
-      raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
   end;
 end;
 
@@ -347,6 +388,7 @@ begin
       else if (token.&Type = tokIdent) or (token.&Type = tokString) then begin
         if FileExists(path + IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value)) then begin
           AddToken(token);
+          AddImport(itCode, token.Value, path);
           //ConsoleWriteln('Target project type: ' + stemp);
           ConsoleWriteln('Import_____________: "' + token.Value + '"');
         end
@@ -355,7 +397,7 @@ begin
          //TNPCProjectSettings(Settings^).ProjectName := token.Value;
       end
       else
-        raise NPCParserException.CreateFmt(sParserUnexpectedTokenInProject, [token.Location.ToString, token.Value]);
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
     end;
   finally
     path := '';
@@ -368,13 +410,63 @@ begin
 end;
 
 procedure TNPCParser.ParseInitialization;
+var
+  token: TNPCToken;
+  has_body: Boolean;
 begin
+  has_body := False;
+  while Lexer.IsNotEmpty do begin
+    token := Lexer.NextToken;
+    if TokenIsReservedSymbol(token, ',') then begin
+      AddToken(token);
+    end
+    else if TokenIsReservedSymbol(token, ';') then begin
+      AddToken(token);
+      Break;
+    end
+    else if token.&Type in [tokIdent..tokString] then begin
+      if TokenIsReservedIdent(token, ri_finalization) or TokenIsReservedIdent(token, ri_begin) then begin
+        if not has_body then
+          raise NPCParserException.ParserError(token.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_initialization].Ident]));
+        Break;
+      end;
+      // add initialization section body
+      has_body := True;
 
+    end
+    else
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
+  end;
 end;
 
 procedure TNPCParser.ParseFinalization;
+var
+  token: TNPCToken;
+  has_body: Boolean;
 begin
+  has_body := False;
+  while Lexer.IsNotEmpty do begin
+    token := Lexer.NextToken;
+    if TokenIsReservedSymbol(token, ',') then begin
+      AddToken(token);
+    end
+    else if TokenIsReservedSymbol(token, ';') then begin
+      AddToken(token);
+      Break;
+    end
+    else if token.&Type in [tokIdent..tokString] then begin
+      if TokenIsReservedIdent(token, ri_begin) then begin
+        if not has_body then
+          raise NPCParserException.ParserError(token.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_finalization].Ident]));
+        Break;
+      end;
+      // add finalization section body
+      has_body := True;
 
+    end
+    else
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
+  end;
 end;
 
 procedure TNPCParser.ParseBegin;
@@ -395,7 +487,7 @@ begin
   token := Lexer.ExpectToken([tokIdent]);
   if not TokenIsReservedIdent(token, ri_project) then begin
     token.Free;
-    raise NPCParserException.CreateFmt(sParserUnexpectedType, [token.Location.ToString, token.Value, NPCReservedIdentifiers[ri_project].Ident]);
+    raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedType, [token.Value, NPCReservedIdentifiers[ri_project].Ident]));
   end;
   //
   // ok we are inside project file
@@ -413,6 +505,26 @@ begin
   // go collect the rest of the project body
   //
   ParseProjectBody;
+end;
+
+procedure TNPCParser.ParseImportFile(const ASourceFile: String);
+begin
+
+end;
+
+procedure TNPCParser.ParseImportFile(const ASourceFile: TStringStream);
+begin
+
+end;
+
+procedure TNPCParser.ParseSourceCode(const ASourceCode: String);
+begin
+
+end;
+
+procedure TNPCParser.ParseSourceCode(const ASourceCode: TStringStream);
+begin
+
 end;
 
 procedure TNPCParser.OutputTokens;

@@ -44,12 +44,12 @@ begin
         output_path := '';
     end;
     //
-    start_time := getRealTime;
+    start_time := getTime;
     //
     if not NPC_CompileProject(PChar(input_path), PChar(output_path)) then
       Writeln(NPC_ReportErrors);
     //
-    total_time := getRealTime - start_time;
+    total_time := getTime - start_time;
     //Writeln(total_time:0:8);
     if total_time < 0 then // if hour changed from 23 to less than that
       total_time := total_time + 3600.0 * 24;

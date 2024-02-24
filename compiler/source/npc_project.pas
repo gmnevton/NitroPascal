@@ -24,6 +24,8 @@ type
   TNPCProjectSettings = packed record
     InputPath: String;
     OutputPath: String;
+    //InputStream: TMemoryStream;
+    OutputStream: TMemoryStream;
     //
     ProjectEncoding: TEncoding;
     ProjectFormatSettings: PFormatSettings;
@@ -45,6 +47,7 @@ type
   public
     constructor Create(const AInputPath, AOutputPath: String); overload;
     constructor Create(const AInputPath, AOutputPath: String; AEncoding: TEncoding; AFormatSettings: PFormatSettings); overload;
+    constructor Create(const AInput, AOutput: TMemoryStream; AEncoding: TEncoding; AFormatSettings: PFormatSettings); overload;
     destructor Destroy; override;
     //
     function Compile: Boolean;
@@ -115,6 +118,8 @@ begin
   //
   Settings.InputPath := AInputPath;
   Settings.OutputPath := AOutputPath;
+//  Settings.InputStream := Nil;
+  Settings.OutputStream := Nil;
   Settings.ProjectEncoding := AEncoding;
   Settings.ProjectFormatSettings := AFormatSettings;
   Settings.ProjectName := '';
@@ -124,6 +129,35 @@ begin
   Errors := TStringList.Create;
   //
   Lexer := TNPCLexer.Create(AInputPath, AFormatSettings^, AEncoding);
+  Parser := TNPCParser.Create(Lexer, @Settings);
+end;
+
+constructor TNPCProject.Create(const AInput, AOutput: TMemoryStream; AEncoding: TEncoding; AFormatSettings: PFormatSettings);
+begin
+  if AEncoding = Nil then
+    if gEncoding <> Nil then
+      AEncoding := gEncoding
+    else
+      AEncoding := TEncoding.UTF8;
+  if AFormatSettings = Nil then
+    if gFormatSettings <> Nil then
+      AFormatSettings := @gFormatSettings
+    else
+      AFormatSettings := @FormatSettings;
+  //
+  Settings.InputPath := '';
+  Settings.OutputPath := '';
+//  Settings.InputStream := AInput;
+  Settings.OutputStream := AOutput;
+  Settings.ProjectEncoding := AEncoding;
+  Settings.ProjectFormatSettings := AFormatSettings;
+  Settings.ProjectName := '';
+  Settings.ProjectType := [];
+  Settings.ProjectExtension := '';
+  //
+  Errors := TStringList.Create;
+  //
+  Lexer := TNPCLexer.Create(AInput, AFormatSettings^, AEncoding);
   Parser := TNPCParser.Create(Lexer, @Settings);
 end;
 
@@ -166,7 +200,7 @@ end;
 
 procedure TNPCProject.ReportErrors;
 begin
-  gReportedErrors := Errors.Text;
+  gReportedErrors := #13#10 + Trim(Errors.Text);
   Errors.Clear;
 end;
 
