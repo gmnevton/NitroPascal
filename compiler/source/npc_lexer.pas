@@ -132,6 +132,11 @@ type
     Location: TNPCLocation;
     ReservedWord: Boolean;
     ReservedSymbol: Boolean;
+//    i32Value: Integer;
+//    i64Value: Int64;
+//    f32Value: Single;
+//    f64Value: Double;
+//    number_flags: Word; // 16 bits
     Value: String;
     ValueHash: TNPCMD5;
     //
@@ -382,7 +387,7 @@ end;
 
 procedure TNPCLexer.SkipWhitespace;
 begin
-  while IsNotEmpty and (cur^ in [32, 9, 11, 12, $A0]) do // SPACE, TAB, LINE-TAB, FF, NBSP
+  while IsNotEmpty and (cur^ in [32, 9, 11, 12, $A0]) do // SPACE, TAB, LINE-TAB, FormFeed, NBSP
     Inc(cur);
 end;
 
@@ -529,6 +534,7 @@ begin
     EatChar;
     while IsNotEmpty and (GetChar.IsLetterOrDigit or (Char(cur^) = '_')) do
       EatChar;
+    loc.SetEndRowCol(row, cur - bol + 1);
     stemp := TokenString(start, cur);
     md5 := TokenMD5(LowerCase(stemp));
     reserved := TokenIsReserved(md5);
@@ -583,6 +589,7 @@ begin
         EatChar;
       end;
     end;
+    loc.SetEndRowCol(row, cur - bol + 1);
 
     if IsNotEmpty then begin
       EatChar;
@@ -594,11 +601,12 @@ begin
       raise NPCLexerException.LexerError(loc, Format('unclosed string literal "%s"', [stemp]));
   end;
 
-  if first.IsNumber then begin
+  if first.IsNumber then begin // 1234567890; 12345.67890; 0x12345678; 123_456_789; 0x12_34_56_78; 12_345.67890
     start := cur;
     EatChar;
-    while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_')) do
+    while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_') or (Char(cur^) = 'x')) do
       EatChar;
+    loc.SetEndRowCol(row, cur - bol + 1);
     stemp := TokenString(start, cur);
     Result := TNPCToken.Create(tokNumber, loc, False, False, stemp, EmptyTokenMD5);
     stemp := '';

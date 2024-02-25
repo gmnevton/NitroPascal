@@ -18,14 +18,17 @@ type
   public
     FilePath: String;
     FileName: String;
-    Row: Integer;
-    Col: Integer;
+    StartRow: Integer;
+    StartCol: Integer;
+    EndRow: Integer;
+    EndCol: Integer;
     //
     constructor Create(const AFileName: String; const ARow, ACol: Integer);
     destructor Destroy; override;
     //
-    function Copy: TNPCLocation;
-    function ToString: String;
+    procedure SetEndRowCol(const AEndRow, AEndCol: Integer); inline;
+    function Copy: TNPCLocation; inline;
+    function ToString: String; inline;
   end;
 
 implementation
@@ -36,8 +39,10 @@ constructor TNPCLocation.Create(const AFileName: String; const ARow, ACol: Integ
 begin
   FilePath := ExtractFilePath(AFileName);
   FileName := ExtractFileName(AFileName);
-  Row := ARow;
-  Col := ACol;
+  StartRow := ARow;
+  StartCol := ACol;
+  EndRow   := ARow;
+  EndCol   := -1;
 end;
 
 destructor TNPCLocation.Destroy;
@@ -46,14 +51,22 @@ begin
   inherited;
 end;
 
+procedure TNPCLocation.SetEndRowCol(const AEndRow, AEndCol: Integer);
+begin
+  EndRow := AEndRow;
+  EndCol := AEndCol;
+end;
+
 function TNPCLocation.Copy: TNPCLocation;
 begin
-  Result := TNPCLocation.Create(FilePath + FileName, Row, Col);
+  Result := TNPCLocation.Create(FilePath + FileName, StartRow, StartCol);
+  Result.EndRow := Self.EndRow;
+  Result.EndCol := Self.EndCol;
 end;
 
 function TNPCLocation.ToString: String;
 begin
-  Result := Format('%s (%d:%d)', [FileName, Row, Col]);
+  Result := Format('%s (%d:%d)', [FileName, StartRow, StartCol]);
 end;
 
 end.

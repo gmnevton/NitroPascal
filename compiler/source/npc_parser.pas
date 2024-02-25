@@ -57,12 +57,12 @@ type
     procedure ParseDefines();
     procedure ParseDirectives();
     procedure ParseComment;
-    procedure ParseImports;
-    procedure ParseExports;
-    procedure ParseInitialization;
-    procedure ParseFinalization;
-    procedure ParseBegin;
-    procedure ParseEnd;
+    procedure ParseImports(const AToken: TNPCToken);
+    procedure ParseExports(const AToken: TNPCToken);
+    procedure ParseInitialization(const AToken: TNPCToken);
+    procedure ParseFinalization(const AToken: TNPCToken);
+    procedure ParseBegin(const AToken: TNPCToken);
+    procedure ParseEnd(const AToken: TNPCToken);
   public
     constructor Create(const ALexer: TNPCLexer; const PSettings: Pointer);
     destructor Destroy; override;
@@ -83,7 +83,8 @@ uses
   StrUtils,
   npc_consts,
   npc_project,
-  npc_md5;
+  npc_md5,
+  npc_types;
 
 { TNPCParser }
 
@@ -169,22 +170,22 @@ begin
         ParseComment;
     end
     else if TokenIsReservedIdent(token, ri_imports) then begin
-      ParseImports;
+      ParseImports(token);
     end
     else if TokenIsReservedIdent(token, ri_exports) then begin
-      ParseExports;
+      ParseExports(token);
     end
     else if TokenIsReservedIdent(token, ri_initialization) then begin
-      ParseInitialization;
+      ParseInitialization(token);
     end
     else if TokenIsReservedIdent(token, ri_finalization) then begin
-      ParseFinalization;
+      ParseFinalization(token);
     end
     else if TokenIsReservedIdent(token, ri_begin) then begin
-      ParseBegin;
+      ParseBegin(token);
     end
     else if TokenIsReservedIdent(token, ri_end) then begin
-      ParseEnd;
+      ParseEnd(token);
       Break;
     end
     else
@@ -362,14 +363,14 @@ begin
       Break;
     end
     else if TokenIsReservedIdent(token, ri_imports) then begin
-      ParseImports;
+      ParseImports(token);
     end
     else
       raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
   end;
 end;
 
-procedure TNPCParser.ParseImports;
+procedure TNPCParser.ParseImports(const AToken: TNPCToken);
 var
   token: TNPCToken;
   path: String;
@@ -404,12 +405,12 @@ begin
   end;
 end;
 
-procedure TNPCParser.ParseExports;
+procedure TNPCParser.ParseExports(const AToken: TNPCToken);
 begin
 
 end;
 
-procedure TNPCParser.ParseInitialization;
+procedure TNPCParser.ParseInitialization(const AToken: TNPCToken);
 var
   token: TNPCToken;
   has_body: Boolean;
@@ -427,7 +428,7 @@ begin
     else if token.&Type in [tokIdent..tokString] then begin
       if TokenIsReservedIdent(token, ri_finalization) or TokenIsReservedIdent(token, ri_begin) then begin
         if not has_body then
-          raise NPCParserException.ParserError(token.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_initialization].Ident]));
+          raise NPCParserException.ParserError(AToken.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_initialization].Ident]));
         Break;
       end;
       // add initialization section body
@@ -439,7 +440,7 @@ begin
   end;
 end;
 
-procedure TNPCParser.ParseFinalization;
+procedure TNPCParser.ParseFinalization(const AToken: TNPCToken);
 var
   token: TNPCToken;
   has_body: Boolean;
@@ -457,7 +458,7 @@ begin
     else if token.&Type in [tokIdent..tokString] then begin
       if TokenIsReservedIdent(token, ri_begin) then begin
         if not has_body then
-          raise NPCParserException.ParserError(token.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_finalization].Ident]));
+          raise NPCParserException.ParserError(AToken.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_finalization].Ident]));
         Break;
       end;
       // add finalization section body
@@ -469,12 +470,12 @@ begin
   end;
 end;
 
-procedure TNPCParser.ParseBegin;
+procedure TNPCParser.ParseBegin(const AToken: TNPCToken);
 begin
 
 end;
 
-procedure TNPCParser.ParseEnd;
+procedure TNPCParser.ParseEnd(const AToken: TNPCToken);
 begin
   AddToken(Lexer.ExpectToken([tokDot]));
   AddToken(Lexer.NextToken);
@@ -542,7 +543,7 @@ begin
       for i:=0 to Length(TokensArray) - 1 do begin
         token := TokensArray[i];
         if Assigned(token) then
-          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"', [ExtractFileName(token.Location.FileName), token.Location.Row, token.Location.Col, NPCTokensType[Ord(token.&Type)], token.Value ]));
+          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"', [token.Location.FileName, token.Location.StartRow, token.Location.StartCol, NPCTokensType[Ord(token.&Type)], token.Value]));
       end;
     finally
       tf.Free;

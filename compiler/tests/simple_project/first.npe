@@ -14,12 +14,12 @@
 imports
   first_main;
 
-//initialization
+initialization
   // initialization code
 
-//finalization
+finalization
   // finalization code
 
-//begin
+begin
   // program initialization code
 end.

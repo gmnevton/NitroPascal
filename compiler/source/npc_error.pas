@@ -29,9 +29,55 @@ type
 implementation
 
 uses
+  Classes,
+  StrUtils,
   npc_consts;
 
+const
+  iShowSourceCodeLines = 3;
+
 { TNPCError }
+
+function GetSourceCodeLines(const ALocation: TNPCLocation; ALines: Integer): String;
+var
+  list: TStringList;
+  i, line_start, line_end: Integer;
+begin
+  Result := '';
+  try
+    list := TStringList.Create;
+    try
+      list.LoadFromFile(ALocation.FilePath + ALocation.FileName);
+      line_start := ALocation.StartRow - 1 - ALines;
+      if line_start < 0 then
+        line_start := 0;
+      line_end := ALocation.EndRow - 1 + ALines;
+      if line_end > list.Count then
+        line_end := list.Count;
+      for i:=line_start to line_end - 1 do begin
+        if Length(Result) = 0 then begin
+          if Length(list.Strings[i]) > 0 then
+            Result := '  >  ' + list.Strings[i];
+        end
+        else begin
+          if (i = ALocation.EndRow - 1) then begin
+            if (Length(list.Strings[i]) > 0) then
+              Result := Result + #13#10 + '  >  ' +list.Strings[i];
+          end
+          else begin
+            Result := Result + #13#10 + '  >  ' +list.Strings[i];
+          end;
+        end;
+        if i = ALocation.StartRow - 1 then
+          Result := Result + #13#10 + '  >--' + DupeString('-', ALocation.EndCol - ALocation.StartCol) + '^';
+      end;
+    finally
+      list.Free;
+    end;
+  except
+    // nothing here
+  end;
+end;
 
 //constructor TNPCError.Create(const ALocation: TNPCLocation; const AError: String);
 //begin
@@ -50,15 +96,23 @@ begin
 end;
 
 constructor TNPCError.LexerError(const ALocation: TNPCLocation; const AError: String);
+var
+  temp: String;
 begin
   Location := ALocation;
-  inherited CreateFmt(sErrorBaseEx, [Location.ToString, 'LexerError', AError]);
+  temp := Format(sErrorBaseEx, [Location.ToString, 'LexerError', AError]);
+  temp := temp + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
+  inherited Create(temp);
 end;
 
 constructor TNPCError.ParserError(const ALocation: TNPCLocation; const AError: String);
+var
+  temp: String;
 begin
   Location := ALocation;
-  inherited CreateFmt(sErrorBaseEx, [Location.ToString, 'ParserError', AError]);
+  temp := Format(sErrorBaseEx, [Location.ToString, 'ParserError', AError]);
+  temp := temp + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
+  inherited Create(temp);
 end;
 
 constructor TNPCError.ProjectError(const AError: String);
