@@ -1,6 +1,8 @@
 # NitroPascal
 NitroPascal is a concept of new OOP programming language based on Pascal / Delphi.  
 
+![NitroPascal1](./git_res/NitroPascal1.png)
+
 The goal is to make this lannguage the best Pascal version there is.  
 Because we believe that a programing language is only as good as the experience of writing it.  
 To eliminate annoying bariers and old habits.  
@@ -19,6 +21,7 @@ All projects are made using Delphi 10.2.3.
 Project uses madExcept to track bugs and memory leaks.  
 For now there is no other external dependencies - but this can change at any time.  
 
+![NitroPascal3](./git_res/NitroPascal3.png)
 ---
 
 ### Project files (extension: '.npe'):
