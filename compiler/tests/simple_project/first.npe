@@ -14,12 +14,22 @@
 imports
   first_main;
 
+var
+  SomeString: String;
+
 initialization
   // initialization code
+  if ConsoleAvailable then
+    ConsoleTitle := %project-name%;
 
 finalization
   // finalization code
 
 begin
   // program initialization code
+  SomeString := 'this is a text';
+  if ConsoleAvailable then {
+    Writeln(SomeString);
+    ConsolePause;
+  };
 end.

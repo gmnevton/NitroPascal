@@ -51,6 +51,15 @@ const
   CYAN      = #$1b'[36m';
   LIGHTGRAY = #$1b'[37m';
 
+  BG_BLACK     = #$1b'[40m';
+  BG_RED       = #$1b'[41m';
+  BG_GREEN     = #$1b'[42m';
+  BG_YELLOW    = #$1b'[43m';
+  BG_BLUE      = #$1b'[44m';
+  BG_MAGENTA   = #$1b'[45m';
+  BG_CYAN      = #$1b'[46m';
+  BG_LIGHTGRAY = #$1b'[47m';
+
   DARKGRAY     = #$1b'[90m';
   LIGHTRED     = #$1b'[91m';
   LIGHTGREEN   = #$1b'[92m';
@@ -59,6 +68,15 @@ const
   LIGHTMAGENTA = #$1b'[95m';
   LIGHTCYAN    = #$1b'[96m';
   WHITE        = #$1b'[97m';
+
+  BG_LIGHT_BLACK     = #$1b'[100m';
+  BG_LIGHT_RED       = #$1b'[101m';
+  BG_LIGHT_GREEN     = #$1b'[102m';
+  BG_LIGHT_YELLOW    = #$1b'[103m';
+  BG_LIGHT_BLUE      = #$1b'[104m';
+  BG_LIGHT_MAGENTA   = #$1b'[105m';
+  BG_LIGHT_CYAN      = #$1b'[106m';
+  BG_LIGHT_LIGHTGRAY = #$1b'[107m';
 
 //  WHITE   = #$1b'[0;97m';
 //  GUTTER  = #$1b'[0;32m';
@@ -265,14 +283,22 @@ begin
             line_len := Length(line);
             ident_start := ALocation.StartCol;
             ident_end := IfThen(ALocation.EndCol > 0, ALocation.EndCol, ALocation.StartCol);
-            for j:=1 to line_len do begin
-              if j = ident_start then
-                Result := Result + HILIGHT;
+            if ident_start <= line_len then begin
+              for j:=1 to line_len do begin
+                if j = ident_start then
+                  Result := Result + HILIGHT;
 
-              Result := Result + line[j];
+                Result := Result + line[j];
 
-              if j = ident_end then
-                Result := Result + NORMAL;
+                if j = ident_end then
+                  Result := Result + NORMAL;
+              end;
+            end
+            else begin
+              Result := Result + syntax_highlight(list.Strings[i]) + DupeString(' ', ALocation.StartCol - line_len - 1);
+              Result := Result + BG_LIGHT_RED + WHITE;
+              Result := Result + ' ';
+              Result := Result + RESET + NORMAL;
             end;
           end
           else

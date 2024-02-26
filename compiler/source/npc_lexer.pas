@@ -20,44 +20,54 @@ type
   TNPCTokenType = Char;
 
 const
-  tokEOF       = TNPCTokenType(0);
+  tokEOF         = TNPCTokenType(0);
 
-  tokOParen    = TNPCTokenType(1);  // (
-  tokCParen    = TNPCTokenType(2);  // )
-  tokOCurly    = TNPCTokenType(3);  // {
-  tokCCurly    = TNPCTokenType(4);  // }
-  tokOBracket  = TNPCTokenType(5);  // [
-  tokCBracket  = TNPCTokenType(6);  // ]
+  tokOParen      = TNPCTokenType(1);  // (
+  tokCParen      = TNPCTokenType(2);  // )
+  tokOCurly      = TNPCTokenType(3);  // {
+  tokCCurly      = TNPCTokenType(4);  // }
+  tokOBracket    = TNPCTokenType(5);  // [
+  tokCBracket    = TNPCTokenType(6);  // ]
 
-  tokDot       = TNPCTokenType(7);  // .
-  tokComma     = TNPCTokenType(8);  // ,
-  tokColon     = TNPCTokenType(9);  // :
-  tokSemicolon = TNPCTokenType(10); // ;
-  tokQuote     = TNPCTokenType(11); // '
-  tokDQuote    = TNPCTokenType(12); // "
+  tokDot         = TNPCTokenType(7);  // .
+  tokComma       = TNPCTokenType(8);  // ,
+  tokColon       = TNPCTokenType(9);  // :
+  tokSemicolon   = TNPCTokenType(10); // ;
+  tokQuote       = TNPCTokenType(11); // '
+  tokDQuote      = TNPCTokenType(12); // "
 
-  tokAt        = TNPCTokenType(13); // @
-  tokDollar    = TNPCTokenType(14); // $
-  tokDash      = TNPCTokenType(15); // ^
-  tokAmpersand = TNPCTokenType(16); // &
-  tokAsterisk  = TNPCTokenType(17); // *
-  tokMinus     = TNPCTokenType(18); // -
-  tokPlus      = TNPCTokenType(19); // +
-  tokEqual     = TNPCTokenType(20); // =
-  tokLess      = TNPCTokenType(21); // <
-  tokMore      = TNPCTokenType(22); // >
-  tokDiv       = TNPCTokenType(23); // /
+  tokAt          = TNPCTokenType(13); // @
+  tokDollar      = TNPCTokenType(14); // $
+  tokPercent     = TNPCTokenType(15); // %
+  tokDash        = TNPCTokenType(16); // ^
+  tokAmpersand   = TNPCTokenType(17); // &
+  tokAsterisk    = TNPCTokenType(18); // *
+  tokMinus       = TNPCTokenType(19); // -
+  tokPlus        = TNPCTokenType(20); // +
+  tokEqual       = TNPCTokenType(21); // =
+  tokLess        = TNPCTokenType(22); // <
+  tokMore        = TNPCTokenType(23); // >
+  tokDiv         = TNPCTokenType(24); // /
 
-  tokIdent     = TNPCTokenType(24); // reserved word or reserved symbol or other name
-  tokNumber    = TNPCTokenType(25); // 0..9
-  tokString    = TNPCTokenType(26); // 'text'
-  tokComment   = TNPCTokenType(27); // multiline: {} (**), singleline: //
-  tokSetting   = TNPCTokenType(28); // {$...} or {$define ...} or {$(condition) ...}
-  tokResource  = TNPCTokenType(29); // {$resources ...}
-  tokSpecifier = TNPCTokenType(30); // {@...}
+  tokIdent       = TNPCTokenType(25); // reserved word or reserved symbol or other name
+  tokNumber      = TNPCTokenType(26); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
+  tokString      = TNPCTokenType(27); // 'text'
+  tokCommentSL   = TNPCTokenType(28); // singleline: //
+  tokCommentMLB  = TNPCTokenType(29); // multiline-begin: {. (*
+  tokCommentMLE  = TNPCTokenType(30); // multiline-end  : .} *)
+  tokAssign      = TNPCTokenType(31); // :=
 
-  NPCTokensType: Array[0..30] of String = (
+
+  tokSetting     = TNPCTokenType(32); // {$...} or {$define ...} or {$(condition) ...}
+  tokResource    = TNPCTokenType(33); // {$resources ...}
+  tokSpecifier   = TNPCTokenType(34); // {@...}
+  tokCompilerVar = TNPCTokenType(35); // %...%
+
+  tokMAX = 36;
+
+  NPCTokensType: Array[0..tokMAX - 1] of String = (
     'end of file',
+    'literal',
     'literal',
     'literal',
     'literal',
@@ -84,10 +94,14 @@ const
     'identifier',
     'number',
     'string',
-    'comment',
+    'comment-sl',
+    'comment-mlb',
+    'comment-mle',
+    'assign',
     'setting',
     'resource',
-    'specifier'
+    'specifier',
+    'compiler-variable'
   );
 
 type
@@ -97,7 +111,7 @@ type
   end;
 
 const
-  NPCLiteralTokens: Array[0..20] of TNPCLiteralToken = (
+  NPCLiteralTokens: Array[0..21] of TNPCLiteralToken = (
     (Literal: '(';  TokenType: tokOParen),
     (Literal: ')';  TokenType: tokCParen),
     (Literal: '{';  TokenType: tokOCurly),
@@ -114,6 +128,7 @@ const
 
     (Literal: '@';  TokenType: tokAt),
     (Literal: '$';  TokenType: tokDollar),
+    (Literal: '%';  TokenType: tokPercent),
     (Literal: '^';  TokenType: tokDash),
     (Literal: '&';  TokenType: tokAmpersand),
     (Literal: '*';  TokenType: tokAsterisk),
@@ -201,10 +216,38 @@ type
 implementation
 
 uses
+  Types,
   Character,
   Hash,
   npc_consts,
   npc_reserved_words;
+
+function ArrayOfTokenToArrayOfString(const Values: Array of Char): TStringDynArray;
+var
+  i: Integer;
+  lit: TNPCLiteralToken;
+begin
+  SetLength(Result, Length(Values));
+  for i:=0 to High(Values) do begin
+    for lit in NPCLiteralTokens do begin
+      if lit.TokenType = Values[i] then
+        Result[i] := lit.Literal;
+    end;
+  end;
+end;
+
+function LiteralTokenToChar(const Token: Char): Char;
+var
+  lit: TNPCLiteralToken;
+begin
+  Result := #0; // empty
+  for lit in NPCLiteralTokens do begin
+    if lit.TokenType = Token then begin
+      Result := lit.Literal;
+      Exit;
+    end;
+  end;
+end;
 
 { TNPCToken }
 
@@ -513,7 +556,7 @@ begin
   Result := Nil;
   SkipWhitespace;
   while IsNotEmpty do begin
-    if not ((Char(cur^) = '/') and (NextChar = '/')) and
+    if {not ((Char(cur^) = '/') and (NextChar = '/')) and}
        not (Char(cur^) in [#13, #10]) then
       Break;
     SkipLine;
@@ -543,7 +586,47 @@ begin
     Exit;
   end;
 
-  if first in ['(', ')', '{', '}', '[', ']', '.', ',', ':', ';', '@', '$', '^', '&', '*', '-', '+', '=', '<', '>', '/'] then begin
+  if first in ['(', ')', '{', '}', '[', ']', '.', ',', ':', ';', '@', '$', '%', '^', '&', '*', '-', '+', '=', '<', '>', '/'] then begin
+    // check for biliterals
+    if (first = '/') and (NextChar = '/') then begin // // - singleline comment
+      start := cur;
+      EatChar;
+      while IsNotEmpty and not (Char(cur^) in [#13, #10]) do
+        EatChar;
+      loc.SetEndRowCol(row, cur - bol + 1);
+      stemp := TokenString(start, cur);
+      Result := TNPCToken.Create(tokCommentSL, loc, False, True, stemp, EmptyTokenMD5);
+      Exit;
+    end;
+
+    if ((first = '(') and (NextChar = '*')) or ((first = '{') and (NextChar = '.')) then begin // (* {. - multiline comment begin
+      start := cur;
+      EatChar;
+      loc.SetEndRowCol(row, cur - bol + 1);
+      stemp := TokenString(start, cur);
+      Result := TNPCToken.Create(tokCommentMLB, loc, False, True, stemp, EmptyTokenMD5);
+      Exit;
+    end;
+
+    if ((first = '*') and (NextChar = ')')) or ((first = '.') and (NextChar = '}')) then begin // *) .} - multiline comment end
+      start := cur;
+      EatChar;
+      loc.SetEndRowCol(row, cur - bol + 1);
+      stemp := TokenString(start, cur);
+      Result := TNPCToken.Create(tokCommentMLE, loc, False, True, stemp, EmptyTokenMD5);
+      Exit;
+    end;
+
+    if (first = ':') and (NextChar = '=') then begin // := - assign
+      start := cur;
+      EatChar;
+      loc.SetEndRowCol(row, cur - bol + 1);
+      stemp := TokenString(start, cur);
+      Result := TNPCToken.Create(tokAssign, loc, False, True, stemp, EmptyTokenMD5);
+      Exit;
+    end;
+
+    // check for literals
     for token in NPCLiteralTokens do begin
       if first = token.Literal then begin
         EatChar;
@@ -551,6 +634,18 @@ begin
         Exit;
       end;
     end;
+  end;
+
+  if first.IsNumber or (first = '-') or (first = '$') then begin // 1234567890; 12345.67890; 0x12345678; 123_456_789; 0x12_34_56_78; 12_345.67890
+    start := cur;
+    EatChar;
+    while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_') or (Char(cur^) = 'x')) do
+      EatChar;
+    loc.SetEndRowCol(row, cur - bol + 1);
+    stemp := TokenString(start, cur);
+    Result := TNPCToken.Create(tokNumber, loc, False, False, stemp, EmptyTokenMD5);
+    stemp := '';
+    Exit;
   end;
 
   if first = '''' then begin // string
@@ -601,18 +696,6 @@ begin
       raise NPCLexerException.LexerError(loc, Format('unclosed string literal "%s"', [stemp]));
   end;
 
-  if first.IsNumber then begin // 1234567890; 12345.67890; 0x12345678; 123_456_789; 0x12_34_56_78; 12_345.67890
-    start := cur;
-    EatChar;
-    while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_') or (Char(cur^) = 'x')) do
-      EatChar;
-    loc.SetEndRowCol(row, cur - bol + 1);
-    stemp := TokenString(start, cur);
-    Result := TNPCToken.Create(tokNumber, loc, False, False, stemp, EmptyTokenMD5);
-    stemp := '';
-    Exit;
-  end;
-
   raise NPCLexerException.LexerError(loc, Format('unknown token starts with "%s"', [first]));
 end;
 
@@ -622,7 +705,7 @@ var
 begin
   Result := NextToken;
   if Result = Nil then begin
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join(' or ', ArrayOfCharToArrayOfString(ATokens))]));
+    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
   end;
 
   for token in ATokens do begin
@@ -630,7 +713,7 @@ begin
       Exit;
   end;
 
-  raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [String.Join(' or ', ArrayOfCharToArrayOfString(ATokens)), Result.&Type]));
+  raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
 end;
 
 function TNPCLexer.Lines: Integer;

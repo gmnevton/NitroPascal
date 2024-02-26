@@ -45,8 +45,11 @@ type
     procedure Clear;
     procedure AddToken(const AToken: TNPCToken);
     procedure AddImport(const AImportType: TNPCImportType; const AImportName: String; const AImportPath: String);
-    function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean;
-    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: Char): Boolean;
+    function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean; overload;
+    function TokenIsReservedIdent(const AToken: TNPCToken): Boolean; overload;
+    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: Char): Boolean; overload;
+    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: String): Boolean; overload;
+    function SkipComments(const AToken: TNPCToken): Boolean;
     //
     procedure ParseProjectBody;
     procedure ParseSettingDefineCondition;
@@ -59,10 +62,14 @@ type
     procedure ParseComment;
     procedure ParseImports(const AToken: TNPCToken);
     procedure ParseExports(const AToken: TNPCToken);
+    procedure ParseTypes(const AToken: TNPCToken);
+    procedure ParseConsts(const AToken: TNPCToken);
+    procedure ParseVariables(const AToken: TNPCToken);
     procedure ParseInitialization(const AToken: TNPCToken);
     procedure ParseFinalization(const AToken: TNPCToken);
     procedure ParseBegin(const AToken: TNPCToken);
     procedure ParseEnd(const AToken: TNPCToken);
+    procedure ParseLambdaParams(const AToken: TNPCToken);
   public
     constructor Create(const ALexer: TNPCLexer; const PSettings: Pointer);
     destructor Destroy; override;
@@ -149,9 +156,44 @@ begin
   Result := (AToken.&Type = tokIdent) and AToken.ReservedWord and SameText(AToken.Value, NPCReservedIdentifiers[AReservedIdent].Ident);
 end;
 
+function TNPCParser.TokenIsReservedIdent(const AToken: TNPCToken): Boolean;
+begin
+  Result := (AToken.&Type = tokIdent) and AToken.ReservedWord;
+end;
+
 function TNPCParser.TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: Char): Boolean;
 begin
   Result := (AToken.&Type in [tokOParen..tokDiv]) and AToken.ReservedSymbol and (AToken.Value = AReservedSymbol);
+end;
+
+function TNPCParser.TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: String): Boolean;
+begin
+  Result := (AToken.&Type in [tokCommentSL..tokAssign]) and AToken.ReservedSymbol and StartsStr(AReservedSymbol, AToken.Value);
+end;
+
+function TNPCParser.SkipComments(const AToken: TNPCToken): Boolean;
+var
+  token: TNPCToken;
+begin
+  Result := False;
+  if TokenIsReservedSymbol(Atoken, '//') then // single-line comment
+    Exit(True);
+  if TokenIsReservedSymbol(Atoken, '(*') then begin // multi-line comment
+    while Lexer.IsNotEmpty do begin
+      token := Lexer.NextToken;
+      if TokenIsReservedSymbol(token, '*)') then // skip comments until closing section
+        Break;
+    end;
+    Exit(True);
+  end;
+  if TokenIsReservedSymbol(Atoken, '{.') then begin // multi-line comment
+    while Lexer.IsNotEmpty do begin
+      token := Lexer.NextToken;
+      if TokenIsReservedSymbol(token, '.}') then // skip comments until closing section
+        Break;
+    end;
+    Exit(True);
+  end;
 end;
 
 procedure TNPCParser.ParseProjectBody;
@@ -160,6 +202,11 @@ var
 begin
   while Lexer.IsNotEmpty do begin
     token := Lexer.NextToken;
+    // skip comments
+    if SkipComments(token) then
+      Continue;
+    //
+    // add relevant tokens
     AddToken(token);
     if TokenIsReservedSymbol(token, '{') then begin
       if Lexer.IsCurrentSymbol('$') then
@@ -174,6 +221,15 @@ begin
     end
     else if TokenIsReservedIdent(token, ri_exports) then begin
       ParseExports(token);
+    end
+    else if TokenIsReservedIdent(token, ri_type) then begin
+      ParseTypes(token);
+    end
+    else if TokenIsReservedIdent(token, ri_const) then begin
+      ParseConsts(token);
+    end
+    else if TokenIsReservedIdent(token, ri_var) then begin
+      ParseVariables(token);
     end
     else if TokenIsReservedIdent(token, ri_initialization) then begin
       ParseInitialization(token);
@@ -410,6 +466,63 @@ begin
 
 end;
 
+procedure TNPCParser.ParseTypes(const AToken: TNPCToken);
+begin
+
+end;
+
+procedure TNPCParser.ParseConsts(const AToken: TNPCToken);
+begin
+
+end;
+
+procedure TNPCParser.ParseVariables(const AToken: TNPCToken);
+var
+  token: TNPCToken;
+  has_body: Boolean;
+begin
+  has_body := False;
+  while Lexer.IsNotEmpty do begin
+    token := Lexer.NextToken;
+    // skip comments
+    if SkipComments(token) then
+      Continue;
+    //
+    if (token.&Type = tokIdent) and not TokenIsReservedIdent(token) then begin
+      has_body := True;
+      // left side is variable name
+      AddToken(token);
+      token := Lexer.ExpectToken([tokComma, tokColon]);
+      AddToken(token);
+      if TokenIsReservedSymbol(token, ',') then // comma separated variable names
+        Continue;
+      // we have colon, now get declared type identifier and semicolon at end
+      token := Lexer.NextToken;
+      //if not (token.&Type in [tokIdent..tokString]) then
+      if not (token.&Type = tokIdent) then
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInDeclaration, [NPCTokensType[Ord(token.&Type)], 'type']));
+      AddToken(token);
+      AddToken(Lexer.ExpectToken([tokSemicolon]));
+//      if (token.&Type = tokIdent) and Lexer.IsCurrentSymbol('(') then // might be a function call
+//        ParseLambdaParams(token);
+    end
+    else if TokenIsReservedSymbol(token, ',') then begin
+      AddToken(token);
+    end
+    else if TokenIsReservedSymbol(token, ';') then begin
+      AddToken(token);
+      Break;
+    end
+    else if TokenIsReservedIdent(token) then begin
+      if not has_body then
+        raise NPCParserException.ParserError(AToken.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_initialization].Ident]));
+      Break;
+    end
+    else
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.Value]));
+  end;
+end;
+
 procedure TNPCParser.ParseInitialization(const AToken: TNPCToken);
 var
   token: TNPCToken;
@@ -479,6 +592,19 @@ procedure TNPCParser.ParseEnd(const AToken: TNPCToken);
 begin
   AddToken(Lexer.ExpectToken([tokDot]));
   AddToken(Lexer.NextToken);
+end;
+
+procedure TNPCParser.ParseLambdaParams(const AToken: TNPCToken);
+begin
+  AddToken(Lexer.ExpectToken([tokOParen]));
+  if Lexer.IsCurrentSymbol(')') then // function without parameters
+    AddToken(Lexer.ExpectToken([tokCParen]))
+  else begin // collect function params
+
+  end;
+
+//      AddToken(TNPCToken.Create(tokSetting, AToken.Location.Copy, False, False, '$program-type', EmptyTokenMD5));
+
 end;
 
 procedure TNPCParser.ParseProject;
