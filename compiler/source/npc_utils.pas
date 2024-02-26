@@ -30,7 +30,10 @@ type
   end;
 
 function getTime: Real;
+function ConsoleAvailable: Boolean;
 procedure ConsoleWriteln(const Value: String);
+function IsANSIConsoleSupported: Boolean;
+procedure SetConsoleANSIMode;
 
 implementation
 
@@ -39,6 +42,9 @@ uses
 
 const
   ATTACH_PARENT_PROCESS: DWORD = $FFFFFFFF;
+  ENABLE_VIRTUAL_TERMINAL_INPUT = $0200;
+  ENABLE_VIRTUAL_TERMINAL_PROCESSING = $0004;
+  ENABLE_PROCESSED_OUTPUT = $0001;
 
 var
   ConsoleAllocated: Boolean;
@@ -109,8 +115,6 @@ begin
     inherited Sort;
 end;
 
-function AttachConsole(dwProcessId: DWORD): BOOL; stdcall; external 'kernel32.dll';
-
 function getTime: Real;
 var
   st: TSystemTime;
@@ -125,11 +129,84 @@ begin
   Result := st.wHour * 3600.0 + st.wMinute * 60.0 + st.wSecond + (st.wMilliseconds / 1000.0);
 end;
 
+function ConsoleAvailable: Boolean;
+begin
+  Result := ConsoleAllocated;
+end;
+
 procedure ConsoleWriteln(const Value: String);
 begin
   if ConsoleAllocated then
     Writeln(Value);
 end;
+
+function IsANSIConsoleSupported: Boolean;
+var
+  h: THandle;
+  dwOriginalMode: DWORD;
+  dwRequestedModes: DWORD;
+begin
+  Result := False;
+
+  h := GetStdHandle(STD_OUTPUT_HANDLE);
+  if h = INVALID_HANDLE_VALUE then
+    Exit;
+
+  dwOriginalMode := 0;
+
+  if not GetConsoleMode(h, dwOriginalMode) then
+    Exit;
+
+  dwRequestedModes := ENABLE_PROCESSED_OUTPUT or ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+  Result := (dwOriginalMode and dwRequestedModes) = dwRequestedModes;
+end;
+
+procedure SetConsoleANSIMode;
+var
+  hIn: THandle;
+  hOut: THandle;
+  dwOriginalInMode,
+  dwRequestedInModes: DWORD;
+  dwOriginalOutMode,
+  dwRequestedOutModes: DWORD;
+  dwInMode,
+  dwOutMode: DWORD;
+begin
+  hIn := GetStdHandle(STD_INPUT_HANDLE);
+  if hIn = INVALID_HANDLE_VALUE then
+    Exit;
+
+  hOut := GetStdHandle(STD_OUTPUT_HANDLE);
+  if hOut = INVALID_HANDLE_VALUE then
+    Exit;
+
+  dwOriginalInMode := 0;
+  dwOriginalOutMode := 0;
+
+  if not GetConsoleMode(hIn, dwOriginalInMode) then
+    Exit;
+
+  if not GetConsoleMode(hOut, dwOriginalOutMode) then
+    Exit;
+
+  dwRequestedInModes := ENABLE_VIRTUAL_TERMINAL_INPUT;
+  dwRequestedOutModes := ENABLE_PROCESSED_OUTPUT or ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+  dwInMode := dwOriginalInMode and dwRequestedInModes;
+  if not SetConsoleMode(hIn, dwInMode) then // we failed to set mode
+    Exit;
+
+  dwOutMode := dwOriginalOutMode or dwRequestedOutModes;
+  if not SetConsoleMode(hOut, dwOutMode) then begin  // we failed to set both modes, try to step down mode gracefully.
+    dwRequestedOutModes := ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    dwOutMode := dwOriginalOutMode or dwRequestedOutModes;
+    if not SetConsoleMode(hOut, dwOutMode) then // Failed to set any VT mode, can't do anything here.
+      Exit;
+  end;
+end;
+
+function AttachConsole(dwProcessId: DWORD): BOOL; stdcall; external 'kernel32.dll';
 
 initialization
   ConsoleAllocated := False;

@@ -31,7 +31,9 @@ implementation
 uses
   Classes,
   StrUtils,
-  npc_consts;
+  Math,
+  npc_consts,
+  npc_utils;
 
 const
   iShowSourceCodeLines = 3;
@@ -39,38 +41,252 @@ const
 { TNPCError }
 
 function GetSourceCodeLines(const ALocation: TNPCLocation; ALines: Integer): String;
+const
+  BLACK     = #$1b'[30m';
+  RED       = #$1b'[31m';
+  GREEN     = #$1b'[32m';
+  YELLOW    = #$1b'[33m';
+  BLUE      = #$1b'[34m';
+  MAGENTA   = #$1b'[35m';
+  CYAN      = #$1b'[36m';
+  LIGHTGRAY = #$1b'[37m';
+
+  DARKGRAY     = #$1b'[90m';
+  LIGHTRED     = #$1b'[91m';
+  LIGHTGREEN   = #$1b'[92m';
+  LIGHTYELLOW  = #$1b'[93m';
+  LIGHTBLUE    = #$1b'[94m';
+  LIGHTMAGENTA = #$1b'[95m';
+  LIGHTCYAN    = #$1b'[96m';
+  WHITE        = #$1b'[97m';
+
+//  WHITE   = #$1b'[0;97m';
+//  GUTTER  = #$1b'[0;32m';
+//  NORMAL  = #$1b'[0;96m';
+//  HILIGHT = #$1b'[1;91m';
+//  RESET   = #$1b'[0m';
+
+  GUTTER  = GREEN;
+  NORMAL  = LIGHTCYAN;
+  HILIGHT = LIGHTRED;
+
+  RESET   = #$1b'[0m';
+var
+  ansi: Boolean;
+  in_comment: Boolean;
+  comment_end_tag: String;
+
+  function number(var P: PChar): String;
+  var
+    S: PChar;
+  begin
+    Result := '';
+    S := P;
+    while P^ in ['0'..'9', '-', '.'] do Inc(P);
+    SetString(Result, S, P - S);
+    Result := MAGENTA + Result + RESET;
+  end;
+
+  function literal(var P: PChar): String;
+  begin
+    Result := P^;
+    Inc(P);
+    Result := YELLOW + Result + RESET;
+  end;
+
+  function ident(var P: PChar): String;
+  var
+    S: PChar;
+  begin
+    Result := '';
+    S := P;
+    while P^ in ['a'..'z', 'A'..'Z', '_', '.'] do Inc(P);
+    SetString(Result, S, P - S);
+    Result := LIGHTCYAN + Result + RESET;
+  end;
+
+  function comment(var P: PChar; const EndTag: String): String;
+  var
+    S: PChar;
+    idx: Byte;
+  begin
+    Result := '';
+    S := P;
+    if Length(EndTag) = 0 then begin
+      while P^ <> #0 do Inc(P);
+    end
+    else begin
+      idx := 0;
+      while (P^ <> #0) and not (P^ = EndTag[idx]) do Inc(P);
+      Inc(idx);
+      if (P^ <> #0) and not (P^ = EndTag[idx]) then begin
+        in_comment := True;
+        comment_end_tag := EndTag;
+      end
+      else begin
+        in_comment := False;
+        comment_end_tag := '';
+      end;
+    end;
+    SetString(Result, S, P - S);
+    Result := DARKGRAY + Result + RESET;
+  end;
+
+  function norm(var P: PChar): String;
+  begin
+    Result := P^;
+    Inc(P);
+    Result := LIGHTGRAY + Result + RESET;
+  end;
+
+  function strline(var P: PChar): String;
+  var
+    S: PChar;
+  begin
+    Result := '';
+    S := P;
+    Inc(P);
+    while (P^ <> #0) and not (P^ = '''') do Inc(P);
+    SetString(Result, S, P - S);
+    Result := WHITE + Result + RESET;
+  end;
+
+  function syntax_highlight(line: String): String;
+  var
+    P, S: PChar;
+  begin
+    if not ansi then begin
+      Result := line;
+      Exit;
+    end;
+
+    Result := '';
+    P := PChar(line);
+    if in_comment then
+      Result := Result + comment(P, comment_end_tag)
+    else begin
+      while True do begin
+        case P^ of
+          #0: Break;
+          '0'..'9': Result := Result + number(P);
+          '-': begin
+            S := P;
+            Inc(S);
+            if S^ in ['0'..'9'] then
+              Result := Result + number(P)
+            else
+              Result := Result + literal(P);
+          end;
+          '+': Result := Result + literal(P);
+          '/': begin
+            S := P;
+            Inc(S);
+            if S^ = '/' then
+              Result := Result + comment(P, '')
+            else
+              Result := Result + literal(P);
+          end;
+          '{': Result := Result + comment(P, '}');
+          '(': begin
+            S := P;
+            Inc(S);
+            if S^ = '*' then
+              Result := Result + comment(P, '*)')
+            else
+              Result := Result + literal(P);
+          end;
+          'A'..'Z': Result := Result + ident(P);
+          'a'..'z': Result := Result + ident(P);
+          '''': Result := Result + strline(P);
+        else
+          Result := Result + norm(P);
+        end;
+      end;
+    end;
+  end;
+
+  function PrintGutter(width, num: Integer): String;
+  begin
+    Result := Format(IfThen(ansi, GUTTER) + ' %.' + IntToStr(width) + 'd' + IfThen(ansi, WHITE) + '|' + IfThen(ansi, RESET) + ' '{ + IfThen(ansi, NORMAL)}, [num]);
+  end;
+
 var
   list: TStringList;
-  i, line_start, line_end: Integer;
+  i, j, num_len, line_len, line_start, line_end, ident_start, ident_end: Integer;
+  line: String;
 begin
+  ansi := False;
+  if ConsoleAvailable then begin
+    ansi := IsANSIConsoleSupported;
+    if not ansi then begin
+      SetConsoleANSIMode;
+      ansi := IsANSIConsoleSupported;
+    end;
+  end;
+
+  in_comment := False;
   Result := '';
   try
     list := TStringList.Create;
     try
       list.LoadFromFile(ALocation.FilePath + ALocation.FileName);
+
       line_start := ALocation.StartRow - 1 - ALines;
       if line_start < 0 then
         line_start := 0;
+
       line_end := ALocation.EndRow - 1 + ALines;
       if line_end > list.Count then
         line_end := list.Count;
-      for i:=line_start to line_end - 1 do begin
-        if Length(Result) = 0 then begin
-          if Length(list.Strings[i]) > 0 then
-            Result := '  >  ' + list.Strings[i];
+
+      while (line_start < ALocation.StartRow - 1) and (Length(list.Strings[line_start]) = 0) do
+        Inc(line_start);
+
+      while (line_end > ALocation.EndRow - 1) and (Length(list.Strings[line_end]) = 0) do
+        Dec(line_end);
+
+      num_len := 1;
+      while (line_end div Trunc(Power(10, num_len))) > 0 do
+        Inc(num_len);
+
+//      if ansi then
+//        Result := NORMAL;
+
+      for i:=line_start to line_end do begin
+        if i = line_start then
+          Result := Result + PrintGutter(num_len, i + 1)
+        else
+          Result := Result + #13#10 + PrintGutter(num_len, i + 1);
+
+        if ansi then begin
+          if i = ALocation.StartRow - 1 then begin
+//            Result := Result + Copy(list.Strings[i], 1, ALocation.StartCol - 1);
+            line := list.Strings[i];
+            line_len := Length(line);
+            ident_start := ALocation.StartCol;
+            ident_end := IfThen(ALocation.EndCol > 0, ALocation.EndCol, ALocation.StartCol);
+            for j:=1 to line_len do begin
+              if j = ident_start then
+                Result := Result + HILIGHT;
+
+              Result := Result + line[j];
+
+              if j = ident_end then
+                Result := Result + NORMAL;
+            end;
+          end
+          else
+            Result := Result + syntax_highlight(list.Strings[i]);
         end
         else begin
-          if (i = ALocation.EndRow - 1) then begin
-            if (Length(list.Strings[i]) > 0) then
-              Result := Result + #13#10 + '  >  ' +list.Strings[i];
-          end
-          else begin
-            Result := Result + #13#10 + '  >  ' +list.Strings[i];
-          end;
+          Result := Result + list.Strings[i];
+          if i = ALocation.StartRow - 1 then
+            Result := Result + #13#10 + DupeString(' ', j + 1) + '| ' + DupeString(' ', ALocation.StartCol - 1) + DupeString('~', ALocation.EndCol - ALocation.StartCol);
         end;
-        if i = ALocation.StartRow - 1 then
-          Result := Result + #13#10 + '  >--' + DupeString('-', ALocation.EndCol - ALocation.StartCol) + '^';
       end;
+
+      if ansi then
+        Result := Result + RESET;
     finally
       list.Free;
     end;
