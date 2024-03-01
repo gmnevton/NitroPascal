@@ -20,6 +20,7 @@ const
   sLexerStreamNotSpecifiedStream = 'Stream not specified while trying to read from stream.';
 
   sParserUnexpectedTokenInProject     = 'unexpected token "%s" in project file';
+  sParserUnexpectedTokenInSection     = 'unexpected token "%s" in %s section';
   sParserUnexpectedTokenInDeclaration = 'unexpected token "%s" in %s declaration';
   sParserUnexpectedTokenInStatement   = 'unexpected token "%s" in %s statement';
   sParserUnexpectedType               = 'unexpected type "%s", expected "%s"';

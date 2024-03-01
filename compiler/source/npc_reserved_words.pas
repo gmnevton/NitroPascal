@@ -19,6 +19,7 @@ type
     ri_as,
     ri_asm,
     ri_begin,
+    ri_break,
     ri_case,
     ri_class,
     ri_const,
@@ -96,6 +97,7 @@ const
     (Ident: 'as';             MD5: (A: $f970e276; B: $7d0cfe75; C: $876ea857; D: $f92e319b)), // f970e276 7d0cfe75 876ea857 f92e319b
     (Ident: 'asm';            MD5: (A: $7c5cc52f; B: $db69c634; C: $bf9c216c; D: $1c2d001b)), // 7c5cc52f db69c634 bf9c216c 1c2d001b
     (Ident: 'begin';          MD5: (A: $8d589afa; B: $4dfaeeed; C: $85fff5aa; D: $78e5ff6a)), // 8d589afa 4dfaeeed 85fff5aa 78e5ff6a
+    (Ident: 'break';          MD5: (A: $1cbfb724; B: $ceee46cd; C: $879df7c7; D: $cfbe7dca)), // 1cbfb724 ceee46cd 879df7c7 cfbe7dca
     (Ident: 'case';           MD5: (A: $cd14c323; B: $902024e7; C: $2c850aa8; D: $28d634a7)), // cd14c323 902024e7 2c850aa8 28d634a7
     (Ident: 'class';          MD5: (A: $a2f2ed4f; B: $8ebc2cbb; C: $4c21a29d; D: $c40ab61d)), // a2f2ed4f 8ebc2cbb 4c21a29d c40ab61d
     (Ident: 'const';          MD5: (A: $6680dba0; B: $0f3a88f6; C: $6f8029a9; D: $3d71d93c)), // 6680dba0 0f3a88f6 6f8029a9 3d71d93c
@@ -163,6 +165,7 @@ const
 
 function IsReservedWord(const AValue: String): Boolean; overload;
 function IsReservedWord(const AValue: TNPCMD5): Boolean; overload;
+function MD5ToReservedWord(const AValue: TNPCMD5): TNPCReservedIdents;
 
 implementation
 
@@ -195,6 +198,22 @@ begin
        (AValue.C = NPCReservedIdentifiers[i].MD5.C) and
        (AValue.D = NPCReservedIdentifiers[i].MD5.D) then begin
       Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+function MD5ToReservedWord(const AValue: TNPCMD5): TNPCReservedIdents;
+var
+  i: TNPCReservedIdents;
+begin
+  Result := TNPCReservedIdents(-1);
+  for i:=Low(TNPCReservedIdents) to High(TNPCReservedIdents) do begin
+    if (AValue.A = NPCReservedIdentifiers[i].MD5.A) and
+       (AValue.B = NPCReservedIdentifiers[i].MD5.B) and
+       (AValue.C = NPCReservedIdentifiers[i].MD5.C) and
+       (AValue.D = NPCReservedIdentifiers[i].MD5.D) then begin
+      Result := i;
       Exit;
     end;
   end;

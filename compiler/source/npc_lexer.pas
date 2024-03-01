@@ -14,59 +14,67 @@ uses
   Classes,
   npc_md5,
   npc_location,
-  npc_error;
+  npc_error,
+  npc_reserved_words;
 
 type
   TNPCTokenType = Char;
 
 const
-  tokEOF         = TNPCTokenType(0);
+//  TNPCTokens = (
+  tokEOF          = TNPCTokenType(0);
 
-  tokOParen      = TNPCTokenType(1);  // (
-  tokCParen      = TNPCTokenType(2);  // )
-  tokOCurly      = TNPCTokenType(3);  // {
-  tokCCurly      = TNPCTokenType(4);  // }
-  tokOBracket    = TNPCTokenType(5);  // [
-  tokCBracket    = TNPCTokenType(6);  // ]
+  tokOParen       = TNPCTokenType(1);  // (
+  tokCParen       = TNPCTokenType(2);  // )
+  tokOCurly       = TNPCTokenType(3);  // {
+  tokCCurly       = TNPCTokenType(4);  // }
+  tokOBracket     = TNPCTokenType(5);  // [
+  tokCBracket     = TNPCTokenType(6);  // ]
 
-  tokDot         = TNPCTokenType(7);  // .
-  tokComma       = TNPCTokenType(8);  // ,
-  tokColon       = TNPCTokenType(9);  // :
-  tokSemicolon   = TNPCTokenType(10); // ;
-  tokQuote       = TNPCTokenType(11); // '
-  tokDQuote      = TNPCTokenType(12); // "
+  tokDot          = TNPCTokenType(7);  // .
+  tokComma        = TNPCTokenType(8);  // ,
+  tokColon        = TNPCTokenType(9);  // :
+  tokSemicolon    = TNPCTokenType(10); // ;
+  tokQuote        = TNPCTokenType(11); // '
+  tokDQuote       = TNPCTokenType(12); // "
 
-  tokAt          = TNPCTokenType(13); // @
-  tokDollar      = TNPCTokenType(14); // $
-  tokPercent     = TNPCTokenType(15); // %
-  tokDash        = TNPCTokenType(16); // ^
-  tokAmpersand   = TNPCTokenType(17); // &
-  tokAsterisk    = TNPCTokenType(18); // *
-  tokMinus       = TNPCTokenType(19); // -
-  tokPlus        = TNPCTokenType(20); // +
-  tokEqual       = TNPCTokenType(21); // =
-  tokLess        = TNPCTokenType(22); // <
-  tokMore        = TNPCTokenType(23); // >
-  tokDiv         = TNPCTokenType(24); // /
+  tokExclamation  = TNPCTokenType(13); // !
+  tokAt           = TNPCTokenType(14); // @
+  tokDollar       = TNPCTokenType(15); // $
+  tokPercent      = TNPCTokenType(16); // %
+  tokDash         = TNPCTokenType(17); // ^
+  tokAmpersand    = TNPCTokenType(18); // &
+  tokAsterisk     = TNPCTokenType(19); // *
+  tokMinus        = TNPCTokenType(20); // -
+  tokPlus         = TNPCTokenType(21); // +
+  tokEqual        = TNPCTokenType(22); // =
+  tokLessThan     = TNPCTokenType(23); // <
+  tokGreaterThan  = TNPCTokenType(24); // >
+  tokDiv          = TNPCTokenType(25); // /
 
-  tokIdent       = TNPCTokenType(25); // reserved word or reserved symbol or other name
-  tokNumber      = TNPCTokenType(26); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
-  tokString      = TNPCTokenType(27); // 'text'
-  tokCommentSL   = TNPCTokenType(28); // singleline: //
-  tokCommentMLB  = TNPCTokenType(29); // multiline-begin: {. (*
-  tokCommentMLE  = TNPCTokenType(30); // multiline-end  : .} *)
-  tokAssign      = TNPCTokenType(31); // :=
+  tokIdent        = TNPCTokenType(26); // reserved word or reserved symbol or other name
+  tokNumber       = TNPCTokenType(27); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
+  tokString       = TNPCTokenType(28); // 'text'
+  tokCommentSL    = TNPCTokenType(29); // singleline: //
+  tokCommentMLB   = TNPCTokenType(30); // multiline-begin: {. (*
+  tokCommentMLE   = TNPCTokenType(31); // multiline-end  : .} *)
+  tokAssign       = TNPCTokenType(32); // :=
+  tokLessEqual    = TNPCTokenType(33); // <=
+  tokGreaterEqual = TNPCTokenType(34); // >=
+  tokNotEqual     = TNPCTokenType(35); // != - alias for '<>': same as not (A = B) used like in C++: A != B
+//  tok       = TNPCTokenType(32); // :=
+//  tok       = TNPCTokenType(32); // :=
 
+  tokSetting      = TNPCTokenType(36); // {$...} or {$define ...} or {$(condition) ...}
+  tokResource     = TNPCTokenType(37); // {$resources ...}
+  tokSpecifier    = TNPCTokenType(38); // {@...}
+  tokCompilerVar  = TNPCTokenType(39); // %...%
 
-  tokSetting     = TNPCTokenType(32); // {$...} or {$define ...} or {$(condition) ...}
-  tokResource    = TNPCTokenType(33); // {$resources ...}
-  tokSpecifier   = TNPCTokenType(34); // {@...}
-  tokCompilerVar = TNPCTokenType(35); // %...%
-
-  tokMAX = 36;
+  tokMAX = 40;
 
   NPCTokensType: Array[0..tokMAX - 1] of String = (
     'end of file',
+    'literal',
     'literal',
     'literal',
     'literal',
@@ -98,6 +106,9 @@ const
     'comment-mlb',
     'comment-mle',
     'assign',
+    'less-equal',
+    'greater-equal',
+    'not-equal',
     'setting',
     'resource',
     'specifier',
@@ -110,8 +121,14 @@ type
     TokenType: TNPCTokenType;
   end;
 
+  TNPCDoubleLiteral = String[2];
+  TNPCDoubleLiteralToken = record
+    DoubleLiteral: TNPCDoubleLiteral;
+    TokenType: TNPCTokenType;
+  end;
+
 const
-  NPCLiteralTokens: Array[0..21] of TNPCLiteralToken = (
+  NPCLiteralTokens: Array[0..22] of TNPCLiteralToken = (
     (Literal: '(';  TokenType: tokOParen),
     (Literal: ')';  TokenType: tokCParen),
     (Literal: '{';  TokenType: tokOCurly),
@@ -126,6 +143,7 @@ const
 //    (Literal: ''''; TokenType: tokQuote),
 //    (Literal: '"';  TokenType: tokDQuote)
 
+    (Literal: '!';  TokenType: tokExclamation),
     (Literal: '@';  TokenType: tokAt),
     (Literal: '$';  TokenType: tokDollar),
     (Literal: '%';  TokenType: tokPercent),
@@ -135,9 +153,22 @@ const
     (Literal: '-';  TokenType: tokMinus),
     (Literal: '+';  TokenType: tokPlus),
     (Literal: '=';  TokenType: tokEqual),
-    (Literal: '<';  TokenType: tokLess),
-    (Literal: '>';  TokenType: tokMore),
+    (Literal: '<';  TokenType: tokLessThan),
+    (Literal: '>';  TokenType: tokGreaterThan),
     (Literal: '/';  TokenType: tokDiv)
+  );
+
+  NPCDoubleLiteralTokens: Array[0..9] of TNPCDoubleLiteralToken = (
+    (DoubleLiteral: '//';  TokenType: tokCommentSL),
+    (DoubleLiteral: '(*';  TokenType: tokCommentMLB),
+    (DoubleLiteral: '*)';  TokenType: tokCommentMLE),
+    (DoubleLiteral: '{.';  TokenType: tokCommentMLB),
+    (DoubleLiteral: '.}';  TokenType: tokCommentMLE),
+    (DoubleLiteral: ':=';  TokenType: tokAssign),
+    (DoubleLiteral: '<=';  TokenType: tokLessEqual),
+    (DoubleLiteral: '>=';  TokenType: tokGreaterEqual),
+    (DoubleLiteral: '<>';  TokenType: tokNotEqual),
+    (DoubleLiteral: '!=';  TokenType: tokNotEqual)
   );
 
 type
@@ -145,6 +176,10 @@ type
   public
     &Type: TNPCTokenType;
     Location: TNPCLocation;
+//    StringBeginRow,
+//    StringBeginCol,
+//    StringEndRow,
+//    StringEndCol: Integer;
     ReservedWord: Boolean;
     ReservedSymbol: Boolean;
 //    i32Value: Integer;
@@ -157,17 +192,25 @@ type
     //
     constructor Create(const AType: TNPCTokenType; const ALocation: TNPCLocation; const AReservedWord, AReservedSymbol: Boolean; const AValue: String; const AValueHash: TNPCMD5);
     destructor Destroy; override;
+    //
+    function TokenToString: String;
   end;
 
   TNPCTokens = Array of TNPCToken;
 
   NPCLexerException = class(TNPCError);
 
+  TNPCCharset = set of AnsiChar;
+
+  TNPCLexerOption = (loIdentWithMinus);
+  TNPCLexerOptions = set of TNPCLexerOption;
+
   TNPCLexer = class
   private
     FFileName: String;
     FFormatSettings: TFormatSettings;
     FEncoding: TEncoding;
+    FOptions: TNPCLexerOptions;
     //
     FSource: TBytes;
     PSource: PByte;
@@ -178,19 +221,31 @@ type
     bol: PByte;
     row: Integer;
     //
+    skip_cur: PByte;
+    skip_bol: PByte;
+    skip_row: Integer;
   protected
     procedure SkipPreamble; inline;
     procedure SkipWhitespace; inline;
     procedure SkipLine; inline;
     function GetChar: Char; overload; inline; // MBCS implementation
     function GetChar(const Index: Integer): Char; overload; inline; // MBCS implementation
+    function Get2Chars: TNPCDoubleLiteral; inline;
     function NextChar: Char; inline;
-    procedure EatChar; inline;
+    procedure SkipChar(const SkipTwoChars: Boolean = False); inline;
     function Location: TNPCLocation; inline;
     function TokenString(const AStart, ACur: PByte): String; inline;
     function TokenMD5(const AValue: String): TNPCMD5; inline;
     function TokenIsReserved(const AMD5: TNPCMD5): Boolean; inline;
+    function GetToken(const ConsumeToken: Boolean): TNPCToken; overload;
   public
+    LiteralCharset: TNPCCharset;
+    //DoubleLiterals: Array of String[2];
+    IdentifierCharset: TNPCCharset;
+    NumberCharset: TNPCCharset;
+    StringCharset: TNPCCharset;
+  public
+    constructor Create; overload;
     constructor Create(const AFileName: String); overload;
     constructor Create(const AFileName: String; const AEncoding: TEncoding); overload;
     constructor Create(const AFileName: String; const AFormatSettings: TFormatSettings); overload;
@@ -198,17 +253,20 @@ type
     constructor Create(const AStream: TStringStream; const AFileName: String); overload;
     constructor Create(const AStream: TStringStream; const AFileName: String; const AEncoding: TEncoding); overload;
     constructor Create(const AStream: TStringStream; const AFileName: String; const AFormatSettings: TFormatSettings); overload;
-    constructor Create(const AStream: TStringStream; const AFileName: String; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload;
+    constructor Create(const AStream: TStringStream; const AFileName: String; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload; // calls Create
     constructor Create(const AStream: TMemoryStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload;
-    constructor Create(const AStream: TStringStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload;
+    constructor Create(const AStream: TStringStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding); overload; // calls Create
     destructor Destroy; override;
     //
     function IsNotEmpty: Boolean; inline;
     function IsEmpty: Boolean; inline;
     function IsCurrentSymbol(const AValue: TNPCTokenType): Boolean; inline;
     function IsNextSymbol(const AValue: TNPCTokenType): Boolean; inline;
-    function NextToken: TNPCToken;
-    function ExpectToken(const ATokens: Array of TNPCTokenType): TNPCToken;
+    function GetToken: TNPCToken; overload; // grabs token and moves stream forward
+    function NextToken: TNPCToken; // saves current stream position, grabs token and restores stream position
+    procedure SkipToken; inline; // if we used NextToken then this fast-forwards stream position to after grabing token by NextToken
+    function ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
+    function ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
     //
     function Lines: Integer;
   end;
@@ -219,8 +277,7 @@ uses
   Types,
   Character,
   Hash,
-  npc_consts,
-  npc_reserved_words;
+  npc_consts;
 
 function ArrayOfTokenToArrayOfString(const Values: Array of Char): TStringDynArray;
 var
@@ -255,6 +312,10 @@ constructor TNPCToken.Create(const AType: TNPCTokenType; const ALocation: TNPCLo
 begin
   &Type := AType;
   Location := ALocation;
+//  StringBeginRow := 0;
+//  StringBeginCol := 0;
+//  StringEndRow := 0;
+//  StringEndCol := 0;
   ReservedWord := AReservedWord;
   ReservedSymbol := AReservedSymbol;
   Value := AValue;
@@ -269,7 +330,44 @@ begin
   inherited;
 end;
 
+function TNPCToken.TokenToString: String;
+begin
+  if &Type in [tokOParen..tokDiv] then
+    Result := NPCTokensType[Ord(Self.&Type)]
+  else begin
+    if Length(Self.Value) > 1 then
+      Result := NPCTokensType[Ord(Self.&Type)]
+    else
+      Result := Self.Value;
+  end;
+end;
+
 { TNPCLexer }
+
+constructor TNPCLexer.Create;
+begin
+  FFileName := '';
+  FFormatSettings := TFormatSettings.Create;
+  FEncoding := Nil;
+  FOptions := [];
+  //
+  LiteralCharset := ['(', ')', '{', '}', '[', ']', '.', ',', ':', ';', '!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=', '<', '>', '/'];
+  IdentifierCharset := ['0'..'9', 'a'..'z', 'A'..'Z', '_', '.'];
+  NumberCharset := ['0'..'9', '-', '.', 'e', 'E', '$', 'x'];
+  StringCharset := ['_', '-', '.'];
+  //
+  SetLength(FSource, 0);
+  PSource := Nil;
+  FLines := 0;
+  //
+  cur := Nil;
+  bol := Nil;
+  row := 0;
+  //
+  skip_cur := Nil;
+  skip_bol := Nil;
+  skip_row := 0;
+end;
 
 constructor TNPCLexer.Create(const AFileName: String);
 begin
@@ -324,6 +422,8 @@ end;
 
 constructor TNPCLexer.Create(const AStream: TStringStream; const AFileName: String; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding);
 begin
+  Create;
+  //
   FFileName := AFileName;
   FFormatSettings := AFormatSettings;
   if AEncoding = Nil then
@@ -363,6 +463,8 @@ end;
 
 constructor TNPCLexer.Create(const AStream: TStringStream; const AFormatSettings: TFormatSettings; const AEncoding: TEncoding);
 begin
+  Create;
+  //
   FFileName := '';
   FFormatSettings := AFormatSettings;
   if AEncoding = Nil then
@@ -387,10 +489,25 @@ end;
 destructor TNPCLexer.Destroy;
 begin
   FFileName := '';
+  //FFormatSettings := TFormatSettings.Create;
+  FEncoding := Nil;
+  //
+  IdentifierCharset := [];
+  NumberCharset := [];
+  StringCharset := [];
+  //
   SetLength(FSource, 0);
   PSource := Nil;
-//  SetLength(FTokens, 0);
-//  FEncoding.Free;
+  FLines := 0;
+  //
+  cur := Nil;
+  bol := Nil;
+  row := 0;
+  //
+  skip_cur := Nil;
+  skip_bol := Nil;
+  skip_row := 0;
+  //
   inherited;
 end;
 
@@ -473,6 +590,15 @@ begin
   Result := FEncoding.GetString(FSource, Index, 1)[1];
 end;
 
+function TNPCLexer.Get2Chars: TNPCDoubleLiteral;
+var
+  temp: String;
+begin
+  temp := FEncoding.GetString(FSource, cur - PSource, 2);
+  Result := temp[1] + temp[2];
+  temp := '';
+end;
+
 function TNPCLexer.NextChar: Char;
 var
   x: PByte;
@@ -489,16 +615,21 @@ begin
   end;
 end;
 
-procedure TNPCLexer.EatChar;
+procedure TNPCLexer.SkipChar(const SkipTwoChars: Boolean = False);
 var
   x: Char;
+  xadd: Byte;
 begin
+  xadd := 1;
+  if SkipTwoChars then
+    xadd := 2;
+  //
   if IsNotEmpty then begin
     x := GetChar;
     if cur^ < 128 then
-      Inc(cur)
+      Inc(cur, xadd)
     else
-      Inc(cur, FEncoding.GetCharCount(FSource, cur - PSource, 1));
+      Inc(cur, FEncoding.GetCharCount(FSource, cur - PSource, xadd));
     if CharInSet(x, [#13, #10]) then begin
       if x = #13 then begin // CR
         if IsNotEmpty and (cur^ = 10) then begin
@@ -543,177 +674,293 @@ begin
   Result := IsReservedWord(AMD5);
 end;
 
-function TNPCLexer.NextToken: TNPCToken;
+function TNPCLexer.GetToken(const ConsumeToken: Boolean): TNPCToken;
 var
   loc: TNPCLocation;
   first, escape: Char;
   start: PByte;
   stemp: String;
+  first2: TNPCDoubleLiteral;
   md5: TNPCMD5;
   reserved: Boolean;
-  token: TNPCLiteralToken;
+  ltoken: TNPCLiteralToken;
+  dltoken: TNPCDoubleLiteralToken;
+//  StringBeginRow,
+//  StringBeginCol,
+//  StringEndRow,
+//  StringEndCol: Integer;
+  //
+  save_cur: PByte;
+  save_bol: PByte;
+  save_row: Integer;
 begin
   Result := Nil;
-  SkipWhitespace;
-  while IsNotEmpty do begin
-    if {not ((Char(cur^) = '/') and (NextChar = '/')) and}
-       not (Char(cur^) in [#13, #10]) then
-      Break;
-    SkipLine;
+  if not ConsumeToken then begin
+    save_cur := cur;
+    save_bol := bol;
+    save_row := row;
+  end;
+  //
+  try
     SkipWhitespace;
-  end;
-
-  loc := Location;
-
-  if IsEmpty then begin
-    Result := TNPCToken.Create(tokEOF, loc, False, False, '', EmptyTokenMD5);
-    Exit;
-  end;
-
-  first := GetChar;
-
-  if first.IsLetter or (first = '_') then begin
-    start := cur;
-    EatChar;
-    while IsNotEmpty and (GetChar.IsLetterOrDigit or (Char(cur^) = '_')) do
-      EatChar;
-    loc.SetEndRowCol(row, cur - bol + 1);
-    stemp := TokenString(start, cur);
-    md5 := TokenMD5(LowerCase(stemp));
-    reserved := TokenIsReserved(md5);
-    Result := TNPCToken.Create(tokIdent, loc, reserved, False, stemp, md5);
-    stemp := '';
-    Exit;
-  end;
-
-  if first in ['(', ')', '{', '}', '[', ']', '.', ',', ':', ';', '@', '$', '%', '^', '&', '*', '-', '+', '=', '<', '>', '/'] then begin
-    // check for biliterals
-    if (first = '/') and (NextChar = '/') then begin // // - singleline comment
-      start := cur;
-      EatChar;
-      while IsNotEmpty and not (Char(cur^) in [#13, #10]) do
-        EatChar;
-      loc.SetEndRowCol(row, cur - bol + 1);
-      stemp := TokenString(start, cur);
-      Result := TNPCToken.Create(tokCommentSL, loc, False, True, stemp, EmptyTokenMD5);
-      Exit;
-    end;
-
-    if ((first = '(') and (NextChar = '*')) or ((first = '{') and (NextChar = '.')) then begin // (* {. - multiline comment begin
-      start := cur;
-      EatChar;
-      loc.SetEndRowCol(row, cur - bol + 1);
-      stemp := TokenString(start, cur);
-      Result := TNPCToken.Create(tokCommentMLB, loc, False, True, stemp, EmptyTokenMD5);
-      Exit;
-    end;
-
-    if ((first = '*') and (NextChar = ')')) or ((first = '.') and (NextChar = '}')) then begin // *) .} - multiline comment end
-      start := cur;
-      EatChar;
-      loc.SetEndRowCol(row, cur - bol + 1);
-      stemp := TokenString(start, cur);
-      Result := TNPCToken.Create(tokCommentMLE, loc, False, True, stemp, EmptyTokenMD5);
-      Exit;
-    end;
-
-    if (first = ':') and (NextChar = '=') then begin // := - assign
-      start := cur;
-      EatChar;
-      loc.SetEndRowCol(row, cur - bol + 1);
-      stemp := TokenString(start, cur);
-      Result := TNPCToken.Create(tokAssign, loc, False, True, stemp, EmptyTokenMD5);
-      Exit;
-    end;
-
-    // check for literals
-    for token in NPCLiteralTokens do begin
-      if first = token.Literal then begin
-        EatChar;
-        Result := TNPCToken.Create(token.TokenType, loc, False, True, first, EmptyTokenMD5);
-        Exit;
-      end;
-    end;
-  end;
-
-  if first.IsNumber or (first = '-') or (first = '$') then begin // 1234567890; 12345.67890; 0x12345678; 123_456_789; 0x12_34_56_78; 12_345.67890
-    start := cur;
-    EatChar;
-    while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_') or (Char(cur^) = 'x')) do
-      EatChar;
-    loc.SetEndRowCol(row, cur - bol + 1);
-    stemp := TokenString(start, cur);
-    Result := TNPCToken.Create(tokNumber, loc, False, False, stemp, EmptyTokenMD5);
-    stemp := '';
-    Exit;
-  end;
-
-  if first = '''' then begin // string
-    EatChar;
-    //start := cur;
-    stemp := '';
     while IsNotEmpty do begin
-      first := GetChar;
-      case first of
-        '''': Break;
-        '\': begin // escaping string
-          EatChar;
-          if IsEmpty then
-            raise NPCLexerException.LexerError(loc, 'unfinished escape sequence');
-
-          escape := GetChar;
-          case escape of
-            'n': begin // escaping \n - new line
-              stemp := stemp + #13#10;
-              EatChar;
-            end;
-            '\': begin // escaping \\ - single \
-              stemp := stemp + '\';
-              EatChar;
-            end;
-            '''': begin // escaping \' - single quote
-              stemp := stemp + '''';
-              EatChar;
-            end;
-          else
-            raise NPCLexerException.LexerError(loc, 'unknown escape sequence starts with \' + escape);
-          end;
-        end;
-      else
-        stemp := stemp + first;
-        EatChar;
-      end;
+      if {not ((Char(cur^) = '/') and (NextChar = '/')) and}
+         not (Char(cur^) in [#13, #10]) then
+        Break;
+      SkipLine;
+      SkipWhitespace;
     end;
-    loc.SetEndRowCol(row, cur - bol + 1);
 
-    if IsNotEmpty then begin
-      EatChar;
-      Result := TNPCToken.Create(tokString, loc, False, False, stemp, EmptyTokenMD5);
+    loc := Location;
+
+    if IsEmpty then begin
+      Result := TNPCToken.Create(tokEOF, loc, False, False, '', EmptyTokenMD5);
+      Exit;
+    end;
+
+    first := GetChar;
+
+//  LiteralCharset := ['(', ')', '{', '}', '[', ']', '.', ',', ':', ';', '!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=', '<', '>', '/'];
+//  IdentifierCharset := ['0'..'9', 'a'..'z', 'A'..'Z', '_', '.'];
+//  NumberCharset := ['0'..'9', '-', '.', 'e', 'E', '$', 'x'];
+//  StringCharset := ['_', '-', '.'];
+
+    if loIdentWithMinus in FOptions then
+      IdentifierCharset := IdentifierCharset + ['-'];
+
+    if first.IsLetter or (first = '_') then begin // ident
+      start := cur;
+      SkipChar;
+      while IsNotEmpty and (GetChar.IsLetterOrDigit or (Char(cur^) in IdentifierCharset)) do
+        SkipChar;
+      loc.SetEndRowCol(row, cur - bol + 1);
+      stemp := TokenString(start, cur);
+      md5 := TokenMD5(LowerCase(stemp));
+      reserved := TokenIsReserved(md5);
+      Result := TNPCToken.Create(tokIdent, loc, reserved, False, stemp, md5);
       stemp := '';
       Exit;
-    end
-    else
-      raise NPCLexerException.LexerError(loc, Format('unclosed string literal "%s"', [stemp]));
-  end;
+    end;
 
-  raise NPCLexerException.LexerError(loc, Format('unknown token starts with "%s"', [first]));
+    if first in LiteralCharset then begin // literals
+      // check for biliterals
+
+      if (first = '/') and (NextChar = '/') then begin // // - singleline comment
+        start := cur;
+        SkipChar;
+        while IsNotEmpty and not (Char(cur^) in [#13, #10]) do
+          SkipChar;
+        loc.SetEndRowCol(row, cur - bol + 1);
+        stemp := TokenString(start, cur);
+        Result := TNPCToken.Create(tokCommentSL, loc, False, True, stemp, EmptyTokenMD5);
+        Exit;
+      end;
+
+//      if ((first = '(') and (NextChar = '*')) or ((first = '{') and (NextChar = '.')) then begin // (* {. - multiline comment begin
+//        start := cur;
+//        SkipChar;
+//        loc.SetEndRowCol(row, cur - bol + 1);
+//        stemp := TokenString(start, cur);
+//        Result := TNPCToken.Create(tokCommentMLB, loc, False, True, stemp, EmptyTokenMD5);
+//        Exit;
+//      end;
+//
+//      if ((first = '*') and (NextChar = ')')) or ((first = '.') and (NextChar = '}')) then begin // *) .} - multiline comment end
+//        start := cur;
+//        SkipChar;
+//        loc.SetEndRowCol(row, cur - bol + 1);
+//        stemp := TokenString(start, cur);
+//        Result := TNPCToken.Create(tokCommentMLE, loc, False, True, stemp, EmptyTokenMD5);
+//        Exit;
+//      end;
+//
+//      if (first = ':') and (NextChar = '=') then begin // := - assign
+//        start := cur;
+//        SkipChar;
+//        loc.SetEndRowCol(row, cur - bol + 1);
+//        stemp := TokenString(start, cur);
+//        Result := TNPCToken.Create(tokAssign, loc, False, True, stemp, EmptyTokenMD5);
+//        Exit;
+//      end;
+
+      for dltoken in NPCDoubleLiteralTokens do begin
+        first2 := Get2Chars;
+        if first2 = dltoken.DoubleLiteral then begin
+          SkipChar(True);
+          loc.SetEndRowCol(row, cur - bol + 1);
+          Result := TNPCToken.Create(dltoken.TokenType, loc, False, True, first2, EmptyTokenMD5);
+          first2 := '';
+          Exit;
+        end;
+        first2 := '';
+      end;
+
+      // check for literals
+      for ltoken in NPCLiteralTokens do begin
+        if first = ltoken.Literal then begin
+          SkipChar;
+          Result := TNPCToken.Create(ltoken.TokenType, loc, False, True, first, EmptyTokenMD5);
+          Exit;
+        end;
+      end;
+    end;
+
+    if {first.IsNumber or} (first in NumberCharset) then begin // 1234567890; 12345.67890; 0x12345678; 123_456_789; 0x12_34_56_78; 12_345.67890
+      start := cur;
+      SkipChar;
+      //while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_') or (Char(cur^) = 'x')) do
+      while IsNotEmpty and (Char(cur^) in NumberCharset) do
+        SkipChar;
+      loc.SetEndRowCol(row, cur - bol + 1);
+      stemp := TokenString(start, cur);
+      Result := TNPCToken.Create(tokNumber, loc, False, False, stemp, EmptyTokenMD5);
+      stemp := '';
+      Exit;
+    end;
+
+    if first = '''' then begin // string
+//      StringBeginRow := row;
+//      StringBeginCol := cur - bol + 1;
+//      StringEndRow := 0;
+//      StringEndCol := 0;
+      SkipChar;
+      //start := cur;
+      stemp := '';
+      while IsNotEmpty do begin
+        first := GetChar;
+        case first of
+          '''': begin
+//            StringEndRow := row;
+//            StringEndCol := cur - bol + 1;
+            Break;
+          end;
+          '\': begin // escaping string
+            SkipChar;
+            if IsEmpty then
+              raise NPCLexerException.LexerError(loc, 'unfinished escape sequence');
+
+            escape := GetChar;
+            case escape of
+              'n': begin // escaping \n - new line
+                stemp := stemp + #13#10;
+                SkipChar;
+              end;
+              '\': begin // escaping \\ - single \
+                stemp := stemp + '\';
+                SkipChar;
+              end;
+              '''': begin // escaping \' - single quote
+                stemp := stemp + '''';
+                SkipChar;
+              end;
+            else
+              raise NPCLexerException.LexerError(loc, 'unknown escape sequence starts with \' + escape);
+            end;
+          end;
+        else
+          stemp := stemp + first;
+          SkipChar;
+        end;
+      end;
+      loc.SetEndRowCol(row, cur - bol + 1);
+      SkipChar;
+
+      if IsNotEmpty then begin
+        Result := TNPCToken.Create(tokString, loc, False, False, stemp, EmptyTokenMD5);
+//        Result.StringBeginRow := StringBeginRow;
+//        Result.StringBeginCol := StringBeginCol;
+//        Result.StringEndRow := StringEndRow;
+//        Result.StringEndCol := StringEndCol;
+        stemp := '';
+        Exit;
+      end
+      else
+        raise NPCLexerException.LexerError(loc, Format('unclosed string literal "%s"', [stemp]));
+    end;
+
+    raise NPCLexerException.LexerError(loc, Format('unknown token starts with "%s"', [first]));
+  finally
+    if loIdentWithMinus in FOptions then
+      IdentifierCharset := IdentifierCharset - ['-'];
+    //
+    if not ConsumeToken then begin
+      skip_cur := cur;
+      skip_bol := bol;
+      skip_row := row;
+      //
+      cur := save_cur;
+      bol := save_bol;
+      row := save_row;
+    end;
+  end;
 end;
 
-function TNPCLexer.ExpectToken(const ATokens: Array of TNPCTokenType): TNPCToken;
+function TNPCLexer.GetToken: TNPCToken;
+begin
+  if skip_cur <> Nil then begin
+    skip_cur := Nil;
+    skip_bol := Nil;
+    skip_row := 0;
+  end;
+  Result := GetToken(True);
+end;
+
+function TNPCLexer.NextToken: TNPCToken;
+begin
+  Result := GetToken(False);
+end;
+
+procedure TNPCLexer.SkipToken;
+begin
+  if skip_cur <> Nil then begin
+    cur := skip_cur;
+    bol := skip_bol;
+    row := skip_row;
+    //
+    skip_cur := Nil;
+    skip_bol := Nil;
+    skip_row := 0;
+  end;
+end;
+
+function TNPCLexer.ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
+var
+  token: Char;
+  tempOptions: TNPCLexerOptions;
+begin
+  tempOptions := FOptions;
+  try
+    if IdentWithMinus then
+      FOptions := FOptions + [loIdentWithMinus];
+    Result := GetToken;
+    if Result = Nil then begin
+      raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
+    end;
+
+    for token in ATokens do begin
+      if Result.&Type = token then
+        Exit;
+    end;
+
+    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
+  finally
+    FOptions := tempOptions;
+  end;
+end;
+
+function TNPCLexer.ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
 var
   token: Char;
 begin
-  Result := NextToken;
+  Result := GetToken;
   if Result = Nil then begin
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
+    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', ['ident']));
   end;
 
-  for token in ATokens do begin
-    if Result.&Type = token then
-      Exit;
-  end;
+  if (Result.&Type = tokIdent) and Result.ReservedWord and (MD5ToReservedWord(Result.ValueHash) = AReservedWord) then
+    Exit;
 
-  raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
+  raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [NPCReservedIdentifiers[AReservedWord].Ident, Result.TokenToString]));
 end;
 
 function TNPCLexer.Lines: Integer;
