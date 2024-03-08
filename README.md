@@ -1,4 +1,4 @@
-# NitroPascal
+# ![NitroPascal](./git_res/NitroPascal.png)
 NitroPascal is a concept of new OOP programming language based on Pascal / Delphi.  
 
 ![NitroPascal1](./git_res/NitroPascal1.png)
