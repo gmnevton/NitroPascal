@@ -12,15 +12,46 @@
 {$program-type GUI+Windows32}
 
 imports
+  // imports section
   first_main;
+  
+{. OK, this is a multi-line comment. It can be one line eighter. .}
+{.
+  But for now we need to test this compiler at every possible way we could imagine.
+  So to do this we need some test cases, like this comment.
+.}
+
+(*
+  After that there will be one more comment to test.
+*)
 
 var
   SomeString: String;
+  FirstProgram: Boolean;
+  ErrorMessage: String;
 
 initialization
   // initialization code
   if ConsoleAvailable then
     ConsoleTitle := %project-name%;
+  //
+  FirstProgram := True;
+  //
+  if not FirstProgram then {
+    // nothing here
+  };
+  //
+  if 1 + 2 = 3 + 4 then {
+    if ConsoleAvailable then {
+      Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+    };
+  } else {
+    ErrorMessage := 'This is expected !';
+  };
+  //
+  if ConsoleAvailable and (Length(ErrorMessage) > 0) then {
+    Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+  };
 
 finalization
   // finalization code

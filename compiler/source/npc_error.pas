@@ -91,7 +91,7 @@ const
   RESET   = #$1b'[0m';
 var
   ansi: Boolean;
-  in_comment: Boolean;
+  in_comment: Integer;
   comment_end_tag: String;
 
   function number(var P: PChar): String;
@@ -102,14 +102,14 @@ var
     S := P;
     while P^ in ['0'..'9', '-', '.'] do Inc(P);
     SetString(Result, S, P - S);
-    Result := MAGENTA + Result + RESET;
+    Result := LIGHTMAGENTA + Result + RESET;
   end;
 
   function literal(var P: PChar): String;
   begin
     Result := P^;
     Inc(P);
-    Result := YELLOW + Result + RESET;
+    Result := LIGHTYELLOW + Result + RESET;
   end;
 
   function ident(var P: PChar): String;
@@ -121,6 +121,13 @@ var
     while P^ in ['a'..'z', 'A'..'Z', '_', '.'] do Inc(P);
     SetString(Result, S, P - S);
     Result := LIGHTCYAN + Result + RESET;
+  end;
+
+  function block(var P: PChar): String;
+  begin
+    Result := P^;
+    Inc(P);
+    Result := WHITE + Result + RESET;
   end;
 
   function comment(var P: PChar; const EndTag: String): String;
@@ -138,12 +145,15 @@ var
       while (P^ <> #0) and not (P^ = EndTag[idx]) do Inc(P);
       Inc(idx);
       if (P^ <> #0) and not (P^ = EndTag[idx]) then begin
-        in_comment := True;
+        Inc(in_comment);
         comment_end_tag := EndTag;
       end
       else begin
-        in_comment := False;
-        comment_end_tag := '';
+        Dec(in_comment);
+        if in_comment <= 0 then begin
+          in_comment := 0;
+          comment_end_tag := '';
+        end;
       end;
     end;
     SetString(Result, S, P - S);
@@ -154,7 +164,7 @@ var
   begin
     Result := P^;
     Inc(P);
-    Result := LIGHTGRAY + Result + RESET;
+    Result := WHITE + Result + RESET;
   end;
 
   function strline(var P: PChar): String;
@@ -165,8 +175,10 @@ var
     S := P;
     Inc(P);
     while (P^ <> #0) and not (P^ = '''') do Inc(P);
+    if P^ <> #0 then
+      Inc(P);
     SetString(Result, S, P - S);
-    Result := WHITE + Result + RESET;
+    Result := LIGHTGREEN + Result + RESET;
   end;
 
   function syntax_highlight(line: String): String;
@@ -180,7 +192,7 @@ var
 
     Result := '';
     P := PChar(line);
-    if in_comment then
+    if in_comment > 0 then
       Result := Result + comment(P, comment_end_tag)
     else begin
       while True do begin
@@ -204,7 +216,15 @@ var
             else
               Result := Result + literal(P);
           end;
-          '{': Result := Result + comment(P, '}');
+          '{': begin
+            S := P;
+            Inc(S);
+            if S^ = '.' then
+              Result := Result + comment(P, '.}')
+            else
+              Result := Result + block(P);
+          end;
+          '}': Result := Result + block(P);
           '(': begin
             S := P;
             Inc(S);
@@ -213,6 +233,7 @@ var
             else
               Result := Result + literal(P);
           end;
+          ')': Result := Result + literal(P);
           'A'..'Z': Result := Result + ident(P);
           'a'..'z': Result := Result + ident(P);
           '''': Result := Result + strline(P);
@@ -242,7 +263,7 @@ begin
     end;
   end;
 
-  in_comment := False;
+  in_comment := 0;
   Result := '';
   try
     list := TStringList.Create;
@@ -291,7 +312,7 @@ begin
                 Result := Result + line[j];
 
                 if j = ident_end then
-                  Result := Result + NORMAL;
+                  Result := Result + RESET;
               end;
             end
             else begin
