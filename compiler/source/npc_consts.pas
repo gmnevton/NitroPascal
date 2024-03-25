@@ -26,8 +26,8 @@ const
   sExpression  = 'expression';
 
   sParserUnexpectedTokenIn = 'unexpected token "%s" in %s%s';
-  sParserUnexpectedType               = 'unexpected type "%s", expected "%s"';
-  sParserSectionHasNoBody             = '"%s" section has no body';
+  sParserUnexpectedType    = 'unexpected type "%s", expected "%s"';
+  sParserSectionHasNoBody  = '"%s" section has no body';
 
   sProjectError = '%s - ProjectError(%s): %s';
 

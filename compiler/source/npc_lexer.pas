@@ -40,37 +40,39 @@ const
 
   tokExclamation  = TNPCTokenType(13); // !
   tokAt           = TNPCTokenType(14); // @
-  tokDollar       = TNPCTokenType(15); // $
-  tokPercent      = TNPCTokenType(16); // %
-  tokDash         = TNPCTokenType(17); // ^
-  tokAmpersand    = TNPCTokenType(18); // &
-  tokAsterisk     = TNPCTokenType(19); // *
-  tokMinus        = TNPCTokenType(20); // -
-  tokPlus         = TNPCTokenType(21); // +
-  tokEqual        = TNPCTokenType(22); // =
-  tokLessThan     = TNPCTokenType(23); // <
-  tokGreaterThan  = TNPCTokenType(24); // >
-  tokDiv          = TNPCTokenType(25); // /
+  tokHash         = TNPCTokenType(15); // #
+  tokDollar       = TNPCTokenType(16); // $
+  tokPercent      = TNPCTokenType(17); // %
+  tokDash         = TNPCTokenType(18); // ^
+  tokAmpersand    = TNPCTokenType(19); // &
+  tokAsterisk     = TNPCTokenType(20); // *
+  tokMinus        = TNPCTokenType(21); // -
+  tokPlus         = TNPCTokenType(22); // +
+  tokEqual        = TNPCTokenType(23); // =
+  tokLessThan     = TNPCTokenType(24); // <
+  tokGreaterThan  = TNPCTokenType(25); // >
+  tokDiv          = TNPCTokenType(26); // /
 
-  tokIdent        = TNPCTokenType(26); // reserved word or reserved symbol or other name
-  tokNumber       = TNPCTokenType(27); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
-  tokString       = TNPCTokenType(28); // 'text'
-  tokCommentSL    = TNPCTokenType(29); // singleline: //
-  tokCommentMLB   = TNPCTokenType(30); // multiline-begin: {. (*
-  tokCommentMLE   = TNPCTokenType(31); // multiline-end  : .} *)
-  tokAssign       = TNPCTokenType(32); // :=
-  tokLessEqual    = TNPCTokenType(33); // <=
-  tokGreaterEqual = TNPCTokenType(34); // >=
-  tokNotEqual     = TNPCTokenType(35); // != - alias for '<>': same as not (A = B) used like in C++: A != B
+  tokIdent        = TNPCTokenType(27); // reserved word or reserved symbol or other name
+  tokNumber       = TNPCTokenType(28); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
+  tokString       = TNPCTokenType(29); // 'text'
+  tokChar         = TNPCTokenType(30); // #12345; #12_345; #$AB; #$AB_CD
+  tokCommentSL    = TNPCTokenType(31); // singleline: //
+  tokCommentMLB   = TNPCTokenType(32); // multiline-begin: {. (*
+  tokCommentMLE   = TNPCTokenType(33); // multiline-end  : .} *)
+  tokAssign       = TNPCTokenType(34); // :=
+  tokLessEqual    = TNPCTokenType(35); // <=
+  tokGreaterEqual = TNPCTokenType(36); // >=
+  tokNotEqual     = TNPCTokenType(37); // != - alias for '<>': same as not (A = B) used like in C++: A != B
 //  tok       = TNPCTokenType(32); // :=
 //  tok       = TNPCTokenType(32); // :=
 
-  tokSetting      = TNPCTokenType(36); // {$...} or {$define ...} or {$(condition) ...}
-  tokResource     = TNPCTokenType(37); // {$resources ...}
-  tokSpecifier    = TNPCTokenType(38); // {@...}
-  tokCompilerVar  = TNPCTokenType(39); // %...%
+  tokSetting      = TNPCTokenType(38); // {$...} or {$define ...} or {$(condition) ...}
+  tokResource     = TNPCTokenType(39); // {$resources ...}
+  tokSpecifier    = TNPCTokenType(40); // {@...}
+  tokCompilerVar  = TNPCTokenType(41); // %...%
 
-  tokMAX = 40;
+  tokMAX = 42;
 
   NPCTokensType: Array[0..tokMAX - 1] of String = (
     'end of file',
@@ -99,9 +101,11 @@ const
     'literal',
     'literal',
     'literal',
+    'literal',
     'identifier',
     'number',
     'string',
+    'char',
     'comment-sl',
     'comment-mlb',
     'comment-mle',
@@ -145,6 +149,7 @@ const
 
     (Literal: '!';  TokenType: tokExclamation),
     (Literal: '@';  TokenType: tokAt),
+//    (Literal: '#';  TokenType: tokHash),
     (Literal: '$';  TokenType: tokDollar),
     (Literal: '%';  TokenType: tokPercent),
     (Literal: '^';  TokenType: tokDash),
@@ -805,16 +810,33 @@ begin
       end;
     end;
 
-    if {first.IsNumber or} (first in NumberCharset) then begin // 1234567890; 12345.67890; 0x12345678; 123_456_789; 0x12_34_56_78; 12_345.67890
+    if (first = '#') or (first in NumberCharset) then begin // 1234567890; 12345.67890; 0x12345678; 123_456_789; 0x12_34_56_78; 12_345.67890; #12345; #$AB
       start := cur;
       SkipChar;
-      //while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_') or (Char(cur^) = 'x')) do
-      while IsNotEmpty and (Char(cur^) in NumberCharset) do
-        SkipChar;
-      loc.SetEndRowCol(row, cur - bol + 1);
-      stemp := TokenString(start, cur);
-      Result := TNPCToken.Create(tokNumber, loc, False, False, stemp, EmptyTokenMD5);
-      stemp := '';
+      if first = '#' then begin
+        if Char(cur^) = '$' then begin
+          SkipChar;
+          while IsNotEmpty and (Char(cur^) in ['0'..'9', 'a'..'f', 'A'..'F', '_']) do
+            SkipChar;
+        end
+        else begin
+          while IsNotEmpty and (Char(cur^) in ['0'..'9', '_']) do
+            SkipChar;
+        end;
+        loc.SetEndRowCol(row, cur - bol + 1);
+        stemp := TokenString(start, cur);
+        Result := TNPCToken.Create(tokChar, loc, False, False, stemp, EmptyTokenMD5);
+        stemp := '';
+      end
+      else begin
+        //while IsNotEmpty and (Char(cur^).IsDigit or (Char(cur^) = '.') or (Char(cur^) = '_') or (Char(cur^) = 'x')) do
+        while IsNotEmpty and (Char(cur^) in NumberCharset) do
+          SkipChar;
+        loc.SetEndRowCol(row, cur - bol + 1);
+        stemp := TokenString(start, cur);
+        Result := TNPCToken.Create(tokNumber, loc, False, False, stemp, EmptyTokenMD5);
+        stemp := '';
+      end;
       Exit;
     end;
 
@@ -841,6 +863,7 @@ begin
 
             escape := GetChar;
             case escape of
+              'r',
               'n': begin // escaping \n - new line
                 stemp := stemp + #13#10;
                 SkipChar;
@@ -854,6 +877,8 @@ begin
                 SkipChar;
               end;
             else
+              Inc(loc.StartCol);
+              loc.SetEndRowCol(row, cur - bol + 1);
               raise NPCLexerException.LexerError(loc, 'unknown escape sequence starts with \' + escape);
             end;
           end;

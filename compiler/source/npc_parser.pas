@@ -41,7 +41,11 @@ type
     Settings: Pointer;
     TokensArray: TNPCTokens;
     Imports: TNPCImportArray;
+    FLevel: Integer;
   protected
+    function Unescape(const Value: String): String;
+    procedure IncLevel; inline;
+    procedure DecLevel; inline;
     procedure Clear;
     procedure AddToken(const AToken: TNPCToken);
     procedure AddImport(const AImportType: TNPCImportType; const AImportName: String; const AImportPath: String);
@@ -71,6 +75,7 @@ type
     procedure ParseExpressionSimpleExpression;
     procedure ParseExpressionTerm;
     procedure ParseExpressionFactor;
+    procedure ParseCallParams(const AToken: TNPCToken);
 
     procedure ParseIf(const AToken: TNPCToken);
     procedure ParseIfExpression;
@@ -79,6 +84,8 @@ type
     procedure ParseIfFactor;
     procedure ParseIfStatement;
     procedure ParseIfStatementFuncParams(const AToken: TNPCToken);
+
+    procedure ParseCase(const AToken: TNPCToken);
 
     procedure ParseImports(const AToken: TNPCToken);
     procedure ParseExports(const AToken: TNPCToken);
@@ -91,7 +98,7 @@ type
     procedure ParseEnd(const AToken: TNPCToken);
 
     function  ParseDeclarations(const AToken: TNPCToken): Boolean;
-    function  ParseStatements(const AToken: TNPCToken): Boolean;
+    function  ParseStatements(var AToken: TNPCToken; const AExitOnReservedIdents: Array of TNPCReservedIdents; const ALevel: Integer): Boolean;
     procedure ParseLambdaParams(const AToken: TNPCToken);
   public
     constructor Create(const ALexer: TNPCLexer; const PSettings: Pointer);
@@ -125,6 +132,7 @@ begin
   SetLength(TokensArray, 0);
   //Imports := TFastStringList.Create;
   SetLength(Imports, 0);
+  FLevel := 0;
 end;
 
 destructor TNPCParser.Destroy;
@@ -133,6 +141,62 @@ begin
 //  Imports.Free;
   Clear;
   inherited;
+end;
+
+function TNPCParser.Unescape(const Value: String): String;
+var
+  sLen, sIndex: Integer;
+begin
+  sLen:=Length(Value);
+  sIndex := 1;
+  Result:=Value;
+  while sIndex <= sLen do begin
+    case Result[sIndex] of
+      #13: begin
+        Result[sIndex]:='\';
+        Insert('r', Result, sIndex + 1);
+        Inc(sIndex);
+        Inc(sLen);
+      end;
+      #10: begin
+        Result[sIndex]:='\';
+        Insert('n', Result, sIndex + 1);
+        Inc(sIndex);
+        Inc(sLen);
+      end;
+      #9: begin
+        Result[sIndex]:='\';
+        Insert('t', Result, sIndex + 1);
+        Inc(sIndex);
+        Inc(sLen);
+      end;
+      '"': begin
+        Result[sIndex]:='\';
+        Insert('"', Result, sIndex + 1);
+        Inc(sIndex);
+        Inc(sLen);
+      end;
+      '''': begin
+        Result[sIndex]:='\';
+        Insert('''', Result, sIndex + 1);
+        Inc(sIndex);
+        Inc(sLen);
+      end;
+    end;
+    Inc(sIndex);
+  end;
+end;
+
+procedure TNPCParser.IncLevel;
+begin
+  Inc(FLevel);
+end;
+
+procedure TNPCParser.DecLevel;
+begin
+  Dec(FLevel);
+  if FLevel < 0 then
+    FLevel := 0;
 end;
 
 procedure TNPCParser.Clear;
@@ -506,7 +570,7 @@ end;
 //
 // term        = factor { ('*' | '/' | 'div' | 'mod' | 'and' | 'shr' | 'shl') factor } .
 //
-// factor      = number | ident | 'nil'
+// factor      = number | ident | string | char | 'nil'
 //             | 'not' factor
 //             | '@' factor
 //             | 'inherited' [ factor ]
@@ -538,7 +602,8 @@ begin
     else if TokenIsReservedSymbol(token, ';') then
       Break
     else
-      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      Break;
+//      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'expression ', sStatement]));
     //
     Lexer.SkipToken;
   end;
@@ -560,7 +625,8 @@ begin
     else if TokenIsReservedSymbol(token, ';') then
       Break
     else
-      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      Break;
+//      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'expression ', sStatement]));
     //
     Lexer.SkipToken;
   end;
@@ -587,7 +653,8 @@ begin
     else if TokenIsReservedSymbol(token, ';') then
       Break
     else
-      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      Break;
+//      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'expression ', sStatement]));
     //
     Lexer.SkipToken;
   end;
@@ -598,7 +665,7 @@ var
   token: TNPCToken;
 begin
   token := Lexer.NextToken;
-  if not token.ReservedWord and (token.&Type in [tokIdent, tokNumber]) then begin
+  if not token.ReservedWord and (token.&Type in [tokIdent..tokChar]) then begin
     AddToken(token);
     Lexer.SkipToken;
   end
@@ -680,12 +747,63 @@ begin
   else if TokenIsReservedSymbol(token, ';') then
     Exit
   else
-    raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+    raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'expression ', sStatement]));
+end;
+
+procedure TNPCParser.ParseCallParams(const AToken: TNPCToken);
+var
+  token: TNPCToken;
+begin
+  AddToken(AToken); // '('
+  Lexer.SkipToken;
+  //
+  while Lexer.IsNotEmpty do begin
+    SkipComments;
+    token := Lexer.NextToken;
+    if not token.ReservedWord and not token.ReservedSymbol and (token.&Type in [tokIdent..tokChar]) then begin
+      AddToken(token);
+      Lexer.SkipToken; // move forward
+      Continue;
+    end
+    else if TokenIsReservedIdent(token) then begin
+      if TokenIsReservedIdent(token, ri_asm) then begin
+        IncLevel;
+      end
+      else if TokenIsReservedIdent(token, ri_case) then begin
+        IncLevel;
+        ParseCase(token);
+        Continue;
+      end
+      else if TokenIsReservedIdent(token, ri_if) then begin
+        IncLevel;
+        ParseIf(token);
+        Continue;
+      end
+      else if TokenIsReservedIdent(token, ri_inherited) then begin
+      end
+      else
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'call params ', sSection]));
+    end
+    else if TokenIsReservedSymbol(token, ')') then begin
+      AddToken(token);
+      Lexer.SkipToken; // move forward
+      token := Lexer.NextToken; // just peek a token
+      if TokenIsReservedSymbol(token, ';') then
+        AddToken(Lexer.GetToken);
+      Break;
+    end
+//    else
+//      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sStatement]));
+    else
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'call params ', sStatement]));
+    //
+    Lexer.SkipToken;
+  end;
 end;
 
 // if_stmt    = 'if' expr 'then' stmt ['else' stmt] ';' .
 //
-// expr        = simp_expr [ ('<' | '<=' | '=' | '>' | '>=' | ('<>' | '!=')) simp_expr ] ';' .
+// expr        = simp_expr [ ('<' | '<=' | '=' | '>' | '>=' | ('<>' | '!=')) simp_expr ] [ ';' ] .
 //
 // simp_expr   = term { ('+' | '-' | 'or') term } .
 //
@@ -693,7 +811,7 @@ end;
 //
 // exp         = factor { [ '^' ] exp } .
 //
-// call_params = '(' exp { ',' exp } ')' .
+// call_params = '(' expr { ',' expr } ')' .
 //
 // call       = ident [ call_params ] .
 //
@@ -834,9 +952,27 @@ begin
     ParseIfFactor;
   end
   else if TokenIsReservedSymbol(token, '(') then begin
-    AddToken(token);
-    Lexer.SkipToken;
-    ParseIfExpression;
+    if (LastToken <> Nil) and not LastToken.ReservedWord and (LastToken.&Type = tokIdent) then
+      ParseCallParams(token)
+    else begin
+      AddToken(token);
+      Lexer.SkipToken;
+      while Lexer.IsNotEmpty do begin
+        ParseExpression;
+        token := Lexer.NextToken;
+        if TokenIsReservedSymbol(token, ',') then begin
+          AddToken(token);
+          Lexer.SkipToken;
+        end
+        else if TokenIsReservedSymbol(token, ')') then begin
+//          AddToken(token);
+//          Lexer.SkipToken;
+          Break;
+        end;
+//        else
+//          raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      end;
+    end;
     AddToken(Lexer.ExpectToken([tokCParen]));
   end
   else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, '}') then
@@ -893,18 +1029,32 @@ begin
     AddToken(token);
     Lexer.SkipToken;
     while Lexer.IsNotEmpty do begin
-      ParseIfExpression;
       token := Lexer.NextToken;
-      if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, '}') then begin
+      if not ParseStatements(token, [], FLevel + 1) then begin
+        if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, '}') then begin
+          AddToken(token);
+          Lexer.SkipToken;
+          token := Lexer.NextToken;
+          if TokenIsReservedSymbol(token, ';') then
+            AddToken(Lexer.GetToken);
+          Break;
+        end
+        else if TokenIsReservedSymbol(token, ';') then begin
+          AddToken(token);
+          Lexer.SkipToken;
+          Break;
+        end
+        else
+          raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      end
+      else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, '}') then begin
         AddToken(token);
         Lexer.SkipToken;
         token := Lexer.NextToken;
         if TokenIsReservedSymbol(token, ';') then
           AddToken(Lexer.GetToken);
         Break;
-      end
-      else
-        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      end;
     end;
     //AddToken(Lexer.ExpectToken([tokSemicolon]));
   end
@@ -949,6 +1099,11 @@ begin
     //
     Lexer.SkipToken;
   end;
+end;
+
+procedure TNPCParser.ParseCase(const AToken: TNPCToken);
+begin
+
 end;
 
 (*
@@ -1129,87 +1284,33 @@ begin
   while Lexer.IsNotEmpty do begin
     SkipComments;
     token := Lexer.NextToken; // just peek a token
-//    if ParseStatements(token) then begin
-//      // if statements ware parsed than do nothing
-//    end
-//    else
-    if TokenIsReservedIdent(token) then begin
+    if ParseStatements(token, [ri_finalization, ri_begin], FLevel + 1) then begin
+      // if statements ware parsed than do nothing
       has_body := True;
-      if TokenIsReservedIdent(token, ri_asm) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_asm) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_begin) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_break) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_case) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_end) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_for) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_goto) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_if) then begin
-        ParseIf(token);
-        Continue;
-      end
-      else if TokenIsReservedIdent(token, ri_inherited) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_label) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_raise) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_repeat) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_try) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_while) then begin
-      end
-      else if TokenIsReservedIdent(token, ri_finalization) or TokenIsReservedIdent(token, ri_begin) then begin
-        if not has_body then
-          raise NPCParserException.ParserError(AToken.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_initialization].Ident]));
-        Break;
-      end
-      else
-        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'initialization ', sSection]));
+    end;
+    //
+    if TokenIsReservedIdent(token, ri_finalization) or TokenIsReservedIdent(token, ri_begin) then begin
+      if not has_body then
+        raise NPCParserException.ParserError(AToken.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_initialization].Ident]));
+      Break;
     end
-    else if TokenIsLiteral(token) or TokenIsBiLiteral(token) then begin
-      if TokenIsReservedSymbol(token, ':=') then begin
-        ParseAssignment(token);
-        Continue;
-      end;
-
-    end
-    else if not token.ReservedWord and not token.ReservedSymbol and (token.&Type = tokIdent) then begin
-      AddToken(token);
-      Lexer.SkipToken; // move forward
-    end
-(*
-      token := Lexer.ExpectToken([tokComma, tokColon]);
-      AddToken(token);
-      if TokenIsReservedSymbol(token, ',') then // comma separated variable names
-        Continue;
-      // we have colon, now get declared type identifier and semicolon at end
-      token := Lexer.GetToken;
-      //if not (token.&Type in [tokIdent..tokString]) then
-      if not (token.&Type = tokIdent) then
-        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInDeclaration, [NPCTokensType[Ord(token.&Type)], 'type']));
-      AddToken(token);
-      AddToken(Lexer.ExpectToken([tokSemicolon]));
-//      if (token.&Type = tokIdent) and Lexer.IsCurrentSymbol('(') then // might be a function call
-//        ParseLambdaParams(token);
-*)
-//    else if TokenIsReservedSymbol(token, ',') then begin
-//      AddToken(token);
-//    end
-//    else if TokenIsReservedSymbol(token, ';') then begin
-//      AddToken(token);
-//      Break;
-//    end
     else
-      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'initialization ', sSection]));
+
+//    else if TokenIsLiteral(token) or TokenIsBiLiteral(token) then begin
+//      if TokenIsReservedSymbol(token, ':=') then begin
+//        ParseAssignment(token);
+//        Continue;
+//      end
+//      else begin
+//        raise NPCParserException.Create('not supported');
+//      end;
+//    end
+//    else if not token.ReservedWord and not token.ReservedSymbol and (token.&Type = tokIdent) then begin
+//      AddToken(token);
+//      Lexer.SkipToken; // move forward
+//    end
+
     //
     Lexer.SkipToken;
   end;
@@ -1264,9 +1365,109 @@ begin
   Result := False;
 end;
 
-function TNPCParser.ParseStatements(const AToken: TNPCToken): Boolean;
+function TNPCParser.ParseStatements(var AToken: TNPCToken; const AExitOnReservedIdents: Array of TNPCReservedIdents; const ALevel: Integer): Boolean;
+var
+  token: TNPCToken;
+  reserved_ident: TNPCReservedIdents;
 begin
   Result := False;
+  while Lexer.IsNotEmpty do begin
+    SkipComments;
+    token := Lexer.NextToken; // just peek a token
+    // check if token is reserved ident on which we wnat to stop parsing statements
+    if Length(AExitOnReservedIdents) > 0 then begin
+      for reserved_ident in AExitOnReservedIdents do begin
+        if TokenIsReservedIdent(token, reserved_ident) then begin
+          AToken := token;
+          Exit;
+        end;
+      end;
+    end;
+    //
+    if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, '}') or TokenIsReservedSymbol(token, ';') then begin
+      AToken := token;
+      Break;
+    end
+    else if TokenIsReservedIdent(token) then begin
+      Result := True;
+      if TokenIsReservedIdent(token, ri_asm) then begin
+        IncLevel;
+      end
+      else if TokenIsReservedIdent(token, ri_begin) then begin
+        IncLevel;
+      end
+      else if TokenIsReservedIdent(token, ri_break) then begin
+        DecLevel;
+      end
+      else if TokenIsReservedIdent(token, ri_case) then begin
+        IncLevel;
+      end
+//      else if TokenIsReservedIdent(token, ri_end) then begin
+//        DecLevel;
+//      end
+      else if TokenIsReservedIdent(token, ri_for) then begin
+        IncLevel;
+      end
+      else if TokenIsReservedIdent(token, ri_goto) then begin
+      end
+      else if TokenIsReservedIdent(token, ri_if) then begin
+        IncLevel;
+        ParseIf(token);
+        if FLevel > ALevel then begin
+          DecLevel;
+//          Break;
+        end;
+        Continue;
+      end
+      else if TokenIsReservedIdent(token, ri_inherited) then begin
+      end
+      else if TokenIsReservedIdent(token, ri_label) then begin
+      end
+      else if TokenIsReservedIdent(token, ri_raise) then begin
+      end
+      else if TokenIsReservedIdent(token, ri_repeat) then begin
+        IncLevel;
+      end
+      else if TokenIsReservedIdent(token, ri_try) then begin
+        IncLevel;
+      end
+      else if TokenIsReservedIdent(token, ri_while) then begin
+        IncLevel;
+      end
+//      else if TokenIsReservedIdent(token, ri_else) then begin
+//        AToken := token;
+//        Break;
+//      end
+      else
+        raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'initialization ', sSection]));
+    end
+    else if TokenIsLiteral(token) or TokenIsBiLiteral(token) then begin
+      Result := True;
+      if TokenIsReservedSymbol(token, ':=') then begin
+        ParseAssignment(token);
+        Continue;
+      end
+      else if TokenIsReservedSymbol(token, '(') then begin // parse function call params
+        ParseCallParams(token);
+        Continue;
+      end
+      else begin
+        AddToken(token);
+        Lexer.SkipToken; // move forward
+        Continue;
+      end;
+    end
+    else if not token.ReservedWord and not token.ReservedSymbol and (token.&Type in [tokIdent..tokChar]) then begin
+      Result := True;
+      AddToken(token);
+      Lexer.SkipToken; // move forward
+      Continue;
+    end
+    else
+      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sStatement]));
+    //
+    Lexer.SkipToken;
+  end;
 end;
 
 procedure TNPCParser.ParseLambdaParams(const AToken: TNPCToken);
@@ -1344,7 +1545,7 @@ begin
       for i:=0 to Length(TokensArray) - 1 do begin
         token := TokensArray[i];
         if Assigned(token) then
-          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"', [token.Location.FileName, token.Location.StartRow, token.Location.StartCol, NPCTokensType[Ord(token.&Type)], token.Value]));
+          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"', [token.Location.FileName, token.Location.StartRow, token.Location.StartCol, NPCTokensType[Ord(token.&Type)], Unescape(token.Value)]));
       end;
     finally
       tf.Free;
