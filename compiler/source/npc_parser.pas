@@ -86,6 +86,12 @@ type
     procedure ParseIfStatementFuncParams(const AToken: TNPCToken);
 
     procedure ParseCase(const AToken: TNPCToken);
+    procedure ParseCaseExpression;
+    procedure ParseCaseSimpleExpression;
+    procedure ParseCaseTerm;
+    procedure ParseCaseFactor;
+    procedure ParseCaseElements;
+    procedure ParseCaseElseStatements;
 
     procedure ParseImports(const AToken: TNPCToken);
     procedure ParseExports(const AToken: TNPCToken);
@@ -1101,7 +1107,173 @@ begin
   end;
 end;
 
+// case         = 'case' expression 'of' case_element { ';' [ 'else' $NOREAD | 'end' $NOREAD | case_element ] } [ 'else' instruction_list ] 'end' [ ';' ] .
+//
+// case_element = case_label ':' instruction .
+//
+// case_label   = constant_expression { ( ',' constant_expression | '..' constant_expression ) } .
+
 procedure TNPCParser.ParseCase(const AToken: TNPCToken);
+var
+  token: TNPCToken;
+begin
+  AddToken(AToken); // 'case'
+  Lexer.SkipToken;
+  ParseCaseExpression; // get everything until 'of'
+  AddToken(Lexer.ExpectReservedToken(ri_of));
+  ParseCaseElements;
+  //
+  SkipComments;
+  token := Lexer.NextToken;
+  if TokenIsReservedIdent(token, ri_else) then begin
+    if (LastToken <> Nil) and TokenIsReservedSymbol(LastToken, ';') then
+      raise NPCParserException.ParserError(LastToken.Location, Format(sParserUnexpectedTokenIn, [LastToken.TokenToString, 'case ', sStatement]));
+    AddToken(token);
+    Lexer.SkipToken;
+    ParseCaseElseStatements;
+  end;
+  if (LastToken <> Nil) and not TokenIsReservedSymbol(LastToken, ';') then
+    raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
+//  AddToken(Lexer.ExpectToken([tokSemicolon]));
+end;
+
+procedure TNPCParser.ParseCaseExpression;
+var
+  token: TNPCToken;
+begin
+  SkipComments;
+  ParseCaseSimpleExpression;
+  token := Lexer.NextToken;
+  if token.ReservedSymbol and (token.&Type in [tokEqual, tokNotEqual, tokLessThan, tokLessEqual, tokGreaterThan, tokGreaterEqual]) then begin
+    AddToken(token);
+    Lexer.SkipToken;
+    ParseCaseSimpleExpression;
+    Exit;
+  end
+  else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, '}') then
+    Exit
+  else if TokenIsReservedSymbol(token, ';') then
+    Exit
+  else if TokenIsReservedIdent(token, ri_of) then
+    Exit
+  else
+    raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
+  //
+  Lexer.SkipToken;
+end;
+
+procedure TNPCParser.ParseCaseSimpleExpression;
+var
+  token: TNPCToken;
+begin
+  ParseCaseTerm;
+  while Lexer.IsNotEmpty do begin
+    SkipComments;
+    token := Lexer.NextToken;
+    if (token.ReservedSymbol and (token.&Type in [tokPlus, tokMinus])) or TokenIsReservedIdent(token, ri_or) or TokenIsReservedIdent(token, ri_xor) then begin
+      AddToken(token);
+      Lexer.SkipToken;
+      ParseCaseTerm;
+      Continue;
+    end
+    else if TokenIsReservedSymbol(token, ';') then
+      Break
+    else if TokenIsReservedIdent(token, ri_of) then
+      Break
+    else
+      Break;
+    //
+    Lexer.SkipToken;
+  end;
+end;
+
+procedure TNPCParser.ParseCaseTerm;
+var
+  token: TNPCToken;
+begin
+  ParseCaseFactor;
+  while Lexer.IsNotEmpty do begin
+    SkipComments;
+    token := Lexer.NextToken;
+    if (token.ReservedSymbol and (token.&Type in [tokAsterisk, tokDiv])) or
+       TokenIsReservedIdent(token, ri_div) or
+       TokenIsReservedIdent(token, ri_mod) or
+       TokenIsReservedIdent(token, ri_and) then begin
+      AddToken(token);
+      Lexer.SkipToken;
+      ParseCaseFactor;
+    end
+    else if TokenIsReservedSymbol(token, ';') then
+      Break
+    else if TokenIsReservedIdent(token, ri_of) then
+      Break
+    else
+      Break;
+//      raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+    //
+    Lexer.SkipToken;
+  end;
+end;
+
+procedure TNPCParser.ParseCaseFactor;
+var
+  token: TNPCToken;
+begin
+  token := Lexer.NextToken;
+  if not token.ReservedWord and (token.&Type in [tokIdent, tokNumber]) then begin
+    AddToken(token);
+    Lexer.SkipToken;
+  end
+  else if TokenIsReservedIdent(token, ri_not) then begin
+    AddToken(token);
+    Lexer.SkipToken;
+    ParseCaseFactor;
+  end
+  else if TokenIsReservedSymbol(token, '%') then begin
+    AddToken(token);
+    Lexer.SkipToken;
+    AddToken(Lexer.ExpectToken([tokIdent], True));
+    AddToken(Lexer.ExpectToken([tokPercent]));
+  end
+  else if (token.ReservedSymbol and (token.&Type in [tokPlus, tokMinus])) then begin
+    AddToken(token);
+    Lexer.SkipToken;
+    ParseCaseFactor;
+  end
+  else if TokenIsReservedSymbol(token, '(') then begin
+    if (LastToken <> Nil) and not LastToken.ReservedWord and (LastToken.&Type = tokIdent) then
+      ParseCallParams(token)
+    else begin
+      AddToken(token);
+      Lexer.SkipToken;
+      while Lexer.IsNotEmpty do begin
+        ParseExpression;
+        token := Lexer.NextToken;
+        if TokenIsReservedSymbol(token, ',') then begin
+          AddToken(token);
+          Lexer.SkipToken;
+        end
+        else if TokenIsReservedSymbol(token, ')') then begin
+          Break;
+        end;
+      end;
+    end;
+    AddToken(Lexer.ExpectToken([tokCParen]));
+  end
+  else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, '}') then
+    Exit
+  else if TokenIsReservedIdent(token, ri_of) then
+    Exit
+  else
+    raise NPCParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
+end;
+
+procedure TNPCParser.ParseCaseElements;
+begin
+
+end;
+
+procedure TNPCParser.ParseCaseElseStatements;
 begin
 
 end;
@@ -1545,7 +1717,11 @@ begin
       for i:=0 to Length(TokensArray) - 1 do begin
         token := TokensArray[i];
         if Assigned(token) then
-          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"', [token.Location.FileName, token.Location.StartRow, token.Location.StartCol, NPCTokensType[Ord(token.&Type)], Unescape(token.Value)]));
+          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"',
+                              [token.Location.FileName, token.Location.StartRow, token.Location.StartCol,
+                               IfThen(token.ReservedWord or token.ReservedSymbol, 'reserved ') +
+                               IfThen(token.ReservedWord, 'word ') +
+                               IfThen(token.ReservedSymbol, 'symbol ') + NPCTokensType[Ord(token.&Type)], Unescape(token.Value)]));
       end;
     finally
       tf.Free;
