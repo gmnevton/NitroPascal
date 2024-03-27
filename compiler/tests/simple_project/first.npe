@@ -25,32 +25,56 @@ imports
   After that there will be one more comment to test.
 *)
 
+//type
+// Enum = (eiOne, eiTwo, eiThree, eiFour, eiFive);
+
 var
   SomeString: String;
   FirstProgram: Boolean;
   ErrorMessage: String;
+  SomeEnum: Enum = eiThree;
 
 initialization
   // initialization code
-  if ConsoleAvailable then
-    ConsoleTitle := %project-name%;
+//  if ConsoleAvailable then
+//    ConsoleTitle := %project-name%;
   //
-  FirstProgram := True;
+//  FirstProgram := True;
   //
-  if not FirstProgram then {
+//  if not FirstProgram then {
     // nothing here
-  };
+//  };
   //
-  if 1 + 2 = 3 + 4 then {
-    if ConsoleAvailable then {
-      Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+//  if 1 + 2 = 3 + 4 then {
+//    if ConsoleAvailable then {
+//      Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+//    };
+//  } else {
+//    ErrorMessage := 'This is expected !';
+//  };
+  //
+//  if ConsoleAvailable and (Length(ErrorMessage) > 0) then {
+//    Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+//  };
+  //
+  case 2 > 1 of {
+    if True: {
     };
-  } else {
-    ErrorMessage := 'This is expected !';
+    if False: {
+    };
   };
   //
-  if ConsoleAvailable and (Length(ErrorMessage) > 0) then {
-    Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+  case SomeEnum of {
+    if .eiOne: {
+    };
+    if .eiTwo: {
+    };
+    if .eiThree: {
+    };
+    if .eiFour: {
+    };
+    if .eiFive: {
+    };
   };
 
 finalization

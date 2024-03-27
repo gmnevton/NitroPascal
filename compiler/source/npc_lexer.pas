@@ -967,7 +967,7 @@ begin
         Exit;
     end;
 
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
+    raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
   finally
     FOptions := tempOptions;
   end;
@@ -985,7 +985,7 @@ begin
   if (Result.&Type = tokIdent) and Result.ReservedWord and (MD5ToReservedWord(Result.ValueHash) = AReservedWord) then
     Exit;
 
-  raise NPCLexerException.LexerError(Location, Format('expected "%s" but got "%s"', [NPCReservedIdentifiers[AReservedWord].Ident, Result.TokenToString]));
+  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedIdentifiers[AReservedWord].Ident, Result.TokenToString]));
 end;
 
 function TNPCLexer.Lines: Integer;
