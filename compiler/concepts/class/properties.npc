@@ -1,0 +1,22 @@
+code 'class properties concept';
+
+type
+  TestClass = class
+  private
+    SomePrivateField: String;
+    SomePrivateFieldInitProc1 = { Return := ''; };
+    SomePrivateFieldInitProc2 = { Return := 'This is a test !'; };
+  protected 
+  public
+  public properties
+    SomeField1: String read SomePrivateField write SomePrivateField init SomePrivateFieldInitProc;
+    SomeField2: String read SomePrivateField write SomePrivateField init SomePrivateFieldInitProc default '';
+    
+    SomeField3: String read SomePrivateField write SomePrivateField init '';
+    SomeField4: String read SomePrivateField write SomePrivateField init { SomePrivateField := ''; };
+
+    SomeField5: String read SomePrivateField write SomePrivateField init 'This is a test !';
+    SomeField6: String read SomePrivateField write SomePrivateField init SomePrivateFieldInitProc2;
+  end;
+  
+end.
