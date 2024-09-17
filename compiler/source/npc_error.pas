@@ -26,6 +26,8 @@ type
     destructor Destroy; override;
   end;
 
+function GetExceptionStackTrace(const E: Exception): String;
+
 implementation
 
 uses
@@ -33,10 +35,87 @@ uses
   StrUtils,
   Math,
   npc_consts,
-  npc_utils;
+  npc_utils,
+  npc_debug_compiler;
 
 const
   iShowSourceCodeLines = 3;
+
+function GetExceptionStackTrace(const E: Exception): String;
+var
+  Stack: String;
+  Inner: Exception;
+begin
+  Inner := E;
+  Result := '';
+  if Inner <> Nil then
+    Result := #13#10'Stack trace:'#13#10;
+  while Inner <> Nil do begin
+    if Length(Result) > 0 then
+      Result := Result + sLineBreak;
+//    Result := Result + Inner.Message;
+//    if (Result <> '') and (Result[Length(Result)] > '.') then
+//      Result := Result + '.';
+
+    Stack := Inner.StackTrace;
+    if Length(Stack) > 0 then begin
+//      if Length(Result) > 0 then
+//        Result := Result + sLineBreak + sLineBreak;
+      Result := Result + Stack + sLineBreak;
+    end;
+
+    Inner := Inner.InnerException;
+    if Inner <> Nil then begin
+      Result := Result + sLineBreak + Inner.Message;
+      if (Result <> '') and (Result[Length(Result)] > '.') then
+        Result := Result + '.';
+    end;
+  end;
+end;
+
+function GetExceptionStackInfo(P: PExceptionRecord): Pointer;
+const
+  cDelphiException = $0EEDFADE;
+var
+  Stack: TStackInfoList;
+  Str: TStringList;
+  Trace: String;
+  Sz: Integer;
+begin
+  if P^.ExceptionCode = cDelphiException then
+    Stack := CreateStackList(False, 3, P^.ExceptAddr)
+  else
+    Stack := CreateStackList(False, 3, P^.ExceptionAddress);
+  try
+    Str := TStringList.Create;
+    try
+      Stack.AddToStrings(Str, True, True, True, True);
+      Trace := Str.Text;
+    finally
+      FreeAndNil(Str);
+    end;
+  finally
+    FreeAndNil(Stack);
+  end;
+
+  if Trace <> '' then begin
+    Sz := (Length(Trace) + 1) * SizeOf(Char);
+    GetMem(Result, Sz);
+    Move(Pointer(Trace)^, Result^, Sz);
+  end
+  else
+    Result := Nil;
+end;
+
+function GetStackInfoString(Info: Pointer): String;
+begin
+  Result := PChar(Info);
+end;
+
+procedure CleanUpStackInfo(Info: Pointer);
+begin
+  FreeMem(Info);
+end;
 
 { TNPCError }
 
@@ -389,5 +468,10 @@ begin
   Message := '';
   inherited;
 end;
+
+initialization
+  Exception.GetExceptionStackInfoProc := GetExceptionStackInfo;
+  Exception.GetStackInfoStringProc := GetStackInfoString;
+  Exception.CleanUpStackInfoProc := CleanUpStackInfo;
 
 end.

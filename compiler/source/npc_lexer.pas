@@ -14,177 +14,16 @@ uses
   Classes,
   npc_md5,
   npc_location,
+  npc_tokens,
   npc_error,
-  npc_reserved_words;
-
-type
-  TNPCTokenType = Char;
-
-const
-//  TNPCTokens = (
-  tokEOF          = TNPCTokenType(0);
-
-  tokOParen       = TNPCTokenType(1);  // (
-  tokCParen       = TNPCTokenType(2);  // )
-  tokOCurly       = TNPCTokenType(3);  // {
-  tokCCurly       = TNPCTokenType(4);  // }
-  tokOBracket     = TNPCTokenType(5);  // [
-  tokCBracket     = TNPCTokenType(6);  // ]
-
-  tokDot          = TNPCTokenType(7);  // .
-  tokComma        = TNPCTokenType(8);  // ,
-  tokColon        = TNPCTokenType(9);  // :
-  tokSemicolon    = TNPCTokenType(10); // ;
-  tokQuote        = TNPCTokenType(11); // '
-  tokDQuote       = TNPCTokenType(12); // "
-
-  tokExclamation  = TNPCTokenType(13); // !
-  tokAt           = TNPCTokenType(14); // @
-  tokHash         = TNPCTokenType(15); // #
-  tokDollar       = TNPCTokenType(16); // $
-  tokPercent      = TNPCTokenType(17); // %
-  tokDash         = TNPCTokenType(18); // ^
-  tokAmpersand    = TNPCTokenType(19); // &
-  tokAsterisk     = TNPCTokenType(20); // *
-  tokMinus        = TNPCTokenType(21); // -
-  tokPlus         = TNPCTokenType(22); // +
-  tokEqual        = TNPCTokenType(23); // =
-  tokLessThan     = TNPCTokenType(24); // <
-  tokGreaterThan  = TNPCTokenType(25); // >
-  tokDiv          = TNPCTokenType(26); // /
-
-  tokIdent        = TNPCTokenType(27); // reserved word or reserved symbol or other name
-  tokNumber       = TNPCTokenType(28); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
-  tokString       = TNPCTokenType(29); // 'text'
-  tokChar         = TNPCTokenType(30); // #12345; #12_345; #$AB; #$AB_CD
-  tokCommentSL    = TNPCTokenType(31); // singleline: //
-  tokCommentMLB   = TNPCTokenType(32); // multiline-begin: {. (*
-  tokCommentMLE   = TNPCTokenType(33); // multiline-end  : .} *)
-  tokAssign       = TNPCTokenType(34); // :=
-  tokLessEqual    = TNPCTokenType(35); // <=
-  tokGreaterEqual = TNPCTokenType(36); // >=
-  tokNotEqual     = TNPCTokenType(37); // != - alias for '<>': same as not (A = B) used like in C++: A != B
-//  tok       = TNPCTokenType(32); // :=
-//  tok       = TNPCTokenType(32); // :=
-
-  tokSetting      = TNPCTokenType(38); // {$...} or {$define ...} or {$(condition) ...}
-  tokResource     = TNPCTokenType(39); // {$resources ...}
-  tokSpecifier    = TNPCTokenType(40); // {@...}
-  tokCompilerVar  = TNPCTokenType(41); // %...%
-
-  tokMAX = 42;
-
-  NPCTokensType: Array[0..tokMAX - 1] of String = (
-    'end of file',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'literal',
-    'identifier',
-    'number',
-    'string',
-    'char',
-    'comment-sl',
-    'comment-mlb',
-    'comment-mle',
-    'assign',
-    'less-equal',
-    'greater-equal',
-    'not-equal',
-    'setting',
-    'resource',
-    'specifier',
-    'compiler-variable'
-  );
-
-type
-  TNPCLiteralToken = record
-    Literal: Char;
-    TokenType: TNPCTokenType;
-  end;
-
-  TNPCDoubleLiteral = String[2];
-  TNPCDoubleLiteralToken = record
-    DoubleLiteral: TNPCDoubleLiteral;
-    TokenType: TNPCTokenType;
-  end;
-
-const
-  NPCLiteralTokens: Array[0..22] of TNPCLiteralToken = (
-    (Literal: '(';  TokenType: tokOParen),
-    (Literal: ')';  TokenType: tokCParen),
-    (Literal: '{';  TokenType: tokOCurly),
-    (Literal: '}';  TokenType: tokCCurly),
-    (Literal: '[';  TokenType: tokOBracket),
-    (Literal: ']';  TokenType: tokCBracket),
-
-    (Literal: '.';  TokenType: tokDot),
-    (Literal: ',';  TokenType: tokComma),
-    (Literal: ':';  TokenType: tokColon),
-    (Literal: ';';  TokenType: tokSemicolon),
-//    (Literal: ''''; TokenType: tokQuote),
-//    (Literal: '"';  TokenType: tokDQuote)
-
-    (Literal: '!';  TokenType: tokExclamation),
-    (Literal: '@';  TokenType: tokAt),
-//    (Literal: '#';  TokenType: tokHash),
-    (Literal: '$';  TokenType: tokDollar),
-    (Literal: '%';  TokenType: tokPercent),
-    (Literal: '^';  TokenType: tokDash),
-    (Literal: '&';  TokenType: tokAmpersand),
-    (Literal: '*';  TokenType: tokAsterisk),
-    (Literal: '-';  TokenType: tokMinus),
-    (Literal: '+';  TokenType: tokPlus),
-    (Literal: '=';  TokenType: tokEqual),
-    (Literal: '<';  TokenType: tokLessThan),
-    (Literal: '>';  TokenType: tokGreaterThan),
-    (Literal: '/';  TokenType: tokDiv)
-  );
-
-  NPCDoubleLiteralTokens: Array[0..9] of TNPCDoubleLiteralToken = (
-    (DoubleLiteral: '//';  TokenType: tokCommentSL),
-    (DoubleLiteral: '(*';  TokenType: tokCommentMLB),
-    (DoubleLiteral: '*)';  TokenType: tokCommentMLE),
-    (DoubleLiteral: '{.';  TokenType: tokCommentMLB),
-    (DoubleLiteral: '.}';  TokenType: tokCommentMLE),
-    (DoubleLiteral: ':=';  TokenType: tokAssign),
-    (DoubleLiteral: '<=';  TokenType: tokLessEqual),
-    (DoubleLiteral: '>=';  TokenType: tokGreaterEqual),
-    (DoubleLiteral: '<>';  TokenType: tokNotEqual),
-    (DoubleLiteral: '!=';  TokenType: tokNotEqual)
-  );
+  npc_reserved_words,
+  npc_reserved_symbols;
 
 type
   TNPCToken = class
   public
     &Type: TNPCTokenType;
     Location: TNPCLocation;
-//    StringBeginRow,
-//    StringBeginCol,
-//    StringEndRow,
-//    StringEndCol: Integer;
     ReservedWord: Boolean;
     ReservedSymbol: Boolean;
 //    i32Value: Integer;
@@ -207,7 +46,9 @@ type
 
   TNPCCharset = set of AnsiChar;
 
-  TNPCLexerOption = (loIdentWithMinus);
+  TNPCLexerOption = (
+    loIdentWithMinus
+  );
   TNPCLexerOptions = set of TNPCLexerOption;
 
   TNPCLexer = class
@@ -267,11 +108,13 @@ type
     function IsEmpty: Boolean; inline;
     function IsCurrentSymbol(const AValue: TNPCTokenType): Boolean; inline;
     function IsNextSymbol(const AValue: TNPCTokenType): Boolean; inline;
+    procedure IdentWithMinus(const AValue: Boolean); inline;
     function GetToken: TNPCToken; overload; // grabs token and moves stream forward
     function NextToken: TNPCToken; // saves current stream position, grabs token and restores stream position
     procedure SkipToken; inline; // if we used NextToken then this fast-forwards stream position to after grabing token by NextToken
     function ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
     function ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
+    function ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken;
     //
     function Lines: Integer;
   end;
@@ -284,7 +127,7 @@ uses
   Hash,
   npc_consts;
 
-function ArrayOfTokenToArrayOfString(const Values: Array of Char): TStringDynArray;
+function ArrayOfTokenToArrayOfString(const Values: Array of TNPCTokenType): TStringDynArray;
 var
   i: Integer;
   lit: TNPCLiteralToken;
@@ -298,7 +141,7 @@ begin
   end;
 end;
 
-function LiteralTokenToChar(const Token: Char): Char;
+function LiteralTokenToChar(const Token: TNPCTokenType): Char;
 var
   lit: TNPCLiteralToken;
 begin
@@ -338,10 +181,10 @@ end;
 function TNPCToken.TokenToString: String;
 begin
   if &Type in [tokOParen..tokDiv] then
-    Result := NPCTokensType[Ord(Self.&Type)]
+    Result := NPCTokensTypeToString(Self.&Type)
   else begin
     if Length(Self.Value) > 1 then
-      Result := NPCTokensType[Ord(Self.&Type)]
+      Result := NPCTokensTypeToString(Self.&Type)
     else
       Result := Self.Value;
   end;
@@ -699,7 +542,7 @@ var
   save_bol: PByte;
   save_row: Integer;
 begin
-  Result := Nil;
+//  Result := Nil;
   if not ConsumeToken then begin
     save_cur := cur;
     save_bol := bol;
@@ -863,9 +706,12 @@ begin
 
             escape := GetChar;
             case escape of
-              'r',
+              'r': begin // escaping \r - carret return
+                stemp := stemp + #13;
+                SkipChar;
+              end;
               'n': begin // escaping \n - new line
-                stemp := stemp + #13#10;
+                stemp := stemp + #10;
                 SkipChar;
               end;
               '\': begin // escaping \\ - single \
@@ -920,6 +766,16 @@ begin
   end;
 end;
 
+procedure TNPCLexer.IdentWithMinus(const AValue: Boolean);
+begin
+  if AValue then begin
+    FOptions := FOptions + [loIdentWithMinus];
+  end
+  else begin
+    FOptions := FOptions - [loIdentWithMinus];
+  end;
+end;
+
 function TNPCLexer.GetToken: TNPCToken;
 begin
   if skip_cur <> Nil then begin
@@ -950,7 +806,7 @@ end;
 
 function TNPCLexer.ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
 var
-  token: Char;
+  token: TNPCTokenType;
   tempOptions: TNPCLexerOptions;
 begin
   tempOptions := FOptions;
@@ -974,8 +830,8 @@ begin
 end;
 
 function TNPCLexer.ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
-var
-  token: Char;
+//var
+//  token: Char;
 begin
   Result := GetToken;
   if Result = Nil then begin
@@ -986,6 +842,21 @@ begin
     Exit;
 
   raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedIdentifiers[AReservedWord].Ident, Result.TokenToString]));
+end;
+
+function TNPCLexer.ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken;
+//var
+//  token: Char;
+begin
+  Result := GetToken;
+  if Result = Nil then begin
+    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', ['symbol']));
+  end;
+
+  if (Result.&Type in [tokOParen..tokNotEqual]) and not Result.ReservedWord and Result.ReservedSymbol and (TokenTypeToReservedSymbol(Result.&Type) = AReservedSymbol) then
+    Exit;
+
+  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedSymbolToString(AReservedSymbol), Result.TokenToString]));
 end;
 
 function TNPCLexer.Lines: Integer;

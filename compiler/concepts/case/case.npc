@@ -7,14 +7,14 @@ var
   SomeEnum: Enum = eiThree;
 
 SomeTestProc() {
-  case 2 > 1 of {
+  case 2 > 1 of
     if True: {
     };
     if False: {
     };
-  };
+  end;
   //
-  case SomeEnum of {
+  case SomeEnum of
     if .eiOne: {
     };
     if .eiTwo: {
@@ -25,7 +25,7 @@ SomeTestProc() {
     };
     if .eiFive: {
     };
-  };
+  end;
 };
 
 end.

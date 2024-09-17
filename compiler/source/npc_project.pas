@@ -16,23 +16,42 @@ uses
   npc_parser;
 
 type
-  TNPCProjectType = (ptGUI, ptCONSOLE, ptDLL, ptWindows, ptLinux, ptAndroid, pt32Bit, pt64Bit);
+  TNPCProjectType = (
+    ptWindows,
+    ptLinux,
+    ptAndroid,
+    ptWebAssembly,
+
+    pt32Bit,
+    pt64Bit,
+
+    ptCONSOLE,
+    ptGUI,
+    ptDLL,
+    ptTEXT
+  );
   TNPCProjectTypes = set of TNPCProjectType;
 
   PFormatSettings = ^TFormatSettings;
 
-  TNPCProjectSettings = packed record
-    InputPath: String;
+  TNPCProjectOutputType = packed record
     OutputPath: String;
     //InputStream: TMemoryStream;
     OutputStream: TMemoryStream;
     //
+    ProjectTypes: TNPCProjectTypes;
+    ProjectExtension: String;
+  end;
+
+  TNPCProjectSettings = packed record
+    InputPath: String;
+
+    ProjectName: String;
+
     ProjectEncoding: TEncoding;
     ProjectFormatSettings: PFormatSettings;
-    //
-    ProjectName: String;
-    ProjectType: TNPCProjectTypes;
-    ProjectExtension: String;
+
+    OutputTypes: Array of TNPCProjectOutputType;
   end;
 
   TNPCProject = class
@@ -62,7 +81,8 @@ function NPC_ReportErrors: PChar; stdcall;
 implementation
 
 uses
-  npc_consts;
+  npc_consts,
+  npc_error;
 
 var
   gEncoding: TEncoding;
@@ -116,15 +136,18 @@ begin
   if AFormatSettings = Nil then
     AFormatSettings := @FormatSettings;
   //
-  Settings.InputPath := AInputPath;
-  Settings.OutputPath := AOutputPath;
-//  Settings.InputStream := Nil;
-  Settings.OutputStream := Nil;
+//  TNPCProjectSettings = packed record
+//    InputPath: String;
+//    ProjectName: String;
+//    ProjectEncoding: TEncoding;
+//    ProjectFormatSettings: PFormatSettings;
+//    OutputTypes: Array of TNPCProjectOutputType;
+  //
+  Settings.InputPath := AInputPath; // main project path
+  Settings.ProjectName := '';
   Settings.ProjectEncoding := AEncoding;
   Settings.ProjectFormatSettings := AFormatSettings;
-  Settings.ProjectName := '';
-  Settings.ProjectType := [];
-  Settings.ProjectExtension := '';
+  SetLength(Settings.OutputTypes, 0);
   //
   Errors := TStringList.Create;
   //
@@ -146,14 +169,16 @@ begin
       AFormatSettings := @FormatSettings;
   //
   Settings.InputPath := '';
-  Settings.OutputPath := '';
-//  Settings.InputStream := AInput;
-  Settings.OutputStream := AOutput;
+  Settings.ProjectName := '';
   Settings.ProjectEncoding := AEncoding;
   Settings.ProjectFormatSettings := AFormatSettings;
-  Settings.ProjectName := '';
-  Settings.ProjectType := [];
-  Settings.ProjectExtension := '';
+  SetLength(Settings.OutputTypes, 1);
+  //
+  Settings.OutputTypes[0].OutputPath := '';
+  //Settings.OutputTypes[0].InputStream := AInput;
+  Settings.OutputTypes[0].OutputStream := AOutput;
+  Settings.OutputTypes[0].ProjectTypes := [];
+  Settings.OutputTypes[0].ProjectExtension := '';
   //
   Errors := TStringList.Create;
   //
@@ -162,18 +187,24 @@ begin
 end;
 
 destructor TNPCProject.Destroy;
+var
+  i: Integer;
 begin
   FreeAndNil(Parser);
   FreeAndNil(Lexer);
   FreeAndNil(Errors);
   //
   Settings.InputPath := '';
-  Settings.OutputPath := '';
-//  Settings.ProjectEncoding := Nil;
-  Settings.ProjectFormatSettings := Nil;
   Settings.ProjectName := '';
-  Settings.ProjectType := [];
-  Settings.ProjectExtension := '';
+  //Settings.ProjectEncoding := Nil;
+  Settings.ProjectFormatSettings := Nil;
+  for i:=0 to High(Settings.OutputTypes) do begin
+    Settings.OutputTypes[i].OutputPath := '';
+    Settings.OutputTypes[i].OutputStream := Nil;
+    Settings.OutputTypes[i].ProjectTypes := [];
+    Settings.OutputTypes[i].ProjectExtension := '';
+  end;
+  SetLength(Settings.OutputTypes, 0);
   inherited;
 end;
 
@@ -194,6 +225,7 @@ begin
     on E: Exception do begin
       Result := False;
       Errors.Add(Format(sProjectError, [ExtractFileName(Settings.InputPath), E.ClassName, E.Message]));
+      Errors.Add(GetExceptionStackTrace(E));
     end;
   end;
 end;

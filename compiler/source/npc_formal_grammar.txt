@@ -1,0 +1,200 @@
+[ ] - optional
+( ) - group
+{ } - repeat
+|   - or
+.   - end of input
+
+----------------------------------------------------------------------------------------------------
+
+// project or code definition
+
+Project_or_Code = ( 'project' | 'code' ) Ident ';'
+                  [ CompilerSettings ]
+                  [ ImportsSection ]
+                  [ ExportsSection ]
+                  [ InitializationSection ]
+                  [ FinalizationSection ]
+                  ( MainBlock | Block ) '.' .
+                  
+CompilerSettings = .
+
+ImportsSection = 'imports' Ident { ',' Ident } ';' .
+
+ExportsSection = 'exports' Ident { ',' Ident } ';' .
+
+InitializationSection = 'initialization' Statements ';' .
+
+FinalizationSection = 'finalization' Statements ';' .
+
+MainBlock = 'begin'
+            [ Statements ]
+            'end' .
+
+Block = [ Declarations ] [ ProcFuncDeclarations ] .
+            
+--------------------------------------------------
+
+Declarations = DeclarationSections .
+
+DeclarationSections = LabelDeclarations |
+                      ConstDeclarations |
+                      TypeDeclarations |
+                      VarDeclarations .
+
+LabelDeclarations = 'label'
+                    Ident { ',' Ident } ';' .
+
+ConstDeclarations =  'const'
+                     ( UntypedConstDeclaration | TypedConstDeclaration ) ';'
+                     { ( UntypedConstDeclaration | TypedConstDeclaration ) ';' } .
+
+UntypedConstDeclaration = Ident '=' ConstExpression .
+
+TypedConstDeclaration = Ident ':' Type '=' Initializer .
+
+TypeDeclarations = 'type'
+                   Ident '=' Type ';'
+                   { Ident '=' Type ';'} .
+
+VarDeclarations = 'var'
+                  IdentList ':' Type [ '=' Initializer ] ';'
+                  { IdentList ':' Type [ '=' Initializer ] ';'} .
+
+--------------------------------------------------
+
+Initializer = ConstExpression |
+              StringLiteral |
+              '(' Initializer { ',' Initializer} ')' |
+              '(' Ident ':' Initializer { ';' Ident ':' Initializer } ')' |
+              SetConstructor .
+
+--------------------------------------------------
+
+ProcFuncDeclarations = [ ClassDirective ] Ident
+                       [ FormalParams ] [ ':' TypeIdent ]
+                       [ Receiver ] [ ProcFuncDirective ]  [ CallModifier ] ';'
+                       [ Block ';' ] .
+
+Receiver = 'for' Ident ':' TypeIdent .
+
+ProcFuncDirective = 'forward' | 'external' ConstExpression .
+
+CallModifier = 'stdcall' | 'cdecl' .
+
+
+FormalParams = '(' FormalParamList { ';' FormalParamList } ')' .
+
+FormalParamList = [ 'const' | 'var' | 'out' ] IdentList [ ':' ( TypeIdent | ArrayTypeIdent ) ] [ '=' ConstExpression ] .
+
+IdentList = Ident { ',' Ident } .
+
+ArrayTypeIdent = [ 'packed' ] 'array' 'of' Type .
+
+ActualParams = '(' [ ( Expression | Designator ) | { ',' ( Expression | Designator ) } ] ')' .
+
+--------------------------------------------------
+
+Type = '(' Ident { ',' Ident } ')' |
+       '^' TypeIdent |
+       [ 'packed' ] 'array' '[' Type { ',' Type } ']' 'of' Type |
+       [ 'packed' ] 'record' Fields 'end' |
+       [ 'packed' ] 'interface' FixedFields 'end' |
+       [ 'packed' ] 'set' 'of' Type |
+       [ 'packed' ] 'string' [ '[' ConstExpression ']' ] |
+       [ 'packed' ] 'file' [ 'of' Type ] |
+       ConstExpression '..' ConstExpression |
+       'call' [ FormalParams ] [ ':' TypeIdent ] [ CallModifier ] |
+       Ident .
+       
+Fields = FixedFields
+         [ 'case' [ Ident ':' ] Type 'of'
+           ConstExpression { ',' ConstExpression } ':' '(' Fields ')'
+           { ';' ConstExpression { ',' ConstExpression } ':' '(' Fields ')' } ] [ ';' ] .
+
+FixedFields = IdentList ':' Type { ';' IdentList ':' Type } .
+
+TypeIdent = 'string' | 'file' | Ident .
+
+Designator = BasicDesignator { Selector } .
+
+BasicDesignator = Ident |
+                  Ident [ ActualParams ] |
+                  Ident '(' Expression ')' .
+
+Selector = '^' |
+           '[' Expression { ',' Expression } ']' |
+           '.' Ident |
+           '(' ActualParams ')' .
+
+Statement = [ Label ':' ] [ ( Designator | Ident ) ':=' Expression |
+                          ( Designator | Ident ) [ ActualParams ] { Selector } |
+                          CompoundStatement |
+                          IfStatement |
+                          CaseStatement |
+                          WhileStatement |
+                          RepeatStatement |
+                          ForStatement |
+                          GotoStatement |
+                          WithStatement ] .
+
+Label = Ident .
+
+StatementList = Statement ';' { Statement ';' } .
+
+CompoundStatement = ( 'begin' | '{' )
+                    StatementList
+                    ( 'end' | '}' ) .
+
+IfStatement = 'if' Expression 'then' Statement [ 'else' Statement ] .
+
+CaseStatement = 'case' Expression ( 'of' | '{' )
+                  CaseElement ';'
+                  [ { CaseElement ';' } ]
+                  [ 'else' StatementList ]
+                ( 'end' | '}' ) .
+
+WhileStatement = 'while' Expression 'do' Statement .
+
+RepeatStatement = 'repeat' StatementList 'until' Expression .
+
+ForStatement = 'for' Ident ':=' Expression ( 'to' | 'downto' ) Expression 'do' Statement.
+
+GotoStatement = 'goto' Label .
+
+WithStatement = 'with' Designator { ',' Designator } 'do' Statement .
+
+CaseElement = CaseLabel { ',' CaseLabel } ':' Statement .
+
+CaseLabel = ConstExpression [ '..' ConstExpression ] .
+
+ConstExpression = Expression .
+
+Expression = SimpleExpression [ ( '=' | ( '<>' | '!=' ) | '<' | '<=' | '>' | '>=' | 'in' ) SimpleExpression ] .
+
+SimpleExpression = [ '+' | '-' ] Term { ( '+' | '-' | 'or' | 'xor' ) Term } .
+
+Term = Factor { ( '*' | '/' | 'div' | 'mod' | 'shl' | 'shr' | 'and' ) Factor } .
+
+Factor = ( Designator | Ident ) [ ActualParams ] { Selector } |
+         Designator |
+         '@' Designator |
+         Number |
+         CharLiteral |
+         StringLiteral |
+         '(' Expression ')' |
+         'not' Factor |
+         SetConstructor |
+         'nil' |
+         Ident '(' Expression ')' { Selector } .
+
+SetConstructor = '[' [ Expression [ '..' Expression ] { ',' Expression [ '..' Expression ] } ] ']' .
+
+Ident = ( Letter | '_' ) { Letter | '_' | Digit }.
+
+Number = '$' HexDigit { HexDigit } |
+         Digit { Digit } [ '.' { Digit } ] [ 'e' [ '+' | '-' ] Digit { Digit } ] .
+
+CharLiteral = '''' ( Character | '''' '''' ) '''' |
+              '#' Number .
+
+StringLiteral = '''' { Character | '''' '''' } '''' .

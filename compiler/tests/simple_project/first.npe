@@ -1,15 +1,38 @@
 ﻿project 'First_Test_Project';
 
-// program-type defines what type of compilation can be done:
+// {$program-type output-type output-subtype[ output-extension]} defines what type of compilation can be done:
+// you can define multiple compilation types in single project
+//
+// supported output-type:
+//   - Windows(32/64)
+//   - Linux(32/64)
+//   - Android(32/64)
+//   - WebAssembly
+//
+//  supported output-subtype:
 //   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,
 //   - CONSOLE - means program that outputs to the operating system console (if available),
-//   - DLL     - dynamically loaded library
+//   - DLL     - dynamically loaded library,
+//   - TEXT    - text format
+//
 // extension will be given to output of compiler, eg.:
-//   if +Windows(32/64) is defined than extension will be '.exe'
-//   if +Linux(32/64) is defined than extension will be '.elf'
-//   if +Android(32/64) is defined than extension will be '.apk'
-// custom extension can be set by declaring {$extension '.ext'}
-{$program-type GUI+Windows32}
+//   if Windows(32/64) is defined than extension will be '.exe' or '.dll'
+//   if Linux(32/64) is defined than extension will be '.elf' or '.so'
+//   if Android(32/64) is defined than extension will be '.apk'
+//   if WebAssembly is defined than extension will be '.wasm' or '.wat'
+//
+// custom extension can be set by declaring {$extension '.ext'} for every project
+// example: {$program-type Windows32 DLL {$extension '.dll'}}
+// or short form {$program-type Windows32 DLL '.dll'}
+// or for every project type using concatenated version {$extension '* .dll * *'}
+// extension that will not change are not required to specify, so usage of * is not required also
+// but if you want to specify extension using {$extension } that is second or third or fourth, but not changing
+// previous ones, than you must use * to let complier know what you are up to
+
+{$program-type Windows32 GUI}
+{$program-type Windows32 DLL '.dll'}
+{$program-type Android64 GUI}
+{$program-type WebAssembly DLL}
 
 imports
   // imports section
@@ -47,24 +70,26 @@ initialization
   //
 //  if 1 + 2 = 3 + 4 then {
 //    if ConsoleAvailable then {
-//      Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+//      Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change in programming in Pascal.');
+//      Writeln('This line shows that we are not limited by line length and string literal length like in Delphi where you can not use lines that are longer than 255 characters. In NitroPascal You can have lines that are 2GB characters long. We are not sure why You may need it, but when we can have it, than why not ?');
 //    };
 //  } else {
 //    ErrorMessage := 'This is expected !';
 //  };
   //
 //  if ConsoleAvailable and (Length(ErrorMessage) > 0) then {
-//    Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change.');
+//      Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change in programming in Pascal.');
+//      Writeln('This line shows that we are not limited by line length and string literal length like in Delphi where you can not use lines that are longer than 255 characters. In NitroPascal You can have lines that are 2GB characters long. We are not sure why You may need it, but when we can have it, than why not ?');
 //  };
   //
-  case 2 > 1 of {
+  case 2 > 1 {
     if True: {
     };
     if False: {
     };
   };
   //
-  case SomeEnum of {
+  case SomeEnum {
     if .eiOne: {
     };
     if .eiTwo: {
