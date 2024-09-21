@@ -642,10 +642,8 @@ begin
         //AddToken(token);
 //        free_token := False;
         stemp := ProjectTypeToString(ProjectTypes);
-        ConsoleWriteln('Compilation target :');
-        ConsoleWriteln('             - type: ' + stemp);
-        ConsoleWriteln('             - path: ' + OutputPath);
-        ConsoleWriteln('             - ext_: ' + ProjectExtension);
+        ConsoleWriteln('Compilation target : ' + stemp + IfThen(Length(ProjectExtension) > 0, ' (extension: ' + ProjectExtension + ')'));
+        ConsoleWriteln('        output path: ' + OutputPath);
         stemp := '';
         OutputPath := '';
         ProjectTypes := [];
