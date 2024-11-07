@@ -32,6 +32,8 @@ begin
       Writeln('        encoding - ASCII or ANSI or UTF8');
       Writeln('        format_settings - n/a');
       Writeln;
+      Writeln('Try:    npc.exe ''.\tests\simple_project\first.npe''');
+      Writeln;
       Exit;
     end;
     //

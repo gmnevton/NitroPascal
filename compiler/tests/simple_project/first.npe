@@ -1,13 +1,13 @@
 ﻿project 'First_Test_Project';
 
-// {$program-type output-type output-subtype[ output-extension]} defines what type of compilation can be done:
+// {$program-type output-type output-subtype[ output-extension][ output-path]} defines what type of compilation can be done:
 // you can define multiple compilation types in single project
 //
 // supported output-type:
 //   - Windows(32/64)
 //   - Linux(32/64)
 //   - Android(32/64)
-//   - WebAssembly
+//   - WebAssembly(32/64)
 //
 //  supported output-subtype:
 //   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,

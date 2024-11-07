@@ -12,7 +12,6 @@ interface
 uses
   SysUtils,
   Classes,
-  npc_lexer,
   npc_parser;
 
 type
@@ -43,6 +42,8 @@ type
     ProjectExtension: String;
   end;
 
+  TNPCProjectOutputTokensType = (otNone, otProjectOnly, otSourcesOnly, otProjectAndSources);
+
   TNPCProjectSettings = packed record
     InputPath: String;
 
@@ -52,6 +53,7 @@ type
     ProjectFormatSettings: PFormatSettings;
 
     OutputTypes: Array of TNPCProjectOutputType;
+    OutputTokens: TNPCProjectOutputTokensType;
   end;
 
   TNPCProject = class
@@ -59,8 +61,7 @@ type
     Settings: TNPCProjectSettings;
     Errors: TStringList;
     //
-    Lexer: TNPCLexer;
-    Parser: TNPCParser;
+    Parser: TNPCProjectParser;
   protected
     procedure ReportErrors;
   public
@@ -81,6 +82,9 @@ function NPC_ReportErrors: PChar; stdcall;
 implementation
 
 uses
+  npc_lexer,
+  npc_tokenizer,
+  npc_source_parser,
   npc_consts,
   npc_error;
 
@@ -148,11 +152,11 @@ begin
   Settings.ProjectEncoding := AEncoding;
   Settings.ProjectFormatSettings := AFormatSettings;
   SetLength(Settings.OutputTypes, 0);
+  Settings.OutputTokens := otNone;
   //
   Errors := TStringList.Create;
   //
-  Lexer := TNPCLexer.Create(AInputPath, AFormatSettings^, AEncoding);
-  Parser := TNPCParser.Create(Lexer, @Settings);
+  Parser := TNPCProjectParser.Create(@Settings);
 end;
 
 constructor TNPCProject.Create(const AInput, AOutput: TMemoryStream; AEncoding: TEncoding; AFormatSettings: PFormatSettings);
@@ -173,6 +177,7 @@ begin
   Settings.ProjectEncoding := AEncoding;
   Settings.ProjectFormatSettings := AFormatSettings;
   SetLength(Settings.OutputTypes, 1);
+  Settings.OutputTokens := otNone;
   //
   Settings.OutputTypes[0].OutputPath := '';
   //Settings.OutputTypes[0].InputStream := AInput;
@@ -182,8 +187,7 @@ begin
   //
   Errors := TStringList.Create;
   //
-  Lexer := TNPCLexer.Create(AInput, AFormatSettings^, AEncoding);
-  Parser := TNPCParser.Create(Lexer, @Settings);
+  Parser := TNPCProjectParser.Create(@Settings);
 end;
 
 destructor TNPCProject.Destroy;
@@ -191,7 +195,6 @@ var
   i: Integer;
 begin
   FreeAndNil(Parser);
-  FreeAndNil(Lexer);
   FreeAndNil(Errors);
   //
   Settings.InputPath := '';
@@ -218,7 +221,15 @@ begin
       Result := False;
       Errors.Add(E.Message);
     end;
-    on E: NPCParserException do begin
+//    on E: NPCTokenizerException do begin
+//      Result := False;
+//      Errors.Add(E.Message);
+//    end;
+    on E: NPCSourceParserException do begin
+      Result := False;
+      Errors.Add(E.Message);
+    end;
+    on E: NPCProjectParserException do begin
       Result := False;
       Errors.Add(E.Message);
     end;
