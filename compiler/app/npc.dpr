@@ -1,3 +1,14 @@
+//
+// Nitro Pascal Compiler
+// version 1.0
+//
+// Creation date (dd-mm-yyyy):  6-02-2024
+// Modification date         : ..-..-....
+//
+// Author: Grzegorz Molenda aka NevTon
+//         All rights reserved.
+//
+
 program npc;
 
 {$APPTYPE CONSOLE}
@@ -20,6 +31,8 @@ var
   output_path: String;
   start_time: Real;
   total_time: Real;
+  i: Integer;
+  cmd_params: String;
 
 begin
   try
@@ -28,9 +41,25 @@ begin
     Writeln('All rights reserved.');
     Writeln;
     if ParamCount = 0 then begin
-      Writeln('npc.exe project_file_path [output_path] [-e:encoding] [-f:format_settings]');
+      Writeln('npc.exe project_file_path [output_path] [-e:encoding] [-o:options]');
       Writeln('        encoding - ASCII or ANSI or UTF8');
-      Writeln('        format_settings - n/a');
+      Writeln('        options:');
+      Writeln('          - format_settings{');
+      Writeln('              ''date_sep'': ''-'',');
+      Writeln('              ''time_sep'': '':'',');
+      Writeln('              ''date_fmt'': ''yyyy-mm-dd'',');
+      Writeln('              ''time_fmt'': ''hh:nn:ss'',');
+      Writeln('              ''1000_sep'': '''',');
+      Writeln('              ''frac_sep'': ''.'',');
+      Writeln('              ''curr_dec'': 2,');
+      Writeln('              ''curr_fmt'': ''#0.00''');
+//      Writeln('              ''curr_str'': ''#0.00'',');
+      Writeln('            }');
+      Writeln('          - output_tokens[');
+      Writeln('              P - for ProjectOnly or');
+      Writeln('              S - for SourcesOnly or');
+      Writeln('              A - for All');
+      Writeln('            ]');
       Writeln;
       Writeln('Try:    npc.exe ''.\tests\simple_project\first.npe''');
       Writeln;
@@ -44,6 +73,13 @@ begin
       end
       else
         output_path := '';
+      //
+      cmd_params := '';
+      for i:=3 to ParamCount do
+        cmd_params := cmd_params + ParamStr(i) + ' ';
+      cmd_params := TrimRight(cmd_params);
+      NPC_InitCompiler(cmd_params, ParamCount - 2);
+      cmd_params := '';
     end;
     //
     start_time := getTime;

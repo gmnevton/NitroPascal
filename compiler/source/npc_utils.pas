@@ -29,16 +29,22 @@ type
     property OwnObjects: Boolean read FOwnObjects write FOwnObjects default False;
   end;
 
+  TStringArray = Array of String;
+
 function getTime: Real;
 function ConsoleAvailable: Boolean;
 procedure ConsoleWriteln(const Value: String);
 function IsANSIConsoleSupported: Boolean;
 procedure SetConsoleANSIMode;
+//function ParamValue(P: PChar; Index: Integer): String;
+function explode_quotes(const Spliter: Char; const Value: String; const TrimParts: Boolean = True; const PreserveQuotes: Boolean = False): TStringArray; overload;
+function explode_quotes(const Spliter: String; const Value: String; const TrimParts: Boolean = True; const PreserveQuotes: Boolean = False): TStringArray; overload;
 
 implementation
 
 uses
-  Windows;
+  Windows,
+  StrUtils;
 
 const
   ATTACH_PARENT_PROCESS: DWORD = $FFFFFFFF;
@@ -203,6 +209,164 @@ begin
     dwOutMode := dwOriginalOutMode or dwRequestedOutModes;
     if not SetConsoleMode(hOut, dwOutMode) then // Failed to set any VT mode, can't do anything here.
       Exit;
+  end;
+end;
+
+//function GetParamValue(P: PChar; var Param: String): PChar;
+//var
+//  i, Len: Integer;
+//  Start, S: PChar;
+//begin
+//  while True do begin
+//    while (P[0] <> #0) and (P[0] <= ' ') do
+//      Inc(P);
+//    if (P[0] = '"') and (P[1] = '"') then
+//      Inc(P, 1)
+//    else
+//      Break;
+//  end;
+//  Len := 0;
+//  Start := P;
+//  while P[0] > ' ' do begin
+//    if P[0] = '"' then begin
+//      Inc(Len);
+//      Inc(P);
+//      while (P[0] <> #0) and (P[0] <> '"') do begin
+//        Inc(Len);
+//        Inc(P);
+//      end;
+//      if P[0] <> #0 then begin
+//        Inc(Len);
+//        Inc(P);
+//      end;
+//    end
+//    else begin
+//      Inc(Len);
+//      Inc(P);
+//    end;
+//  end;
+//
+//  SetLength(Param, Len);
+//
+//  P := Start;
+//  S := Pointer(Param);
+//  i := 0;
+//  while P[0] > ' ' do begin
+//    if P[0] = '"' then begin
+//      S[i] := P^;
+//      Inc(P);
+//      Inc(i);
+//      while (P[0] <> #0) and (P[0] <> '"') do begin
+//        S[i] := P^;
+//        Inc(P);
+//        Inc(i);
+//      end;
+//      if P[0] <> #0 then begin
+//        S[i] := P^;
+//        Inc(P);
+//        Inc(i);
+//      end;
+//    end
+//    else begin
+//      S[i] := P^;
+//      Inc(P);
+//      Inc(i);
+//    end;
+//  end;
+//
+//  Result := P;
+//end;
+//
+//function ParamValue(P: PChar; Index: Integer): String;
+//begin
+//  Result := '';
+//  while True do begin
+//    P := GetParamValue(P, Result);
+//    if (Index = 0) or (Result = '') then Break;
+//    Dec(Index);
+//  end;
+//end;
+
+function explode_quotes(const Spliter: Char; const Value: String; const TrimParts: Boolean = True; const PreserveQuotes: Boolean = False): TStringArray;
+begin
+  Result:=explode_quotes(String(Spliter), Value, TrimParts, PreserveQuotes);
+end;
+
+function explode_quotes(const Spliter: String; const Value: String; const TrimParts: Boolean = True; const PreserveQuotes: Boolean = False): TStringArray; overload;
+var
+  poz, sl: Integer;
+  temp_value, temp: String;
+
+  function inQuotes(const Text: String): Boolean;
+  var
+    C: Char;
+  begin
+    Result:=False;
+    for C in Text do
+      if CharInSet(C, ['''', '"']) then
+        Result:=not Result;
+  end;
+
+  function deQuoted(var Text: String): Boolean;
+  var
+    len: Integer;
+    quote_char: Char;
+  begin
+    Result:=False;
+    if PreserveQuotes then
+      Exit;
+    if (Pos('''', Text) > 1) or (Pos('"', Text) > 1) then
+      Text:=TrimLeft(Text);
+    len:=Length(Text);
+    if len > 0 then begin
+      quote_char:=#0;
+      if CharInSet(Text[1], ['''', '"']) then begin
+        quote_char:=Text[1];
+        Delete(Text, 1, 1);
+        Dec(len);
+        Result:=True;
+      end;
+      if (quote_char <> #0) and (len > 0) and (Text[len] = quote_char) then
+        Delete(Text, len, 1);
+    end;
+  end;
+
+begin
+  SetLength(Result, 0);
+  temp_value:=TrimRight(Value);
+  sl:=Length(Spliter);
+  if (Length(temp_value) >= sl) and (temp_value[Length(temp_value) - sl + 1] = Spliter) then
+    Delete(temp_value, Length(temp_value) - sl + 1, sl)
+  else
+    temp_value:=Value;
+
+  poz:=1;
+  while temp_value <> '' do begin
+    poz:=PosEx(Spliter, temp_value, poz);
+    if poz > 0 then begin
+      temp:=Copy(temp_value, 1, poz - 1);
+      if inQuotes(temp) then begin
+        Inc(poz);
+        Continue;
+      end;
+      SetLength(Result, Length(Result) + 1);
+      if not deQuoted(temp) and TrimParts then
+        temp:=Trim(temp);
+//      deQuoted(temp);
+      Result[High(Result)]:=temp;
+      Delete(temp_value, 1, poz + sl - 1);
+      poz:=1;
+    end
+    else begin
+      poz:=Length(temp_value) + 1;
+      temp:=Copy(temp_value, 1, poz - 1);
+      SetLength(Result, Length(Result) + 1);
+      if not deQuoted(temp) and TrimParts then
+        temp:=Trim(temp);
+//      deQuoted(temp);
+      Result[High(Result)]:=temp;
+      Delete(temp_value, 1, poz);
+    end;
   end;
 end;
 

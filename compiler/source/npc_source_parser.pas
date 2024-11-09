@@ -1927,18 +1927,12 @@ var
 begin
   Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(Settings^).ProjectFormatSettings^);
   try
-    Tokenizer.TokenizeFile(TNPCProjectSettings(Settings^).InputPath, TNPCProjectSettings(Settings^).ProjectEncoding, True);
+    Tokenizer.TokenizeFile(TNPCProjectSettings(Settings^).InputPath, TNPCProjectSettings(Settings^).ProjectEncoding);
     if TNPCProjectSettings(Settings^).OutputTokens in [otProjectOnly, otProjectAndSources] then
       Tokenizer.OutputTokens;
     //
     TokensArray := Tokenizer.Tokens;
-
-
-
-  finally
-    FreeAndNil(Tokenizer);
-  end;
-
+    //
 //  token := Lexer.ExpectToken([tokIdent]);
 //  if not TokenIsReservedIdent(token, ri_project) then begin
 //    token.Free;
@@ -1960,6 +1954,9 @@ begin
 //  // go collect the rest of the project body
 //  //
 //  ParseProjectBody;
+  finally
+    FreeAndNil(Tokenizer);
+  end;
 end;
 
 end.

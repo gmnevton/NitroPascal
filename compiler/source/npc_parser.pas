@@ -58,7 +58,7 @@ end;
 
 procedure TNPCProjectParser.ParseProject;
 begin
-
+  Source.ParseProject;
 end;
 
 procedure TNPCProjectParser.ParseImportFile(const ASourceFile: String);

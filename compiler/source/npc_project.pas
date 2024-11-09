@@ -44,6 +44,14 @@ type
 
   TNPCProjectOutputTokensType = (otNone, otProjectOnly, otSourcesOnly, otProjectAndSources);
 
+  TNPCCommandLineSettings = packed record
+    FormatSettings: TFormatSettings;
+    SetFormatSettings: Boolean;
+    //
+    OutputTokens: TNPCProjectOutputTokensType;
+    SetOutputTokens: Boolean;
+  end;
+
   TNPCProjectSettings = packed record
     InputPath: String;
 
@@ -65,9 +73,9 @@ type
   protected
     procedure ReportErrors;
   public
-    constructor Create(const AInputPath, AOutputPath: String); overload;
-    constructor Create(const AInputPath, AOutputPath: String; AEncoding: TEncoding; AFormatSettings: PFormatSettings); overload;
-    constructor Create(const AInput, AOutput: TMemoryStream; AEncoding: TEncoding; AFormatSettings: PFormatSettings); overload;
+    constructor Create(const AInputPath, AOutputPath: String; const ASettings: TNPCCommandLineSettings); overload;
+    constructor Create(const AInputPath, AOutputPath: String; const ASettings: TNPCCommandLineSettings; AEncoding: TEncoding; AFormatSettings: PFormatSettings); overload;
+    constructor Create(const AInput, AOutput: TMemoryStream; const ASettings: TNPCCommandLineSettings; AEncoding: TEncoding; AFormatSettings: PFormatSettings); overload;
     destructor Destroy; override;
     //
     function Compile: Boolean;
@@ -76,22 +84,27 @@ type
 procedure NPC_SetProjectEncoding(const AEncoding: TEncoding); stdcall;
 procedure NPC_SetProjectFormatSettings(const AFormatSettings: PFormatSettings); stdcall;
 
+procedure NPC_InitCompiler(const AParams: String; AParamsCount: Byte); stdcall;
 function NPC_CompileProject(const AProjectFileName, AProjectOutputPath: PChar): Boolean; stdcall;
 function NPC_ReportErrors: PChar; stdcall;
 
 implementation
 
 uses
+  StrUtils,
   npc_lexer,
   npc_tokenizer,
   npc_source_parser,
   npc_consts,
+  npc_utils,
   npc_error;
 
 var
   gEncoding: TEncoding;
   gFormatSettings: PFormatSettings;
   gReportedErrors: String;
+  //
+  commandLineSettings: TNPCCommandLineSettings;
 
 procedure NPC_SetProjectEncoding(const AEncoding: TEncoding);
 begin
@@ -106,11 +119,73 @@ begin
   gFormatSettings := AFormatSettings;
 end;
 
+procedure NPC_InitCompiler(const AParams: String; AParamsCount: Byte);
+var
+  Params: TStringArray;
+  Param, Value: String;
+  i, j, k: Integer;
+begin
+  FillChar(commandLineSettings, SizeOf(TNPCCommandLineSettings), 0);
+  if AParamsCount < 1 then
+    Exit;
+  //
+  Params := explode_quotes(' ', AParams);
+  try
+    for k:=0 to Length(Params) - 1 do begin
+      Param := Params[k];
+      if (Length(Param) > 1) and StartsText('-e:', Param) then begin // ASCII or ANSI or UTF8
+
+      end;
+      if (Length(Param) > 1) and StartsText('-o:', Param) then begin
+        i := Pos(':', Param);
+        if i > 0 then
+          Delete(Param, 1, i);
+        //
+        if Length(Param) > 1 then begin
+          //format_settings{}
+          //output_tokens[]
+          if StartsText('format_settings', Param) then begin
+
+          end
+          else if StartsText('output_tokens', Param) then begin
+            i := Pos('[', Param);
+            if i > 0 then begin
+              j := Pos(']', Param);
+              if j > 0 then begin
+                Value := Copy(Param, i + 1, j - i - 1);
+                if Value = 'P' then begin // ProjectOnly
+                  commandLineSettings.OutputTokens := otProjectOnly;
+                  commandLineSettings.SetOutputTokens := True;
+                end
+                else if Value = 'S' then begin // SourcesOnly
+                  commandLineSettings.OutputTokens := otSourcesOnly;
+                  commandLineSettings.SetOutputTokens := True;
+                end
+                else
+                if Value = 'A' then begin // All
+                  commandLineSettings.OutputTokens := otProjectAndSources;
+                  commandLineSettings.SetOutputTokens := True;
+                end;
+              end
+              else
+                Continue;
+            end
+            else
+              Continue;
+          end;
+        end;
+      end;
+    end;
+  finally
+    SetLength(Params, 0);
+  end;
+end;
+
 function NPC_CompileProject(const AProjectFileName, AProjectOutputPath: PChar): Boolean;
 var
   Project: TNPCProject;
 begin
-  Project := TNPCProject.Create(AProjectFileName, AProjectOutputPath);
+  Project := TNPCProject.Create(AProjectFileName, AProjectOutputPath, commandLineSettings);
   try
     Result := Project.Compile;
     Project.Parser.OutputTokens;
@@ -128,12 +203,12 @@ end;
 
 { TNPCProject }
 
-constructor TNPCProject.Create(const AInputPath, AOutputPath: String);
+constructor TNPCProject.Create(const AInputPath, AOutputPath: String; const ASettings: TNPCCommandLineSettings);
 begin
-  Create(AInputPath, AOutputPath, gEncoding, gFormatSettings);
+  Create(AInputPath, AOutputPath, ASettings, gEncoding, gFormatSettings);
 end;
 
-constructor TNPCProject.Create(const AInputPath, AOutputPath: String; AEncoding: TEncoding; AFormatSettings: PFormatSettings);
+constructor TNPCProject.Create(const AInputPath, AOutputPath: String; const ASettings: TNPCCommandLineSettings; AEncoding: TEncoding; AFormatSettings: PFormatSettings);
 begin
   if AEncoding = Nil then
     AEncoding := TEncoding.UTF8;
@@ -154,12 +229,19 @@ begin
   SetLength(Settings.OutputTypes, 0);
   Settings.OutputTokens := otNone;
   //
+  if ASettings.SetFormatSettings then begin
+    Settings.ProjectFormatSettings := @ASettings.FormatSettings;
+  end;
+  if ASettings.SetOutputTokens then begin
+    Settings.OutputTokens := ASettings.OutputTokens;
+  end;
+  //
   Errors := TStringList.Create;
   //
   Parser := TNPCProjectParser.Create(@Settings);
 end;
 
-constructor TNPCProject.Create(const AInput, AOutput: TMemoryStream; AEncoding: TEncoding; AFormatSettings: PFormatSettings);
+constructor TNPCProject.Create(const AInput, AOutput: TMemoryStream; const ASettings: TNPCCommandLineSettings; AEncoding: TEncoding; AFormatSettings: PFormatSettings);
 begin
   if AEncoding = Nil then
     if gEncoding <> Nil then
@@ -178,6 +260,13 @@ begin
   Settings.ProjectFormatSettings := AFormatSettings;
   SetLength(Settings.OutputTypes, 1);
   Settings.OutputTokens := otNone;
+  //
+  if ASettings.SetFormatSettings then begin
+    Settings.ProjectFormatSettings := @ASettings.FormatSettings;
+  end;
+  if ASettings.SetOutputTokens then begin
+    Settings.OutputTokens := ASettings.OutputTokens;
+  end;
   //
   Settings.OutputTypes[0].OutputPath := '';
   //Settings.OutputTypes[0].InputStream := AInput;
@@ -250,6 +339,7 @@ end;
 initialization
   gEncoding := Nil;
   gFormatSettings := Nil;
+  FillChar(commandLineSettings, SizeOf(TNPCCommandLineSettings), 0);
 
 finalization
 //  gEncoding := Nil;

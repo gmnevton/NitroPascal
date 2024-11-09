@@ -113,7 +113,7 @@ begin
   Inc(FIndex);
 end;
 
-procedure TNPCTokenizer.TokenizeFile(const AFileName: String; const AEncoding: TEncoding; const AProject: Boolean);
+procedure TNPCTokenizer.TokenizeFile(const AFileName: String; const AEncoding: TEncoding);
 var
   token: TNPCToken;
 begin
