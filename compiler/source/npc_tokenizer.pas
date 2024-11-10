@@ -195,10 +195,12 @@ begin
   FFileName := AFileName;
   FEncoding := AEncoding;
   Lexer := TNPCLexer.Create(AFileName, FFormatSettings, AEncoding);
-  while Lexer.IsNotEmpty do begin
+//  while Lexer.IsNotEmpty do begin
+  repeat
     token := Lexer.GetToken;
     AddToken(token);
-  end;
+  until token.&Type = tokEOF;
+//  end;
   Trim;
 end;
 

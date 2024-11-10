@@ -24,10 +24,10 @@ const
   tokColon        = TNPCTokenType(136); // :
   tokSemicolon    = TNPCTokenType(137); // ;
   tokQuote        = TNPCTokenType(138); // '
-  tokDQuote       = TNPCTokenType(139);  // "
+  tokDQuote       = TNPCTokenType(139); // "
 
-  tokApostrof     = TNPCTokenType(140);  // `
-  tokTilda        = TNPCTokenType(141);  // ~
+  tokApostrof     = TNPCTokenType(140); // `
+  tokTilda        = TNPCTokenType(141); // ~
 
   tokExclamation  = TNPCTokenType(142); // !
   tokAt           = TNPCTokenType(143); // @
@@ -130,9 +130,9 @@ const
     (DoubleLiteral: '!=';  TokenType: tokNotEqual2)
   );
 
-function NPCTokensTypeToString(const TokenType: TNPCTokenType): String;
+function NPCTokensTypeToString(const TokenType: TNPCTokenType): String; inline;
 function ArrayOfTokenToArrayOfString(const Values: Array of TNPCTokenType): TStringDynArray;
-function LiteralTokenToChar(const Token: TNPCTokenType): Char;
+function LiteralTokenToChar(const Token: TNPCTokenType): Char; inline;
 
 implementation
 
@@ -142,7 +142,8 @@ begin
   if TokenType = #0 then
     Exit('end of file');
 
-  if (TokenType > #31) and (TokenType < #128) then
+//  if (Ord(TokenType) > 31) and (Ord(TokenType) < 157) then
+  if TokenType < tokCommentSL then
     Exit('literal');
 
   case TokenType of
