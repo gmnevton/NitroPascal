@@ -2,6 +2,9 @@ unit npc_tokens;
 
 interface
 
+uses
+  Types;
+
 type
   TNPCTokenType = Char;
 
@@ -128,6 +131,8 @@ const
   );
 
 function NPCTokensTypeToString(const TokenType: TNPCTokenType): String;
+function ArrayOfTokenToArrayOfString(const Values: Array of TNPCTokenType): TStringDynArray;
+function LiteralTokenToChar(const Token: TNPCTokenType): Char;
 
 implementation
 
@@ -163,6 +168,33 @@ begin
     tokResource    : Result := 'resource';
     tokSpecifier   : Result := 'specifier';
     tokCompilerVar : Result := 'compiler-variable';
+  end;
+end;
+
+function ArrayOfTokenToArrayOfString(const Values: Array of TNPCTokenType): TStringDynArray;
+var
+  i: Integer;
+  lit: TNPCLiteralToken;
+begin
+  SetLength(Result, Length(Values));
+  for i:=0 to High(Values) do begin
+    for lit in NPCLiteralTokens do begin
+      if lit.TokenType = Values[i] then
+        Result[i] := lit.Literal;
+    end;
+  end;
+end;
+
+function LiteralTokenToChar(const Token: TNPCTokenType): Char;
+var
+  lit: TNPCLiteralToken;
+begin
+  Result := #0; // empty
+  for lit in NPCLiteralTokens do begin
+    if lit.TokenType = Token then begin
+      Result := lit.Literal;
+      Exit;
+    end;
   end;
 end;
 

@@ -153,16 +153,16 @@ begin
               j := Pos(']', Param);
               if j > 0 then begin
                 Value := Copy(Param, i + 1, j - i - 1);
-                if Value = 'P' then begin // ProjectOnly
+                if SameText(Value, 'P') then begin // ProjectOnly
                   commandLineSettings.OutputTokens := otProjectOnly;
                   commandLineSettings.SetOutputTokens := True;
                 end
-                else if Value = 'S' then begin // SourcesOnly
+                else if SameText(Value, 'S') then begin // SourcesOnly
                   commandLineSettings.OutputTokens := otSourcesOnly;
                   commandLineSettings.SetOutputTokens := True;
                 end
                 else
-                if Value = 'A' then begin // All
+                if SameText(Value, 'A') then begin // All
                   commandLineSettings.OutputTokens := otProjectAndSources;
                   commandLineSettings.SetOutputTokens := True;
                 end;

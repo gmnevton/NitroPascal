@@ -21,6 +21,7 @@ uses
   madListModules,
   SysUtils,
   Windows,
+  StrUtils,
   npc_lexer,
   npc_parser,
   npc_project,
@@ -29,9 +30,10 @@ uses
 var
   input_path: String;
   output_path: String;
+  temp: String;
   start_time: Real;
   total_time: Real;
-  i: Integer;
+  i, start_idx, decrement: Integer;
   cmd_params: String;
 
 begin
@@ -66,19 +68,32 @@ begin
       Exit;
     end;
     //
+    output_path := '';
     if ParamCount > 0 then begin
       input_path := ParamStr(1);
-      if ParamCount > 1 then begin
-        output_path := ParamStr(2);
+      if (ParamCount > 1) then begin
+        temp := ParamStr(2);
+        if not StartsText('-e:', temp) and not StartsText('-o:', temp) then begin
+          output_path := temp;
+          start_idx := 3;
+          decrement := 2;
+        end
+        else begin
+          start_idx := 2;
+          decrement := 1;
+        end;
+        temp := '';
       end
-      else
-        output_path := '';
+      else begin
+        start_idx := 2;
+        decrement := 1;
+      end;
       //
       cmd_params := '';
-      for i:=3 to ParamCount do
+      for i:=start_idx to ParamCount do
         cmd_params := cmd_params + ParamStr(i) + ' ';
       cmd_params := TrimRight(cmd_params);
-      NPC_InitCompiler(cmd_params, ParamCount - 2);
+      NPC_InitCompiler(cmd_params, ParamCount - decrement);
       cmd_params := '';
     end;
     //

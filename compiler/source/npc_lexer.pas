@@ -109,12 +109,10 @@ type
     function IsCurrentSymbol(const AValue: TNPCTokenType): Boolean; inline;
     function IsNextSymbol(const AValue: TNPCTokenType): Boolean; inline;
     procedure IdentWithMinus(const AValue: Boolean); inline;
-    function GetToken: TNPCToken; overload; // grabs token and moves stream forward
-    function NextToken: TNPCToken; // saves current stream position, grabs token and restores stream position
+    //
+    function GetToken: TNPCToken; overload; inline; // grabs token and moves stream forward
+    function NextToken: TNPCToken; inline; // saves current stream position, grabs token and restores stream position
     procedure SkipToken; inline; // if we used NextToken then this fast-forwards stream position to after grabing token by NextToken
-    function ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
-    function ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
-    function ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken;
     //
     function Lines: Integer;
   end;
@@ -122,37 +120,10 @@ type
 implementation
 
 uses
-  Types,
+//  Types,
   Character,
   Hash,
   npc_consts;
-
-function ArrayOfTokenToArrayOfString(const Values: Array of TNPCTokenType): TStringDynArray;
-var
-  i: Integer;
-  lit: TNPCLiteralToken;
-begin
-  SetLength(Result, Length(Values));
-  for i:=0 to High(Values) do begin
-    for lit in NPCLiteralTokens do begin
-      if lit.TokenType = Values[i] then
-        Result[i] := lit.Literal;
-    end;
-  end;
-end;
-
-function LiteralTokenToChar(const Token: TNPCTokenType): Char;
-var
-  lit: TNPCLiteralToken;
-begin
-  Result := #0; // empty
-  for lit in NPCLiteralTokens do begin
-    if lit.TokenType = Token then begin
-      Result := lit.Literal;
-      Exit;
-    end;
-  end;
-end;
 
 { TNPCToken }
 
@@ -631,16 +602,18 @@ begin
 //        Exit;
 //      end;
 
-      for dltoken in NPCDoubleLiteralTokens do begin
-        first2 := Get2Chars;
-        if first2 = dltoken.DoubleLiteral then begin
-          SkipChar(True);
-          loc.SetEndRowCol(row, cur - bol + 1);
-          Result := TNPCToken.Create(dltoken.TokenType, loc, False, True, first2, EmptyTokenMD5);
+      if NextChar <> #0 then begin
+        for dltoken in NPCDoubleLiteralTokens do begin
+          first2 := Get2Chars;
+          if first2 = dltoken.DoubleLiteral then begin
+            SkipChar(True);
+            loc.SetEndRowCol(row, cur - bol + 1);
+            Result := TNPCToken.Create(dltoken.TokenType, loc, False, True, first2, EmptyTokenMD5);
+            first2 := '';
+            Exit;
+          end;
           first2 := '';
-          Exit;
         end;
-        first2 := '';
       end;
 
       // check for literals
@@ -802,61 +775,6 @@ begin
     skip_bol := Nil;
     skip_row := 0;
   end;
-end;
-
-function TNPCLexer.ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
-var
-  token: TNPCTokenType;
-  tempOptions: TNPCLexerOptions;
-begin
-  tempOptions := FOptions;
-  try
-    if IdentWithMinus then
-      FOptions := FOptions + [loIdentWithMinus];
-    Result := GetToken;
-    if Result = Nil then begin
-      raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
-    end;
-
-    for token in ATokens do begin
-      if Result.&Type = token then
-        Exit;
-    end;
-
-    raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
-  finally
-    FOptions := tempOptions;
-  end;
-end;
-
-function TNPCLexer.ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
-//var
-//  token: Char;
-begin
-  Result := GetToken;
-  if Result = Nil then begin
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', ['ident']));
-  end;
-
-  if (Result.&Type = tokIdent) and Result.ReservedWord and (MD5ToReservedWord(Result.ValueHash) = AReservedWord) then
-    Exit;
-
-  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedIdentifiers[AReservedWord].Ident, Result.TokenToString]));
-end;
-
-function TNPCLexer.ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken;
-//var
-//  token: Char;
-begin
-  Result := GetToken;
-  if Result = Nil then begin
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', ['symbol']));
-  end;
-
-  if (Result.&Type in [tokOParen..tokNotEqual]) and not Result.ReservedWord and Result.ReservedSymbol and (TokenTypeToReservedSymbol(Result.&Type) = AReservedSymbol) then
-    Exit;
-
-  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedSymbolToString(AReservedSymbol), Result.TokenToString]));
 end;
 
 function TNPCLexer.Lines: Integer;

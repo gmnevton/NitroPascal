@@ -12,7 +12,7 @@ interface
 uses
   SysUtils,
   Classes;
-  
+
 type
   TNPCLocation = class
   public
@@ -27,6 +27,7 @@ type
     destructor Destroy; override;
     //
     procedure SetEndRowCol(const AEndRow, AEndCol: Integer); inline;
+    procedure SetEndAsStart;
     function Copy: TNPCLocation; inline;
     function ToString: String; inline;
   end;
@@ -55,6 +56,12 @@ procedure TNPCLocation.SetEndRowCol(const AEndRow, AEndCol: Integer);
 begin
   EndRow := AEndRow;
   EndCol := AEndCol;
+end;
+
+procedure TNPCLocation.SetEndAsStart;
+begin
+  StartRow := EndRow;
+  StartCol := EndCol;
 end;
 
 function TNPCLocation.Copy: TNPCLocation;

@@ -36,6 +36,7 @@ function ConsoleAvailable: Boolean;
 procedure ConsoleWriteln(const Value: String);
 function IsANSIConsoleSupported: Boolean;
 procedure SetConsoleANSIMode;
+
 //function ParamValue(P: PChar; Index: Integer): String;
 function explode_quotes(const Spliter: Char; const Value: String; const TrimParts: Boolean = True; const PreserveQuotes: Boolean = False): TStringArray; overload;
 function explode_quotes(const Spliter: String; const Value: String; const TrimParts: Boolean = True; const PreserveQuotes: Boolean = False): TStringArray; overload;
