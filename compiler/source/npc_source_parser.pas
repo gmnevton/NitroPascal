@@ -313,7 +313,7 @@ var
   token: TNPCToken;
 begin
   while Texer.IsNotEmpty do begin
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     // skip comment
     if SkipComment(token, True) then
       Continue
@@ -336,8 +336,9 @@ begin
     if ConsumeToken then
       Texer.SkipToken;
     while Texer.IsNotEmpty do begin
-      token := Texer.GetToken;
+      token := Texer.PeekToken;
       // @TODO: count opened comments
+      Texer.SkipToken;
       if TokenIsReservedSymbol(token, rs_CommentMLE2) then // skip comments until closing section
         Break;
     end;
@@ -347,8 +348,9 @@ begin
     if ConsumeToken then
       Texer.SkipToken;
     while Texer.IsNotEmpty do begin
-      token := Texer.GetToken;
+      token := Texer.PeekToken;
       // @TODO: count opened comments
+      Texer.SkipToken;
       if TokenIsReservedSymbol(token, rs_CommentMLE1) then // skip comments until closing section
         Break;
     end;
@@ -408,27 +410,20 @@ end;
 procedure TNPCSourceParser.ParseSettingDefineCondition;
 var
   token: TNPCToken;
-  free_token: Boolean;
 begin
   while Texer.IsNotEmpty do begin
-    token := Texer.GetToken;
-    free_token := True;
-    try
-      //AddToken(token);
-      if TokenIsReservedSymbol(token, rs_Dollar) then begin
-        ParseSettingOrDefineDirective;
-      end
-      else if TokenIsReservedSymbol(token, rs_CCurly) then begin
-        AddToken(token);
-        free_token := False;
-        Break;
-      end
-      else
-        raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
-    finally
-      if free_token then
-        token.Free;
-    end;
+    token := Texer.PeekToken;
+    if TokenIsReservedSymbol(token, rs_Dollar) then begin
+      Texer.SkipToken;
+      ParseSettingOrDefineDirective;
+    end
+    else if TokenIsReservedSymbol(token, rs_CCurly) then begin
+      AddToken(token);
+      Texer.SkipToken;
+      Break;
+    end
+    else
+      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
   end;
 end;
 
@@ -437,9 +432,7 @@ var
   token: TNPCToken;
 begin
   while Texer.IsNotEmpty do begin
-    Texer.IdentWithMinus(True);
-    token := Texer.GetToken;
-    Texer.IdentWithMinus(False);
+    token := Texer.GetTokenWithMinus;
     try
       if (token.&Type = tokIdent) and SameText(token.Value, 'program-type') then begin
         ParseSettings(token, setProgramType);
@@ -588,7 +581,6 @@ procedure TNPCSourceParser.ParseSettingProgramType(AToken: TNPCToken);
 
 var
   token: TNPCToken;
-//  free_token: Boolean;
   stemp: String;
   //
   OutputPath: String;
@@ -597,7 +589,6 @@ var
 begin
   Assert(Assigned(AToken), 'no token passed');
   AddToken(TNPCToken.Create(tokSetting, AToken.Location.Copy, False, False, '$program-type', EmptyTokenMD5));
-  //AToken.Free;
   //
   OutputPath := '';
   ProjectTypes := [];
@@ -606,85 +597,79 @@ begin
   stemp := '';
   //
   while Texer.IsNotEmpty do begin
-    token := Texer.NextToken;
-//    free_token := True;
-    try
-      if (token.&Type = tokIdent) then begin
-        Texer.SkipToken;
-        if SameText(token.Value, 'Windows32') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-          ProjectTypes := ProjectTypes + [ptWindows];
-          ProjectTypes := ProjectTypes + [pt32Bit];
-        end
-        else if SameText(token.Value, 'Windows64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-          ProjectTypes := ProjectTypes + [ptWindows];
-          ProjectTypes := ProjectTypes + [pt64Bit];
-        end
-        else if SameText(token.Value, 'Linux32') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-          ProjectTypes := ProjectTypes + [ptLinux];
-          ProjectTypes := ProjectTypes + [pt32Bit];
-        end
-        else if SameText(token.Value, 'Linux64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-          ProjectTypes := ProjectTypes + [ptLinux];
-          ProjectTypes := ProjectTypes + [pt64Bit];
-        end
-        else if SameText(token.Value, 'Android32') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-          ProjectTypes := ProjectTypes + [ptAndroid];
-          ProjectTypes := ProjectTypes + [pt32Bit];
-        end
-        else if SameText(token.Value, 'Android64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-          ProjectTypes := ProjectTypes + [ptAndroid];
-          ProjectTypes := ProjectTypes + [pt64Bit];
-        end
-        else if SameText(token.Value, 'WebAssembly') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-          ProjectTypes := ProjectTypes + [ptWebAssembly];
-          ProjectTypes := ProjectTypes + [pt32Bit];
-        end
-  //      else if SameText(token.Value, 'WebAssembly64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
-  //        ProjectTypes := ProjectTypes + [ptWebAssembly];
-  //        ProjectTypes := ProjectTypes + [pt64Bit];
-  //      end
-        else if SameText(token.Value, 'CONSOLE') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
-          ProjectTypes := ProjectTypes + [ptCONSOLE]
-        else if SameText(token.Value, 'GUI') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
-          ProjectTypes := ProjectTypes + [ptGUI]
-        else if SameText(token.Value, 'DLL') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
-          ProjectTypes := ProjectTypes + [ptDLL]
-        else if SameText(token.Value, 'TEXT') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
-          ProjectTypes := ProjectTypes + [ptTEXT]
-        else
-          raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
+    token := Texer.PeekToken;
+    if (token.&Type = tokIdent) then begin
+      Texer.SkipToken;
+      if SameText(token.Value, 'Windows32') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+        ProjectTypes := ProjectTypes + [ptWindows];
+        ProjectTypes := ProjectTypes + [pt32Bit];
       end
-      else if (token.&Type = tokString) then begin
-        Texer.SkipToken;
-        if (Length(token.Value) > 1) and (token.Value[1] = '.') and (Length(ProjectExtension) = 0) then begin // extension
-          ProjectExtension := token.Value;
-        end
-        else if (Length(token.Value) > 0) and (Length(OutputPath) = 0) then begin
-          OutputPath := token.Value;
-        end
-        else
-          raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
+      else if SameText(token.Value, 'Windows64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+        ProjectTypes := ProjectTypes + [ptWindows];
+        ProjectTypes := ProjectTypes + [pt64Bit];
       end
-      else if TokenIsReservedSymbol(token, rs_CCurly) then begin
-        AddProjectType(TNPCProjectSettings(Settings^), OutputPath, ProjectTypes, ProjectExtension);
-        AddToken(TNPCToken.Create(tokIdent, AToken.Location.Copy, False, False, ProjectTypeToIdent(ProjectTypes, ProjectExtension, OutputPath), EmptyTokenMD5));
-        //AddToken(token);
-//        free_token := False;
-        stemp := ProjectTypeToString(ProjectTypes);
-        ConsoleWriteln('Compilation target : ' + stemp + IfThen(Length(ProjectExtension) > 0, ' (extension: ' + ProjectExtension + ')'));
-        ConsoleWriteln('        output path: ' + OutputPath);
-        stemp := '';
-        OutputPath := '';
-        ProjectTypes := [];
-        ProjectExtension := '';
-        Break;
+      else if SameText(token.Value, 'Linux32') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+        ProjectTypes := ProjectTypes + [ptLinux];
+        ProjectTypes := ProjectTypes + [pt32Bit];
+      end
+      else if SameText(token.Value, 'Linux64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+        ProjectTypes := ProjectTypes + [ptLinux];
+        ProjectTypes := ProjectTypes + [pt64Bit];
+      end
+      else if SameText(token.Value, 'Android32') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+        ProjectTypes := ProjectTypes + [ptAndroid];
+        ProjectTypes := ProjectTypes + [pt32Bit];
+      end
+      else if SameText(token.Value, 'Android64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+        ProjectTypes := ProjectTypes + [ptAndroid];
+        ProjectTypes := ProjectTypes + [pt64Bit];
+      end
+      else if SameText(token.Value, 'WebAssembly') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+        ProjectTypes := ProjectTypes + [ptWebAssembly];
+        ProjectTypes := ProjectTypes + [pt32Bit];
+      end
+//      else if SameText(token.Value, 'WebAssembly64') and EnsureTypeIsNotSet(token, ProjectTypes, [ptWindows, ptLinux, ptAndroid, ptWebAssembly, pt32Bit, pt64Bit]) then begin
+//        ProjectTypes := ProjectTypes + [ptWebAssembly];
+//        ProjectTypes := ProjectTypes + [pt64Bit];
+//      end
+      else if SameText(token.Value, 'CONSOLE') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
+        ProjectTypes := ProjectTypes + [ptCONSOLE]
+      else if SameText(token.Value, 'GUI') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
+        ProjectTypes := ProjectTypes + [ptGUI]
+      else if SameText(token.Value, 'DLL') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
+        ProjectTypes := ProjectTypes + [ptDLL]
+      else if SameText(token.Value, 'TEXT') and EnsureTypeIsNotSet(token, ProjectTypes, [ptCONSOLE, ptGUI, ptDLL, ptTEXT]) then
+        ProjectTypes := ProjectTypes + [ptTEXT]
+      else
+        raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
+    end
+    else if (token.&Type = tokString) then begin
+      Texer.SkipToken;
+      if (Length(token.Value) > 1) and (token.Value[1] = '.') and (Length(ProjectExtension) = 0) then begin // extension
+        ProjectExtension := token.Value;
+      end
+      else if (Length(token.Value) > 0) and (Length(OutputPath) = 0) then begin
+        OutputPath := token.Value;
       end
       else
         raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
-    finally
-//      if free_token then
-        token.Free;
-    end;
+    end
+    else if TokenIsReservedSymbol(token, rs_CCurly) then begin
+      AddProjectType(TNPCProjectSettings(Settings^), OutputPath, ProjectTypes, ProjectExtension);
+      AddToken(TNPCToken.Create(tokIdent, AToken.Location.Copy, False, False, ProjectTypeToIdent(ProjectTypes, ProjectExtension, OutputPath), EmptyTokenMD5));
+//      AddToken(token);
+//      Texer.SkipToken;
+      stemp := ProjectTypeToString(ProjectTypes);
+      ConsoleWriteln('Compilation target : ' + stemp + IfThen(Length(ProjectExtension) > 0, ' (extension: ' + ProjectExtension + ')'));
+      ConsoleWriteln('        output path: ' + OutputPath);
+      stemp := '';
+      OutputPath := '';
+      ProjectTypes := [];
+      ProjectExtension := '';
+      Break;
+    end
+    else
+      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
   end;
 end;
 
@@ -762,7 +747,7 @@ var
 begin
   ParseExpressionSimpleExpression;
   while Texer.IsNotEmpty do begin
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if token.ReservedSymbol and (token.&Type in [tokEqual, tokNotEqual, tokLessThan, tokLessEqual, tokGreaterThan, tokGreaterEqual]) then begin
       AddToken(token);
       Texer.SkipToken;
@@ -785,7 +770,7 @@ var
 begin
   ParseExpressionTerm;
   while Texer.IsNotEmpty do begin
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if (token.ReservedSymbol and (token.&Type in [tokPlus, tokMinus])) or TokenIsReservedIdent(token, ri_or) or TokenIsReservedIdent(token, ri_xor) then begin
       AddToken(token);
       Texer.SkipToken;
@@ -808,7 +793,7 @@ var
 begin
   ParseExpressionFactor;
   while Texer.IsNotEmpty do begin
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if (token.ReservedSymbol and (token.&Type in [tokAsterisk, tokDiv])) or
        TokenIsReservedIdent(token, ri_div) or
        TokenIsReservedIdent(token, ri_mod) or
@@ -834,7 +819,7 @@ procedure TNPCSourceParser.ParseExpressionFactor;
 var
   token: TNPCToken;
 begin
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if not token.ReservedWord and (token.&Type in [tokIdent..tokChar]) then begin
     AddToken(token);
     Texer.SkipToken;
@@ -862,7 +847,7 @@ begin
     AddToken(token);
     Texer.SkipToken;
     while Texer.IsNotEmpty do begin
-      token := Texer.NextToken;
+      token := Texer.PeekToken;
       //
       if not token.ReservedWord and (token.&Type = tokIdent) then begin
         AddToken(token);
@@ -884,7 +869,7 @@ begin
     Texer.SkipToken;
     ParseExpression;
     while Texer.IsNotEmpty do begin
-      token := Texer.NextToken;
+      token := Texer.PeekToken;
       //
       if not token.ReservedWord and (token.&Type = tokIdent) then begin
         AddToken(token);
@@ -929,7 +914,7 @@ begin
   //
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if not token.ReservedWord and not token.ReservedSymbol and (token.&Type in [tokIdent..tokChar]) then begin
       AddToken(token);
       Texer.SkipToken; // move forward
@@ -957,7 +942,7 @@ begin
     else if TokenIsReservedSymbol(token, rs_CParen) then begin
       AddToken(token);
       Texer.SkipToken; // move forward
-      token := Texer.NextToken; // just peek a token
+      token := Texer.PeekToken; // just peek a token
       if TokenIsReservedSymbol(token, rs_Semicolon) then
         AddToken(Texer.GetToken);
       Break;
@@ -1004,7 +989,7 @@ begin
   ParseIfStatement;
   //
   SkipComments;
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if TokenIsReservedIdent(token, ri_else) then begin
     if (LastToken <> Nil) and TokenIsReservedSymbol(LastToken, rs_Semicolon) then
       raise NPCSourceParserException.ParserError(LastToken.Location, Format(sParserUnexpectedTokenIn, [LastToken.TokenToString, 'if ', sStatement]));
@@ -1023,7 +1008,7 @@ var
 begin
   SkipComments;
   ParseIfSimpleExpression;
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if token.ReservedSymbol and (token.&Type in [tokEqual, tokNotEqual, tokLessThan, tokLessEqual, tokGreaterThan, tokGreaterEqual]) then begin
     AddToken(token);
     Texer.SkipToken;
@@ -1049,7 +1034,7 @@ begin
   ParseIfTerm;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if (token.ReservedSymbol and (token.&Type in [tokPlus, tokMinus])) or TokenIsReservedIdent(token, ri_or) or TokenIsReservedIdent(token, ri_xor) then begin
       AddToken(token);
       Texer.SkipToken;
@@ -1075,7 +1060,7 @@ begin
   ParseIfFactor;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if (token.ReservedSymbol and (token.&Type in [tokAsterisk, tokDiv])) or
        TokenIsReservedIdent(token, ri_div) or
        TokenIsReservedIdent(token, ri_mod) or
@@ -1100,7 +1085,7 @@ procedure TNPCSourceParser.ParseIfFactor;
 var
   token: TNPCToken;
 begin
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if not token.ReservedWord and (token.&Type in [tokIdent, tokNumber]) then begin
     AddToken(token);
     Texer.SkipToken;
@@ -1129,7 +1114,7 @@ begin
       Texer.SkipToken;
       while Texer.IsNotEmpty do begin
         ParseExpression;
-        token := Texer.NextToken;
+        token := Texer.PeekToken;
         if TokenIsReservedSymbol(token, rs_Comma) then begin
           AddToken(token);
           Texer.SkipToken;
@@ -1156,11 +1141,11 @@ var
   token: TNPCToken;
 begin
   SkipComments;
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if not token.ReservedWord and (token.&Type = tokIdent) then begin
     AddToken(token);
     Texer.SkipToken;
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if TokenIsReservedSymbol(token, rs_CParen) then begin
       ParseIfStatementFuncParams(token);
       AddToken(Texer.ExpectToken([tokCParen]));
@@ -1179,7 +1164,7 @@ begin
       Texer.SkipToken;
       while Texer.IsNotEmpty do begin
         ParseIfStatement;
-        token := Texer.NextToken;
+        token := Texer.PeekToken;
         if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then begin
           AddToken(token);
           Texer.SkipToken;
@@ -1197,12 +1182,12 @@ begin
     AddToken(token);
     Texer.SkipToken;
     while Texer.IsNotEmpty do begin
-      token := Texer.NextToken;
+      token := Texer.PeekToken;
       if not ParseStatements(token, [], FLevel + 1) then begin
         if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then begin
           AddToken(token);
           Texer.SkipToken;
-          token := Texer.NextToken;
+          token := Texer.PeekToken;
           if TokenIsReservedSymbol(token, rs_Semicolon) then
             AddToken(Texer.GetToken);
           Break;
@@ -1218,7 +1203,7 @@ begin
       else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then begin
         AddToken(token);
         Texer.SkipToken;
-        token := Texer.NextToken;
+        token := Texer.PeekToken;
         if TokenIsReservedSymbol(token, rs_Semicolon) then
           AddToken(Texer.GetToken);
         Break;
@@ -1239,11 +1224,11 @@ begin
   AddToken(token);
   Texer.SkipToken;
   while Texer.IsNotEmpty do begin
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if not token.ReservedWord and (token.&Type = tokIdent) then begin
       AddToken(token);
       Texer.SkipToken;
-      token := Texer.NextToken;
+      token := Texer.PeekToken;
       if TokenIsReservedSymbol(token, rs_CParen) then begin
         ParseIfStatementFuncParams(token);
         AddToken(Texer.ExpectToken([tokCParen]));
@@ -1302,11 +1287,11 @@ begin
   //
   SkipComments;
 //    if (LastToken <> Nil) and TokenIsReservedSymbol(LastToken, rs_Semicolon) then
-//  token := Texer.NextToken;
+//  token := Texer.PeekToken;
   token := LastToken;
   if (case_of and not TokenIsReservedIdent(token, ri_end)) or (not case_of and not TokenIsReservedSymbol(token, rs_CCurly)) then
     raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if not TokenIsReservedSymbol(LastToken, rs_Semicolon) then
     raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
 //  AddToken(Texer.ExpectToken([tokSemicolon]));
@@ -1318,7 +1303,7 @@ var
 begin
   SkipComments;
   ParseCaseSimpleExpression;
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if token.ReservedSymbol and (token.&Type in [tokEqual, tokNotEqual, tokLessThan, tokLessEqual, tokGreaterThan, tokGreaterEqual]) then begin
     AddToken(token);
     Texer.SkipToken;
@@ -1344,7 +1329,7 @@ begin
   ParseCaseTerm;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if (token.ReservedSymbol and (token.&Type in [tokPlus, tokMinus])) or TokenIsReservedIdent(token, ri_or) or TokenIsReservedIdent(token, ri_xor) then begin
       AddToken(token);
       Texer.SkipToken;
@@ -1369,7 +1354,7 @@ begin
   ParseCaseFactor;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if (token.ReservedSymbol and (token.&Type in [tokAsterisk, tokDiv])) or
        TokenIsReservedIdent(token, ri_div) or
        TokenIsReservedIdent(token, ri_mod) or
@@ -1394,7 +1379,7 @@ procedure TNPCSourceParser.ParseCaseFactor;
 var
   token: TNPCToken;
 begin
-  token := Texer.NextToken;
+  token := Texer.PeekToken;
   if not token.ReservedWord and (token.&Type in [tokIdent, tokNumber]) then begin
     AddToken(token);
     Texer.SkipToken;
@@ -1423,7 +1408,7 @@ begin
       Texer.SkipToken;
       while Texer.IsNotEmpty do begin
         ParseExpression;
-        token := Texer.NextToken;
+        token := Texer.PeekToken;
         if TokenIsReservedSymbol(token, rs_Comma) then begin
           AddToken(token);
           Texer.SkipToken;
@@ -1453,7 +1438,7 @@ var
 begin
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
     if TokenIsReservedIdent(token, ri_if) then begin
       AddToken(token); // 'if'
       Texer.SkipToken;
@@ -1479,7 +1464,7 @@ begin
 //  ParseIfStatement;
 //  //
 //  SkipComments;
-//  token := Texer.NextToken;
+//  token := Texer.PeekToken;
 //  if TokenIsReservedIdent(token, ri_else) then begin
 //    if (LastToken <> Nil) and TokenIsReservedSymbol(LastToken, rs_Semicolon) then
 //      raise NPCSourceParserException.ParserError(LastToken.Location, Format(sParserUnexpectedTokenIn, [LastToken.TokenToString, 'if ', sStatement]));
@@ -1504,7 +1489,7 @@ end;
 
 (*
   while Texer.IsNotEmpty do begin
-    token := Texer.NextToken;
+    token := Texer.PeekToken;
 
 
     if token.&Type in [tokIdent..tokString, tokExclamation..tokDash, tokAsterisk..tokDiv, tokAssign..tokNotEqual] then begin
@@ -1632,7 +1617,7 @@ begin
   has_body := False;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken; // just peek a token
+    token := Texer.PeekToken; // just peek a token
     if (token.&Type = tokIdent) and not TokenIsReservedIdent(token) then begin
       has_body := True;
       // left side is variable name
@@ -1679,7 +1664,7 @@ begin
   has_body := False;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken; // just peek a token
+    token := Texer.PeekToken; // just peek a token
     if (token.&Type = tokIdent) and not TokenIsReservedIdent(token) then begin
       has_body := True;
       // left side is variable name
@@ -1726,7 +1711,7 @@ begin
   has_body := False;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken; // just peek a token
+    token := Texer.PeekToken; // just peek a token
     if (token.&Type = tokIdent) and not TokenIsReservedIdent(token) then begin
       has_body := True;
       // left side is variable name
@@ -1750,6 +1735,7 @@ begin
       end;
 //      if (token.&Type = tokIdent) and Texer.IsCurrentSymbol('(') then // might be a function call
 //        ParseLambdaParams(token);
+      Continue;
     end
 //    else if TokenIsReservedSymbol(token, ',') then begin
 //      AddToken(token);
@@ -1778,7 +1764,7 @@ begin
   has_body := False;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken; // just peek a token
+    token := Texer.PeekToken; // just peek a token
     if ParseStatements(token, [ri_finalization, ri_begin], FLevel + 1) then begin
       // if statements ware parsed than do nothing
       has_body := True;
@@ -1819,7 +1805,7 @@ begin
   has_body := False;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken; // just peek a token
+    token := Texer.PeekToken; // just peek a token
     if TokenIsReservedSymbol(token, rs_Comma) then begin
       AddToken(token);
     end
@@ -1868,7 +1854,7 @@ begin
   Result := False;
   while Texer.IsNotEmpty do begin
     SkipComments;
-    token := Texer.NextToken; // just peek a token
+    token := Texer.PeekToken; // just peek a token
     // check if token is reserved ident on which we wnat to stop parsing statements
     if Length(AExitOnReservedIdents) > 0 then begin
       for reserved_ident in AExitOnReservedIdents do begin

@@ -55,7 +55,6 @@ type
     FFileName: String;
     FCount: UInt64;
     FIndex: UInt64;
-    FOptions: TNPCLexerOptions;
     FLastTokenLocation: TNPCLocation;
   protected
     function Location: TNPCLocation; inline;
@@ -66,13 +65,13 @@ type
     function IsNotEmpty: Boolean; inline;
     function IsEmpty: Boolean; inline;
     function IsCurrentSymbol(const AValue: TNPCTokenType): Boolean; inline;
-    procedure IdentWithMinus(const AValue: Boolean); inline;
-
-
+    //
     function GetToken: TNPCToken; inline; // grabs token and moves index forward
-    function NextToken: TNPCToken; inline; // grabs token and preserves actual index
+    function GetTokenWithMinus: TNPCToken; // combine tokens if there is minus between them
+    function PeekToken: TNPCToken; inline; // grabs current token and preserves actual index
+    function NextToken: TNPCToken; inline; // grabs next token and preserves actual index
     procedure SkipToken; inline; // increase index to next position
-
+    //
     function ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
     function ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken; inline;
     function ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken; inline;
@@ -240,7 +239,6 @@ begin
   TokensArray := ATokens;
   FCount := Length(TokensArray);
   FIndex := 0;
-  FOptions := [];
   FLastTokenLocation := Nil;
 end;
 
@@ -281,16 +279,6 @@ begin
   Result := TokensArray[FIndex].Value[1] = AValue;
 end;
 
-procedure TNPCTokensParser.IdentWithMinus(const AValue: Boolean);
-begin
-  if AValue then begin
-    FOptions := FOptions + [loIdentWithMinus];
-  end
-  else begin
-    FOptions := FOptions - [loIdentWithMinus];
-  end;
-end;
-
 function TNPCTokensParser.GetToken: TNPCToken;
 begin
   Result := Nil;
@@ -300,6 +288,37 @@ begin
   Result := TokensArray[FIndex];
   FLastTokenLocation := Result.Location;
   Inc(FIndex);
+end;
+
+function TNPCTokensParser.GetTokenWithMinus: TNPCToken;
+var
+  token: TNPCToken;
+  ident: String;
+  location: TNPCLocation;
+begin
+  Result := GetToken;
+  if Result = Nil then
+    Exit;
+  location := Result.Location.Copy;
+  ident := Result.Value;
+  while (PeekToken <> Nil) and (PeekToken.&Type = tokMinus) do begin
+    SkipToken;
+    ident := ident + '-';
+    token := GetToken;
+    if (token = Nil) or (token.&Type <> tokIdent) then
+      Break;
+    ident := ident + token.Value;
+    location.SetEndRowCol(token.Location.EndRow, token.Location.EndCol);
+  end;
+  Result := TNPCToken.Create(tokIdent, location, False, False, ident, EmptyTokenMD5);
+end;
+
+function TNPCTokensParser.PeekToken: TNPCToken;
+begin
+  Result := Nil;
+  if FIndex >= FCount then
+    Exit;
+  Result := TokensArray[FIndex];
 end;
 
 function TNPCTokensParser.NextToken: TNPCToken;
@@ -320,26 +339,21 @@ end;
 function TNPCTokensParser.ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
 var
   token: TNPCTokenType;
-  tempOptions: TNPCLexerOptions;
 begin
-  tempOptions := FOptions;
-  try
-    if IdentWithMinus then
-      FOptions := FOptions + [loIdentWithMinus];
+  if IdentWithMinus then
+    Result := GetTokenWithMinus
+  else
     Result := GetToken;
-    if Result = Nil then begin
-      raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
-    end;
-
-    for token in ATokens do begin
-      if Result.&Type = token then
-        Exit;
-    end;
-
-    raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
-  finally
-    FOptions := tempOptions;
+  if Result = Nil then begin
+    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
   end;
+
+  for token in ATokens do begin
+    if Result.&Type = token then
+      Exit;
+  end;
+
+  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
 end;
 
 function TNPCTokensParser.ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
