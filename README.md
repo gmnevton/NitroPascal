@@ -20,7 +20,31 @@ This is "work in progress" type repo for the time being.
 All projects are made using Delphi 10.2.3.  
 Project uses madExcept to track bugs and memory leaks.  
 For now there is no other external dependencies - but this can change at any time.  
-
+  
+  
+A typical compiler consists of key components such as:  
+- lexical analyser (TNPCLexer and TNPCTexer),  
+- syntax analyser (TNPCSourceParser),  
+- semantic analyser (TNPCASTGenerator),  
+- intermediate code generator (TNPCINTGenerator),  
+- code optimiser (TNPCOptimization),  
+- code generator (TNPCBITGenerator).  
+  
+  
+Stages complited/under development:  
+|?| - lexical analyser (TNPCLexer and TNPCTexer),  
+|?| - syntax analyser (TNPCSourceParser),  
+| | - semantic analyser (TNPCASTGenerator),  
+| | - intermediate code generator (TNPCINTGenerator),  
+| | - code optimiser (TNPCOptimization),  
+| | - code generator (TNPCBITGenerator).  
+  
+----------------------------------------------------------------------  
+|x| - done  
+|?| - under development  
+| | - not developed yet  
+  
+  
 ![NitroPascal3](./git_res/NitroPascal3.png)
 ---
 
