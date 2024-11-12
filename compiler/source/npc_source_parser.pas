@@ -100,6 +100,11 @@ type
     procedure ParseCaseElements(const case_of: Boolean);
     procedure ParseCaseElseStatements;
     procedure ParseCaseIfExpression;
+    procedure ParseCaseIfSimpleExpression;
+    procedure ParseCaseIfTerm;
+    procedure ParseCaseIfFactor;
+    procedure ParseCaseIfStatement;
+    procedure ParseCaseIfStatementFuncParams(const AToken: TNPCToken);
 
     procedure ParseImports(const AToken: TNPCToken);
     procedure ParseExports(const AToken: TNPCToken);
@@ -300,12 +305,12 @@ end;
 
 function TNPCSourceParser.LastToken: TNPCToken;
 var
-  idx: Integer;
+  cnt: Integer;
 begin
   Result := Nil;
-  idx := Length(TokensArray);
-  if idx > 0 then
-    Result := TokensArray[idx - 1];
+  cnt := Length(TokensArray);
+  if FIndex < cnt then
+    Result := TokensArray[FIndex - 1];
 end;
 
 procedure TNPCSourceParser.SkipComments;
@@ -1189,12 +1194,12 @@ begin
           Texer.SkipToken;
           token := Texer.PeekToken;
           if TokenIsReservedSymbol(token, rs_Semicolon) then
-            AddToken(Texer.GetToken);
+            AddToken(token);
           Break;
         end
         else if TokenIsReservedSymbol(token, rs_Semicolon) then begin
           AddToken(token);
-          Texer.SkipToken;
+//          Texer.SkipToken;
           Break;
         end
         else
@@ -1205,7 +1210,7 @@ begin
         Texer.SkipToken;
         token := Texer.PeekToken;
         if TokenIsReservedSymbol(token, rs_Semicolon) then
-          AddToken(Texer.GetToken);
+          AddToken(token);
         Break;
       end;
     end;
@@ -1285,16 +1290,18 @@ begin
   AddToken(token);
   ParseCaseElements(case_of);
   //
-  SkipComments;
+//  SkipComments;
 //    if (LastToken <> Nil) and TokenIsReservedSymbol(LastToken, rs_Semicolon) then
-//  token := Texer.PeekToken;
-  token := LastToken;
+//  token := LastToken;
+  token := Texer.GetToken;
   if (case_of and not TokenIsReservedIdent(token, ri_end)) or (not case_of and not TokenIsReservedSymbol(token, rs_CCurly)) then
     raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
-  token := Texer.PeekToken;
-  if not TokenIsReservedSymbol(LastToken, rs_Semicolon) then
+  AddToken(token);
+  token := Texer.GetToken;
+  if not TokenIsReservedSymbol(token, rs_Semicolon) then
     raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
 //  AddToken(Texer.ExpectToken([tokSemicolon]));
+  AddToken(token);
 end;
 
 procedure TNPCSourceParser.ParseCaseExpression;
@@ -1442,15 +1449,15 @@ begin
     if TokenIsReservedIdent(token, ri_if) then begin
       AddToken(token); // 'if'
       Texer.SkipToken;
-      ParseCaseIfExpression; // get everything until 'then'
-      AddToken(Texer.ExpectReservedToken(ri_then));
-      ParseIfStatement;
+      ParseCaseIfExpression; // get everything until ':'
+      AddToken(Texer.ExpectReservedSymbol(rs_Colon));
+      ParseCaseIfStatement;
 //      raise Exception.Create('Error Message');
     end
     else if TokenIsReservedSymbol(token, rs_Semicolon) then
       Break
     else if (case_of and not TokenIsReservedIdent(token, ri_end)) or (not case_of and not TokenIsReservedSymbol(token, rs_CCurly)) then
-      Break
+      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]))
     else
       Break;
     //
@@ -1483,8 +1490,255 @@ begin
 end;
 
 procedure TNPCSourceParser.ParseCaseIfExpression;
+var
+  token: TNPCToken;
 begin
+  SkipComments;
+  ParseCaseIfSimpleExpression;
+  token := Texer.PeekToken;
+  if token.ReservedSymbol and (token.&Type in [tokEqual, tokNotEqual, tokLessThan, tokLessEqual, tokGreaterThan, tokGreaterEqual]) then begin
+    AddToken(token);
+    Texer.SkipToken;
+    ParseCaseIfSimpleExpression;
+    Exit;
+  end
+  else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then
+    Exit
+  else if TokenIsReservedSymbol(token, rs_Semicolon) then
+    Exit
+  else if TokenIsReservedSymbol(token, rs_Colon) then
+    Exit
+  else
+    raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+  //
+  Texer.SkipToken;
+end;
 
+procedure TNPCSourceParser.ParseCaseIfSimpleExpression;
+var
+  token: TNPCToken;
+begin
+  ParseCaseIfTerm;
+  while Texer.IsNotEmpty do begin
+    SkipComments;
+    token := Texer.PeekToken;
+    if (token.ReservedSymbol and (token.&Type in [tokPlus, tokMinus])) or TokenIsReservedIdent(token, ri_or) or TokenIsReservedIdent(token, ri_xor) then begin
+      AddToken(token);
+      Texer.SkipToken;
+      ParseCaseIfTerm;
+      Continue;
+    end
+    else if TokenIsReservedSymbol(token, rs_Semicolon) then
+      Break
+    else if TokenIsReservedSymbol(token, rs_Colon) then
+      Break
+    else
+      Break;
+//      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+    //
+    Texer.SkipToken;
+  end;
+end;
+
+procedure TNPCSourceParser.ParseCaseIfTerm;
+var
+  token: TNPCToken;
+begin
+  ParseCaseIfFactor;
+  while Texer.IsNotEmpty do begin
+    SkipComments;
+    token := Texer.PeekToken;
+    if (token.ReservedSymbol and (token.&Type in [tokAsterisk, tokDiv])) or
+       TokenIsReservedIdent(token, ri_div) or
+       TokenIsReservedIdent(token, ri_mod) or
+       TokenIsReservedIdent(token, ri_and) then begin
+      AddToken(token);
+      Texer.SkipToken;
+      ParseCaseIfFactor;
+    end
+    else if TokenIsReservedSymbol(token, rs_Semicolon) then
+      Break
+    else if TokenIsReservedSymbol(token, rs_Colon) then
+      Break
+    else
+      Break;
+//      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+    //
+    Texer.SkipToken;
+  end;
+end;
+
+procedure TNPCSourceParser.ParseCaseIfFactor;
+var
+  token: TNPCToken;
+begin
+  token := Texer.PeekToken;
+  if not token.ReservedWord and (token.&Type in [tokIdent, tokNumber]) then begin
+    AddToken(token);
+    Texer.SkipToken;
+  end
+  else if TokenIsReservedIdent(token, ri_not) then begin
+    AddToken(token);
+    Texer.SkipToken;
+    ParseCaseIfFactor;
+  end
+  else if TokenIsReservedSymbol(token, rs_Percent) then begin
+    AddToken(token);
+    Texer.SkipToken;
+    AddToken(Texer.ExpectToken([tokIdent], True));
+    AddToken(Texer.ExpectToken([tokPercent]));
+  end
+  else if (token.ReservedSymbol and (token.&Type in [tokPlus, tokMinus])) then begin
+    AddToken(token);
+    Texer.SkipToken;
+    ParseCaseIfFactor;
+  end
+  else if TokenIsReservedSymbol(token, rs_OParen) then begin
+    if (LastToken <> Nil) and not LastToken.ReservedWord and (LastToken.&Type = tokIdent) then
+      ParseCallParams(token)
+    else begin
+      AddToken(token);
+      Texer.SkipToken;
+      while Texer.IsNotEmpty do begin
+        ParseExpression;
+        token := Texer.PeekToken;
+        if TokenIsReservedSymbol(token, rs_Comma) then begin
+          AddToken(token);
+          Texer.SkipToken;
+        end
+        else if TokenIsReservedSymbol(token, rs_CParen) then begin
+          Break;
+        end;
+//        else
+//          raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      end;
+    end;
+    AddToken(Texer.ExpectToken([tokCParen]));
+  end
+  else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then
+    Exit
+  else if TokenIsReservedIdent(token, ri_then) then
+    Exit
+  else
+    raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+end;
+
+procedure TNPCSourceParser.ParseCaseIfStatement;
+var
+  token: TNPCToken;
+begin
+  SkipComments;
+  token := Texer.PeekToken;
+  if not token.ReservedWord and (token.&Type = tokIdent) then begin
+    AddToken(token);
+    Texer.SkipToken;
+    token := Texer.PeekToken;
+    if TokenIsReservedSymbol(token, rs_CParen) then begin
+      ParseCaseIfStatementFuncParams(token);
+      AddToken(Texer.ExpectToken([tokCParen]));
+      AddToken(Texer.ExpectToken([tokSemicolon]));
+    end
+    else if TokenIsReservedSymbol(token, rs_Assign) then begin // assignment
+      AddToken(token);
+      Texer.SkipToken;
+      ParseCaseIfExpression;
+      AddToken(Texer.ExpectToken([tokSemicolon]));
+    end
+    else if TokenIsReservedIdent(token, ri_if) then
+      ParseIf(token)
+    else if TokenIsReservedIdent(token, ri_begin) or TokenIsReservedSymbol(token, rs_OCurly) then begin
+      AddToken(token);
+      Texer.SkipToken;
+      while Texer.IsNotEmpty do begin
+        ParseCaseIfStatement;
+        token := Texer.PeekToken;
+        if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then begin
+          AddToken(token);
+          Texer.SkipToken;
+          Break;
+        end
+        else
+          raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      end;
+      AddToken(Texer.ExpectToken([tokSemicolon]));
+    end
+    else
+      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+  end
+  else if TokenIsReservedIdent(token, ri_begin) or TokenIsReservedSymbol(token, rs_OCurly) then begin
+    AddToken(token);
+    Texer.SkipToken;
+    while Texer.IsNotEmpty do begin
+      token := Texer.PeekToken;
+      if not ParseStatements(token, [], FLevel + 1) then begin
+        if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then begin
+          AddToken(token);
+          Texer.SkipToken;
+          token := Texer.PeekToken;
+          if TokenIsReservedSymbol(token, rs_Semicolon) then
+            AddToken(token);
+          Break;
+        end
+        else if TokenIsReservedSymbol(token, rs_Semicolon) then begin
+          AddToken(token);
+          Texer.SkipToken;
+          Break;
+        end
+        else
+          raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+      end
+      else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then begin
+        AddToken(token);
+        Texer.SkipToken;
+        token := Texer.PeekToken;
+        if TokenIsReservedSymbol(token, rs_Semicolon) then
+          AddToken(token);
+        Break;
+      end;
+    end;
+    //AddToken(Texer.ExpectToken([tokSemicolon]));
+  end
+  else if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then
+    Exit
+  else
+    raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+end;
+
+procedure TNPCSourceParser.ParseCaseIfStatementFuncParams(const AToken: TNPCToken);
+var
+  token: TNPCToken;
+begin
+  AddToken(token);
+  Texer.SkipToken;
+  while Texer.IsNotEmpty do begin
+    token := Texer.PeekToken;
+    if not token.ReservedWord and (token.&Type = tokIdent) then begin
+      AddToken(token);
+      Texer.SkipToken;
+      token := Texer.PeekToken;
+      if TokenIsReservedSymbol(token, rs_CParen) then begin
+        ParseCaseIfStatementFuncParams(token);
+        AddToken(Texer.ExpectToken([tokCParen]));
+        AddToken(Texer.ExpectToken([tokSemicolon]));
+      end
+      else if token.&Type in [tokNumber, tokString] then begin
+        AddToken(token);
+        Texer.SkipToken;
+      end
+      else if TokenIsReservedSymbol(token, rs_Comma) then begin
+        AddToken(token);
+        Texer.SkipToken;
+      end
+      else
+        raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+    end
+    else if TokenIsReservedSymbol(token, rs_CParen) then
+      Break
+    else
+      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+    //
+    Texer.SkipToken;
+  end;
 end;
 
 (*
