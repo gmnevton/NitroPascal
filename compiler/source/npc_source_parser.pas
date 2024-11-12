@@ -1321,7 +1321,7 @@ begin
     Exit
   else if TokenIsReservedSymbol(token, rs_Semicolon) then
     Exit
-  else if TokenIsReservedIdent(token, ri_of) then
+  else if TokenIsReservedIdent(token, ri_of) or TokenIsReservedSymbol(token, rs_OCurly) then
     Exit
   else
     raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
@@ -1576,6 +1576,11 @@ begin
   if not token.ReservedWord and (token.&Type in [tokIdent, tokNumber]) then begin
     AddToken(token);
     Texer.SkipToken;
+  end
+  else if TokenIsReservedSymbol(token, rs_Dot) then begin
+    AddToken(token);
+    Texer.SkipToken;
+    ParseCaseIfFactor;
   end
   else if TokenIsReservedIdent(token, ri_not) then begin
     AddToken(token);
