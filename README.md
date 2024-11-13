@@ -34,6 +34,13 @@ A typical compiler consists of key components such as:
 Stages complited/under development:  
 |?| - lexical analyser (TNPCLexer and TNPCTexer),  
 |?| - syntax analyser (TNPCSourceParser),  
+      -- control flow statements comleted/under development:  
+      |x| - if statement,  
+      |?| - case statement,  
+      | | - for statement,  
+      | | - while statement,  
+      | | - repeat statement,  
+      | | - with statement,  
 | | - semantic analyser (TNPCASTGenerator),  
 | | - intermediate code generator (TNPCINTGenerator),  
 | | - code optimiser (TNPCOptimization),  
