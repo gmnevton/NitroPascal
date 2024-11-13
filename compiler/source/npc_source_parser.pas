@@ -1003,7 +1003,7 @@ begin
     ParseIfStatement;
   end;
   if (LastToken <> Nil) and not TokenIsReservedSymbol(LastToken, rs_Semicolon) then
-    raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'if ', sStatement]));
+    raise NPCSourceParserException.ParserError(LastToken.Location, Format(sParserUnexpectedTokenIn, [LastToken.TokenToString, 'if ', sStatement]));
 //  AddToken(Texer.ExpectToken([tokSemicolon]));
 end;
 
@@ -1073,6 +1073,7 @@ begin
       AddToken(token);
       Texer.SkipToken;
       ParseIfFactor;
+      Continue;
     end
     else if TokenIsReservedSymbol(token, rs_Semicolon) then
       Break
@@ -1194,7 +1195,7 @@ begin
           Texer.SkipToken;
           token := Texer.PeekToken;
           if TokenIsReservedSymbol(token, rs_Semicolon) then
-            AddToken(token);
+            AddToken(Texer.GetToken);
           Break;
         end
         else if TokenIsReservedSymbol(token, rs_Semicolon) then begin
@@ -1210,7 +1211,7 @@ begin
         Texer.SkipToken;
         token := Texer.PeekToken;
         if TokenIsReservedSymbol(token, rs_Semicolon) then
-          AddToken(token);
+          AddToken(Texer.GetToken);
         Break;
       end;
     end;

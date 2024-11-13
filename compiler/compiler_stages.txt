@@ -4,18 +4,26 @@ A typical compiler consists of key components such as:
 - semantic analyser (TNPCASTGenerator),
 - intermediate code generator (TNPCINTGenerator),
 - code optimiser (TNPCOptimization),
-- code generator (TNPCBITGenerator).
+- byte code generator (TNPCBITGenerator).
 
 
-Stages complited/under development:
-|?| - lexical analyser (TNPCLexer and TNPCTexer),
-|?| - syntax analyser (TNPCSourceParser),
-| | - semantic analyser (TNPCASTGenerator),
-| | - intermediate code generator (TNPCINTGenerator),
-| | - code optimiser (TNPCOptimization),
-| | - code generator (TNPCBITGenerator).
-
-----------------------------------------------------------------------
-|x| - done
-|?| - under development
-| | - not developed yet
+Stages completed/under development:  
+|?| - lexical analyser (TNPCLexer and TNPCTexer),  
+|?| - syntax analyser (TNPCSourceParser),  
+      -- control flow statements comleted/under development:  
+      |?| - if statement,  
+      |?| - case statement,  
+      | | - for statement,  
+      | | - while statement,  
+      | | - repeat statement,  
+      | | - with statement,  
+| | - semantic analyser (TNPCASTGenerator),  
+| | - intermediate code generator (TNPCINTGenerator),  
+| | - code optimiser (TNPCOptimization),  
+| | - code generator (TNPCBITGenerator).  
+  
+----------------------------------------------------------------------  
+|x| - done  
+|?| - under development  
+|*| - bug fixes
+| | - not developed yet  
