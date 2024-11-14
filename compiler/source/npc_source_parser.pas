@@ -106,6 +106,10 @@ type
     procedure ParseCaseIfStatement;
     procedure ParseCaseIfStatementFuncParams(const AToken: TNPCToken);
 
+    procedure ParseFor(const AToken: TNPCToken);
+    procedure ParseForExpression;
+    procedure ParseForStatements(const for_do: Boolean);
+
     procedure ParseImports(const AToken: TNPCToken);
     procedure ParseExports(const AToken: TNPCToken);
     procedure ParseTypes(const AToken: TNPCToken);
@@ -1283,7 +1287,7 @@ var
 begin
   AddToken(AToken); // 'case'
   Texer.SkipToken;
-  ParseCaseExpression; // get everything until 'of'
+  ParseCaseExpression; // get everything until 'of' or '{'
   token := Texer.GetToken;
   case_of := TokenIsReservedIdent(token, ri_of); // and not TokenIsReservedSymbol(token, rs_OCurly);
   if not TokenIsReservedIdent(token, ri_of) and not TokenIsReservedSymbol(token, rs_OCurly) then
@@ -1747,76 +1751,41 @@ begin
   end;
 end;
 
-(*
-  while Texer.IsNotEmpty do begin
-    token := Texer.PeekToken;
+procedure TNPCSourceParser.ParseFor(const AToken: TNPCToken);
+var
+  token: TNPCToken;
+  for_do: Boolean;
+begin
+  AddToken(AToken); // 'for'
+  Texer.SkipToken;
+  ParseForExpression; // get everything until 'do' or '{'
+  token := Texer.GetToken;
+  for_do := TokenIsReservedIdent(token, ri_do); // and not TokenIsReservedSymbol(token, rs_OCurly);
+  if not TokenIsReservedIdent(token, ri_of) and not TokenIsReservedSymbol(token, rs_OCurly) then
+    raise NPCSourceParserException.ParserError(LastToken.Location, Format(sParserUnexpectedTokenIn, [LastToken.TokenToString, 'for ', sStatement]));
+  AddToken(token);
+  ParseForStatements(for_do);
+  //
+  token := Texer.GetToken;
+  if (for_do and not TokenIsReservedIdent(token, ri_end)) or (not for_do and not TokenIsReservedSymbol(token, rs_CCurly)) then
+    raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'for ', sStatement]));
+  AddToken(token);
+  token := Texer.GetToken;
+  if not TokenIsReservedSymbol(token, rs_Semicolon) then
+    raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'for ', sStatement]));
+//  AddToken(Texer.ExpectToken([tokSemicolon]));
+  AddToken(token);
+end;
 
+procedure TNPCSourceParser.ParseForExpression;
+begin
 
-    if token.&Type in [tokIdent..tokString, tokExclamation..tokDash, tokAsterisk..tokDiv, tokAssign..tokNotEqual] then begin
-      AddToken(token);
-      Texer.SkipToken;
-//      if True then
-    end
-    else if TokenIsReservedSymbol(token, ';') then begin
-      AddToken(token);
-      Texer.SkipToken;
-      Break;
-    end
-    else
-      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.TokenToString]));
-    //
-    Texer.SkipToken;
-  end;
+end;
 
+procedure TNPCSourceParser.ParseForStatements(const for_do: Boolean);
+begin
 
-
-  while Texer.IsNotEmpty do begin
-    case token.&Type of
-      tokIdent: begin
-
-      end;
-      tokNumber: begin
-
-      end;
-      tokPlus: begin
-
-      end;
-      tokMinus: begin
-
-      end;
-      tokOParen: begin
-        AddToken(token);
-        Texer.SkipToken;
-        ParseExpression;
-        AddToken(Texer.ExpectToken([tokCParen]));
-      end;
-    end;
-
-
-    if token.&Type in [tokIdent..tokString, tokExclamation..tokDash, tokAsterisk..tokDiv, tokAssign..tokNotEqual] then begin
-      AddToken(token);
-      Texer.SkipToken;
-//      if True then
-
-
-    end
-    else if TokenIsReservedSymbol(token, ';') then begin
-      AddToken(token);
-      Texer.SkipToken;
-      Break;
-    end
-//    else if TokenIsReservedSymbol(token, '}') then begin
-//      Break;
-//    end
-//    else if TokenIsReservedIdent(token) then begin
-//      Break;
-//    end
-    else
-      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenInProject, [token.TokenToString]));
-    //
-    Texer.SkipToken;
-  end;
-*)
+end;
 
 procedure TNPCSourceParser.ParseImportFile(const ASourceFile: String);
 begin
@@ -2154,6 +2123,12 @@ begin
 //      end
       else if TokenIsReservedIdent(token, ri_for) then begin
         IncLevel;
+        ParseFor(token);
+        if FLevel > ALevel then begin
+          DecLevel;
+//          Break;
+        end;
+        Continue;
       end
       else if TokenIsReservedIdent(token, ri_goto) then begin
       end

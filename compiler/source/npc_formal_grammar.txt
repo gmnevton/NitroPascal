@@ -157,7 +157,7 @@ WhileStatement = 'while' Expression 'do' Statement .
 
 RepeatStatement = 'repeat' StatementList 'until' Expression .
 
-ForStatement = 'for' Ident ':=' Expression ( 'to' | 'downto' ) Expression 'do' Statement.
+ForStatement = 'for' [ LoopInitExpression ] [ ';' ] [ LoopCondition ] [ ';' ] [ PostLoopExpression ] [ ( 'do' | '{' [ LoopStatements ] '}' ) ] ';' .
 
 GotoStatement = 'goto' Label .
 
@@ -182,6 +182,7 @@ Factor = ( Designator | Ident ) [ ActualParams ] { Selector } |
          CharLiteral |
          StringLiteral |
          '(' Expression ')' |
+         '.' Factor |
          'not' Factor |
          SetConstructor |
          'nil' |

@@ -28,7 +28,7 @@ type
     ri_dispinterface,
     ri_div,
     ri_do,
-    ri_downto,
+//    ri_downto,
     ri_else,
     ri_end,
     ri_except,
@@ -106,7 +106,7 @@ const
     (Ident: 'dispinterface';  MD5: (A: $e7fe19e8; B: $f505b9f1; C: $c6f568eb; D: $58a49abe)), // e7fe19e8 f505b9f1 c6f568eb 58a49abe
     (Ident: 'div';            MD5: (A: $38696558; B: $dc98494c; C: $08d951c0; D: $52900a2a)), // 38696558 dc98494c 08d951c0 52900a2a
     (Ident: 'do';             MD5: (A: $d4579b26; B: $88d67523; C: $5f402f6b; D: $4b43bcbf)), // d4579b26 88d67523 5f402f6b 4b43bcbf
-    (Ident: 'downto';         MD5: (A: $8e03fd4a; B: $bf5e3809; C: $86347067; D: $91bd6bba)), // 8e03fd4a bf5e3809 86347067 91bd6bba
+//    (Ident: 'downto';         MD5: (A: $8e03fd4a; B: $bf5e3809; C: $86347067; D: $91bd6bba)), // 8e03fd4a bf5e3809 86347067 91bd6bba
     (Ident: 'else';           MD5: (A: $2954e92a; B: $9b4d0e99; C: $8fe4893f; D: $8141649a)), // 2954e92a 9b4d0e99 8fe4893f 8141649a
     (Ident: 'end';            MD5: (A: $7f021a14; B: $15b86f2d; C: $013b2618; D: $fb31ae53)), // 7f021a14 15b86f2d 013b2618 fb31ae53
     (Ident: 'except';         MD5: (A: $d1cc652b; B: $86b9858f; C: $e7805851; D: $1716e92f)), // d1cc652b 86b9858f e7805851 1716e92f

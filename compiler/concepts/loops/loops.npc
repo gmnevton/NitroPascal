@@ -1,0 +1,18 @@
+code 'loops statements';
+
+SomeTestProc() {
+//  for [init-loop statement]; [loop condition]; [post-loop statement] ['do'] | [ { statements } ];
+
+//  init-loop statement
+//  for ; [loop condition]; [post-loop statement] ['do'] | [ { statements } ];
+
+//  init-loop statement
+//  for ; [loop condition]; { statements; post-loop statement; };
+
+
+  for i := 0; i < 100; i += 1 {
+  
+  }
+};
+
+end.
