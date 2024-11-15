@@ -56,6 +56,11 @@ var
   FirstProgram: Boolean;
   ErrorMessage: String;
   SomeEnum: Enum = eiThree;
+  
+//const
+//  SomeConst: Boolean = True;
+//  SomeOtherConst1: Boolean = True;
+//  SomeOtherConst2: Boolean = True;
 
 initialization
   // initialization code
@@ -80,6 +85,29 @@ initialization
   if ConsoleAvailable and (Length(ErrorMessage) > 0) then {
       Writeln('We are testing our compiler.'#13#10'\rIf everything will be ok, than\rmaybe we make a change in programming in Pascal.');
       Writeln('This line shows that we are not limited by line length and string literal length like in Delphi where you can not use lines that are longer than 255 characters. In NitroPascal You can have lines that are 2GB characters long. We are not sure why You may need it, but when we can have it, than why not ?');
+  };
+  //
+  if SomeConst then {
+    // maybe some statements
+    SomeConst := False;
+    SomeOtherConst1 := False;
+    SomeOtherConst2 := False;
+  } else if SomeOtherConst1 then {
+    // maybe some statements
+    SomeConst := False;
+    SomeOtherConst1 := False;
+    SomeOtherConst2 := False;
+  } // else in next line, because we commented here
+  else if SomeOtherConst2 then {
+    // maybe some statements
+    SomeConst := False;
+    SomeOtherConst1 := False;
+    SomeOtherConst2 := False;
+  } else {
+    // maybe some statements
+    SomeConst := False;
+    SomeOtherConst1 := False;
+    SomeOtherConst2 := False;
   };
   //
   case 2 > 1 {

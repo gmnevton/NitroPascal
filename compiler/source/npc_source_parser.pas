@@ -1004,6 +1004,12 @@ begin
       raise NPCSourceParserException.ParserError(LastToken.Location, Format(sParserUnexpectedTokenIn, [LastToken.TokenToString, 'if ', sStatement]));
     AddToken(token);
     Texer.SkipToken;
+    SkipComments;
+    token := Texer.PeekToken;
+    if TokenIsReservedIdent(token, ri_if) then begin
+      ParseIf(token);
+      Exit;
+    end;
     ParseIfStatement;
   end;
   if (LastToken <> Nil) and not TokenIsReservedSymbol(LastToken, rs_Semicolon) then
