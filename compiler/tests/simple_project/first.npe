@@ -37,6 +37,8 @@
 {$program-type Android64 GUI}
 {$program-type WebAssembly DLL}
 
+{$search-path '..\\..\\concepts\\'}
+
 imports
   // imports section
   first_main;

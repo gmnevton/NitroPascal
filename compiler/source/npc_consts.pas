@@ -25,9 +25,10 @@ const
   sStatement   = 'statement';
   sExpression  = 'expression';
 
-  sParserUnexpectedTokenIn = 'unexpected token "%s" in %s%s';
-  sParserUnexpectedType    = 'unexpected type "%s", expected "%s"';
-  sParserSectionHasNoBody  = '"%s" section has no body';
+  sParserUnexpectedTokenIn      = 'unexpected token "%s" in %s%s';
+  sParserUnexpectedType         = 'unexpected type "%s", expected "%s"';
+  sParserSectionHasNoBody       = '"%s" section has no body';
+  sParserUnknownDirectiveNameIn = 'unknown setting or define directive name "%s" in %s%s';
 
   sProjectError = '%s - ProjectError(%s): %s';
 

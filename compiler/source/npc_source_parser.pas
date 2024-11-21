@@ -23,6 +23,7 @@ type
   TNPCSettingType = (
     setProgram,
     setProgramType,
+    setSearchPath,
     setResources
   );
 
@@ -72,6 +73,7 @@ type
     procedure ParseSettings(const AToken: TNPCToken; const ASettingType: TNPCSettingType);
     procedure ParseSettingProgram(const AToken: TNPCToken);
     procedure ParseSettingProgramType(AToken: TNPCToken);
+    procedure ParseSearchPath(AToken: TNPCToken);
 
     procedure ParseDefines();
     procedure ParseDirectives();
@@ -108,8 +110,8 @@ type
 
     procedure ParseFor(const AToken: TNPCToken);
     procedure ParseForParams;
-    procedure ParseForExpression;
     procedure ParseForStatements(const for_do: Boolean);
+    procedure ParseForExpression;
 
     procedure ParseImports(const AToken: TNPCToken);
     procedure ParseExports(const AToken: TNPCToken);
@@ -460,11 +462,12 @@ begin
         ParseSettings(token, setProgramType);
         Break;
       end
-//      else if TokenIsReservedSymbol(token, '}') then begin
-//        Break;
-//      end
+      else if (token.&Type = tokIdent) and SameText(token.Value, 'search-path') then begin
+        ParseSettings(token, setSearchPath);
+        Break;
+      end
       else
-        raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
+        raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnknownDirectiveNameIn, [token.Value, '', sProjectFile]));
     finally
       token.Free;
     end;
@@ -476,6 +479,7 @@ begin
   case ASettingType of
     setProgram: ParseSettingProgram(AToken);
     setProgramType: ParseSettingProgramType(AToken);
+    setSearchPath: ParseSearchPath(AToken);
     setResources: ;
   end;
 end;
@@ -693,6 +697,11 @@ begin
     else
       raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
   end;
+end;
+
+procedure TNPCSourceParser.ParseSearchPath(AToken: TNPCToken);
+begin
+
 end;
 
 procedure TNPCSourceParser.ParseDefines;
@@ -1871,6 +1880,32 @@ begin
   end;
 end;
 
+procedure TNPCSourceParser.ParseForStatements(const for_do: Boolean);
+var
+  token: TNPCToken;
+  has_body: Boolean;
+begin
+  has_body := False;
+  while Texer.IsNotEmpty do begin
+    SkipComments;
+    token := Texer.PeekToken; // just peek a token
+    if ParseStatements(token, [ri_begin], FLevel + 1) then begin
+      // if statements ware parsed than do nothing
+      has_body := True;
+    end;
+    //
+    if TokenIsReservedIdent(token, ri_begin) then begin
+      if not has_body then
+        raise NPCSourceParserException.ParserError(token.Location, Format(sParserSectionHasNoBody, [NPCReservedIdentifiers[ri_initialization].Ident]));
+      Break;
+    end
+    else
+      raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'finalization ', sSection]));
+    //
+    Texer.SkipToken;
+  end;
+end;
+
 procedure TNPCSourceParser.ParseForExpression;
 var
   token: TNPCToken;
@@ -1894,11 +1929,6 @@ begin
     raise NPCSourceParserException.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
   //
   Texer.SkipToken;
-end;
-
-procedure TNPCSourceParser.ParseForStatements(const for_do: Boolean);
-begin
-
 end;
 
 procedure TNPCSourceParser.ParseImportFile(const ASourceFile: String);

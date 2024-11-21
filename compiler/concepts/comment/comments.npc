@@ -1,0 +1,65 @@
+code 'comments';
+
+// this source file is about to test types of comments that we have in NitroPascal
+// first type is single-line comment, the one you are reading now
+// single line comment starts with "//" (double slash) and ends at line end where there is CRLF (carret-return line-feed) characters
+
+/.
+  second type is multi-line comment
+  multi-line comment starts with "/." (slash-dot) characters and ends with "./" (dot-slash) characters
+
+  this multi-line comment can be nested without limits and use other types of comments inside
+  
+  /.
+    this is example of nesting multi-line comments
+    it is second level comment
+    
+    /.
+      it is third level comment
+    ./
+
+  ./
+
+./
+
+{.
+  third type of comment is the same in meaning and function as second type, but
+  this multi-line comment starts with "{." (curly-dot) characters and ends with ".}" (dot-curly) characters
+
+  this type of comment is usefull when we think of commenting out directives such as:
+  {$search-path '..\\..\\concepts\\'}
+
+  commented out directive looks like that:
+  {.$search-path '..\\..\\concepts\\'.}
+
+  this multi-line comment can be nested without limits and use other types of comments inside
+
+  {.
+    it is second level comment
+
+    {.
+      it is third level comment
+    .}
+
+  .}
+
+.}
+
+(*
+  fourth type of comment is the same in meaning and function as second type, but
+  this multi-line comment starts with "(*" (paren-dot) characters and ends with "*)" (dot-paren) characters
+
+  this multi-line comment can be nested without limits and use other types of comments inside
+
+  (*
+    it is second level comment
+
+    (*
+      it is third level comment
+    *)
+
+  *)
+
+*)
+
+end.

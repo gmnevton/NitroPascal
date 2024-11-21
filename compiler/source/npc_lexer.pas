@@ -695,6 +695,10 @@ begin
                 stemp := stemp + '''';
                 SkipChar;
               end;
+//              '.': begin // escaping \. - backslash-dot, but this is not escapable character, so add it all
+//                stemp := stemp + '\.';
+//                SkipChar;
+//              end;
             else
               Inc(loc.StartCol);
               loc.SetEndRowCol(row, cur - bol + 1);
