@@ -1,33 +1,36 @@
 ﻿project 'First_Test_Project';
 
-// {$program-type output-type output-subtype[ output-extension][ output-path]} defines what type of compilation can be done:
-// you can define multiple compilation types in single project
-//
-// supported output-type:
-//   - Windows(32/64)
-//   - Linux(32/64)
-//   - Android(32/64)
-//   - WebAssembly(32/64)
-//
-//  supported output-subtype:
-//   - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,
-//   - CONSOLE - means program that outputs to the operating system console (if available),
-//   - DLL     - dynamically loaded library,
-//   - TEXT    - text format
-//
-// extension will be given to output of compiler, eg.:
-//   if Windows(32/64) is defined than extension will be '.exe' or '.dll'
-//   if Linux(32/64) is defined than extension will be '.elf' or '.so'
-//   if Android(32/64) is defined than extension will be '.apk'
-//   if WebAssembly is defined than extension will be '.wasm' or '.wat'
-//
-// custom extension can be set by declaring {$extension '.ext'} for every project
-// example: {$program-type Windows32 DLL {$extension '.dll'}}
-// or short form {$program-type Windows32 DLL '.dll'}
-// or for every project type using concatenated version {$extension '* .dll * *'}
-// extension that will not change are not required to specify, so usage of * is not required also
-// but if you want to specify extension using {$extension } that is second or third or fourth, but not changing
-// previous ones, than you must use * to let complier know what you are up to
+/.
+  {$program-type output-type output-subtype[ output-extension][ output-path]}
+  defines what type of compilation can be done:
+  you can define multiple compilation types in single project
+
+  supported output-type:
+    - Windows(32/64)
+    - Linux(32/64)
+    - Android(32/64)
+    - WebAssembly(32/64)
+
+  supported output-subtype:
+    - GUI     - means program that uses operating system Graphic User Interface like in eg.: Windows,
+    - CONSOLE - means program that outputs to the operating system console (if available),
+    - DLL     - dynamically loaded library,
+    - TEXT    - text format
+
+  extension will be given to output of compiler, eg.:
+    if Windows(32/64) is defined than extension will be '.exe' or '.dll'
+    if Linux(32/64) is defined than extension will be '.elf' or '.so'
+    if Android(32/64) is defined than extension will be '.apk'
+    if WebAssembly is defined than extension will be '.wasm' or '.wat'
+
+  custom extension can be set by declaring {$extension '.ext'} for every project
+  example: {$program-type Windows32 DLL {$extension '.dll'}}
+    or short form {$program-type Windows32 DLL '.dll'}
+    or for every project type using concatenated version {$extension '* .dll * *'}
+  extension that will not change are not required to specify, so usage of * is not required also
+  but if you want to specify extension using {$extension } that is second or third or fourth, but not changing
+  previous ones, than you must use * to let complier know what you are up to
+./
 
 {$program-type Windows32 GUI}
 {$program-type Windows32 DLL '.dll'}
@@ -61,7 +64,7 @@ var
 //  SomeConst: Boolean = True;
 //  SomeOtherConst1: Boolean = True;
 //  SomeOtherConst2: Boolean = True;
-
+{.
 initialization
   // initialization code
   if ConsoleAvailable then
@@ -92,7 +95,8 @@ initialization
     SomeConst := False;
     SomeOtherConst1 := False;
     SomeOtherConst2 := False;
-  } else if SomeOtherConst1 then {
+  } else // test comments in various places, @TODO: use other types of comments as well
+  if SomeOtherConst1 then {
     // maybe some statements
     SomeConst := False;
     SomeOtherConst1 := False;
@@ -129,9 +133,12 @@ initialization
     if .eiFive: {
     };
   };
-
+.}
 finalization
   // finalization code
+  for i := 0; i < 10; i += 1 {
+    // loop
+  }
 
 begin
   // program initialization code

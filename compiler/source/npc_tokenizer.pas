@@ -218,11 +218,15 @@ begin
       for i:=0 to Length(TokensArray) - 1 do begin
         token := TokensArray[i];
         if Assigned(token) then
-          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"',
+          tf.WriteLine(Format('%s (%d:%d) - %s: "%s"%s',
                               [token.Location.FileName, token.Location.StartRow, token.Location.StartCol,
-                               IfThen(token.ReservedWord or token.ReservedSymbol, 'reserved ') +
-                               IfThen(token.ReservedWord, 'word ') +
-                               IfThen(token.ReservedSymbol, 'symbol ') + NPCTokensTypeToString(token.&Type), Unescape(token.Value)]));
+                               NPCTokensTypeToString(token.&Type), Unescape(token.Value),
+                               IfThen((token.&Type < tokCommentSL) or (token.&Type > tokCommentMLE2),
+                                 IfThen(token.ReservedWord or token.ReservedSymbol, ', reserved ') +
+                                 IfThen(token.ReservedWord, 'word') +
+                                 IfThen(token.ReservedSymbol, 'symbol'))
+                              ]
+                             ));
       end;
     finally
       tf.Free;

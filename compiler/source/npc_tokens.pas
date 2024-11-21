@@ -47,8 +47,8 @@ const
   tokDiv          = TNPCTokenType(156); // /
 
   tokCommentSL    = TNPCTokenType(157); // singleline: //
-  tokCommentMLB   = TNPCTokenType(158); // multiline-begin: {.
-  tokCommentMLE   = TNPCTokenType(159); // multiline-end  : .}
+  tokCommentMLB   = TNPCTokenType(158); // multiline-begin: /.
+  tokCommentMLE   = TNPCTokenType(159); // multiline-end  : ./
   tokCommentMLB1  = TNPCTokenType(160); // multiline-begin: {.
   tokCommentMLE1  = TNPCTokenType(161); // multiline-end  : .}
   tokCommentMLB2  = TNPCTokenType(162); // multiline-begin: (*
@@ -61,16 +61,23 @@ const
   tokNotEqual     = TNPCTokenType(168); // <> - same as not (A = B)
   tokNotEqual1    = TNPCTokenType(169); // <> - same as not (A = B)
   tokNotEqual2    = TNPCTokenType(170); // != - alias for '<>': same as not (A = B) used like in C++: A != B
+  tokDoublePlus   = TNPCTokenType(171); // ++
+  tokDoubleMinus  = TNPCTokenType(172); // --
+  tokPlusEqual    = TNPCTokenType(173); // +=
+  tokMinusEqual   = TNPCTokenType(174); // -=
+  tokMulEqual     = TNPCTokenType(175); // *=
+  tokDivEqual     = TNPCTokenType(176); // /=
+  tokModEqual     = TNPCTokenType(177); // %=
 
-  tokIdent        = TNPCTokenType(171); // reserved word or reserved symbol or other name
-  tokNumber       = TNPCTokenType(172); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
-  tokString       = TNPCTokenType(173); // 'text'
-  tokChar         = TNPCTokenType(174); // #12345; #12_345; #$AB; #$AB_CD
+  tokIdent        = TNPCTokenType(178); // reserved word or reserved symbol or other name
+  tokNumber       = TNPCTokenType(179); // ([$]/[0x]/[-])(0..9[_])[.](0..9[_])
+  tokString       = TNPCTokenType(180); // 'text'
+  tokChar         = TNPCTokenType(181); // #12345; #12_345; #$AB; #$AB_CD
 
-  tokSetting      = TNPCTokenType(175); // {$...} or {$define ...} or {$(condition) ...}
-  tokResource     = TNPCTokenType(176); // {$resources ...}
-  tokSpecifier    = TNPCTokenType(177); // {@...}
-  tokCompilerVar  = TNPCTokenType(178); // %...%
+  tokSetting      = TNPCTokenType(182); // {$...} or {$define ...} or {$(condition) ...}
+  tokResource     = TNPCTokenType(183); // {$resources ...}
+  tokSpecifier    = TNPCTokenType(184); // {@...}
+  tokCompilerVar  = TNPCTokenType(185); // %...%
 
 type
   TNPCLiteralToken = record
@@ -116,8 +123,10 @@ const
     (Literal: '/';  TokenType: tokDiv)
   );
 
-  NPCDoubleLiteralTokens: Array[0..10] of TNPCDoubleLiteralToken = (
+  NPCDoubleLiteralTokens: Array[0..19] of TNPCDoubleLiteralToken = (
     (DoubleLiteral: '//';  TokenType: tokCommentSL),
+    (DoubleLiteral: '/.';  TokenType: tokCommentMLB),
+    (DoubleLiteral: './';  TokenType: tokCommentMLE),
     (DoubleLiteral: '{.';  TokenType: tokCommentMLB1),
     (DoubleLiteral: '.}';  TokenType: tokCommentMLE1),
     (DoubleLiteral: '(*';  TokenType: tokCommentMLB2),
@@ -127,7 +136,14 @@ const
     (DoubleLiteral: '<=';  TokenType: tokLessEqual),
     (DoubleLiteral: '>=';  TokenType: tokGreaterEqual),
     (DoubleLiteral: '<>';  TokenType: tokNotEqual1),
-    (DoubleLiteral: '!=';  TokenType: tokNotEqual2)
+    (DoubleLiteral: '!=';  TokenType: tokNotEqual2),
+    (DoubleLiteral: '++';  TokenType: tokDoublePlus),
+    (DoubleLiteral: '--';  TokenType: tokDoubleMinus),
+    (DoubleLiteral: '+=';  TokenType: tokPlusEqual),
+    (DoubleLiteral: '-=';  TokenType: tokMinusEqual),
+    (DoubleLiteral: '*=';  TokenType: tokMulEqual),
+    (DoubleLiteral: '/=';  TokenType: tokDivEqual),
+    (DoubleLiteral: '%=';  TokenType: tokModEqual)
   );
 
 function NPCTokensTypeToString(const TokenType: TNPCTokenType): String; inline;
@@ -148,6 +164,8 @@ begin
 
   case TokenType of
     tokCommentSL   : Result := 'comment-sl';
+    tokCommentMLB  : Result := 'comment-mlb';
+    tokCommentMLE  : Result := 'comment-mle';
     tokCommentMLB1 : Result := 'comment-mlb1';
     tokCommentMLE1 : Result := 'comment-mle1';
     tokCommentMLB2 : Result := 'comment-mlb2';
@@ -159,6 +177,13 @@ begin
     tokGreaterEqual: Result := 'greater-equal';
     tokNotEqual1   : Result := 'not-equal';
     tokNotEqual2   : Result := 'not-equal';
+    tokDoublePlus  : Result := 'plus-plus';
+    tokDoubleMinus : Result := 'minus-minus';
+    tokPlusEqual   : Result := 'plus-equal';
+    tokMinusEqual  : Result := 'minus-equal';
+    tokMulEqual    : Result := 'multiply-equal';
+    tokDivEqual    : Result := 'divide-equal';
+    tokModEqual    : Result := 'modulo-equal';
 
     tokIdent       : Result := 'identifier';
     tokNumber      : Result := 'number';
@@ -200,3 +225,4 @@ begin
 end;
 
 end.
+

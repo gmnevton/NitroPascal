@@ -45,36 +45,50 @@ type
     rs_Div,         // /
 
     rs_CommentSL,    // singleline: //
-    rs_CommentMLB,   // multiline-begin: {. (*
-    rs_CommentMLE,   // multiline-end  : .} *)
-    rs_CommentMLB1,  // multiline-begin: {. (*
-    rs_CommentMLE1,  // multiline-end  : .} *)
-    rs_CommentMLB2,  // multiline-begin: {. (*
-    rs_CommentMLE2,  // multiline-end  : .} *)
+    rs_CommentMLB,   // multiline-begin: /.
+    rs_CommentMLE,   // multiline-end  : ./
+    rs_CommentMLB1,  // multiline-begin: {.
+    rs_CommentMLE1,  // multiline-end  : .}
+    rs_CommentMLB2,  // multiline-begin: (*
+    rs_CommentMLE2,  // multiline-end  : *)
     rs_DoubleDot,    // ..
     rs_Assign,       // :=
     rs_LessEqual,    // <=
     rs_GreaterEqual, // >=
     rs_NotEqual,     // != - alias for '<>': same as not (A = B) used like in C++: A != B
     rs_NotEqual1,    // != - alias for '<>': same as not (A = B) used like in C++: A != B
-    rs_NotEqual2     // != - alias for '<>': same as not (A = B) used like in C++: A != B
+    rs_NotEqual2,    // != - alias for '<>': same as not (A = B) used like in C++: A != B
+    rs_DoublePlus,   // ++
+    rs_DoubleMinus,  // --
+    rs_PlusEqual,    // +=
+    rs_MinusEqual,   // -=
+    rs_MulEqual,     // *=
+    rs_DivEqual,     // /=
+    rs_ModEqual      // %=
   );
 
   TNPCReservedDoubleSymbols = (
     rds_CommentSL,    // singleline: //
-    rds_CommentMLB,   // multiline-begin: {. (*
-    rds_CommentMLE,   // multiline-end  : .} *)
-    rds_CommentMLB1,  // multiline-begin: {. (*
-    rds_CommentMLE1,  // multiline-end  : .} *)
-    rds_CommentMLB2,  // multiline-begin: {. (*
-    rds_CommentMLE2,  // multiline-end  : .} *)
+    rds_CommentMLB,   // multiline-begin: /.
+    rds_CommentMLE,   // multiline-end  : ./
+    rds_CommentMLB1,  // multiline-begin: {.
+    rds_CommentMLE1,  // multiline-end  : .}
+    rds_CommentMLB2,  // multiline-begin: (*
+    rds_CommentMLE2,  // multiline-end  : *)
     rds_DoubleDot,    // ..
     rds_Assign,       // :=
     rds_LessEqual,    // <=
     rds_GreaterEqual, // >=
     rds_NotEqual,     // != - alias for '<>': same as not (A = B) used like in C++: A != B
     rds_NotEqual1,    // != - alias for '<>': same as not (A = B) used like in C++: A != B
-    rds_NotEqual2     // != - alias for '<>': same as not (A = B) used like in C++: A != B
+    rds_NotEqual2,    // != - alias for '<>': same as not (A = B) used like in C++: A != B
+    rds_DoublePlus,   // ++
+    rds_DoubleMinus,  // --
+    rds_PlusEqual,    // +=
+    rds_MinusEqual,   // -=
+    rds_MulEqual,     // *=
+    rds_DivEqual,     // /=
+    rds_ModEqual      // %=
   );
 
 function NPCReservedSymbolToString(const ReservedSymbols: TNPCReservedSymbols): String;// inline;
@@ -116,8 +130,8 @@ begin
     rs_Div         : Result := '/';
 
     rs_CommentSL   : Result := '//';
-    rs_CommentMLB  : Result := '{.';
-    rs_CommentMLE  : Result := '.}';
+    rs_CommentMLB  : Result := '/.';
+    rs_CommentMLE  : Result := './';
     rs_CommentMLB1 : Result := '{.';
     rs_CommentMLE1 : Result := '.}';
     rs_CommentMLB2 : Result := '(*';
@@ -129,6 +143,13 @@ begin
     rs_NotEqual    : Result := '<>';
     rs_NotEqual1   : Result := '<>';
     rs_NotEqual2   : Result := '!=';
+    rs_DoublePlus  : Result := '++';
+    rs_DoubleMinus : Result := '--';
+    rs_PlusEqual   : Result := '+=';
+    rs_MinusEqual  : Result := '-=';
+    rs_MulEqual    : Result := '*=';
+    rs_DivEqual    : Result := '/=';
+    rs_ModEqual    : Result := '%=';
   end;
 end;
 
@@ -166,16 +187,25 @@ begin
     tokDiv          : Result := rs_Div;          // /
 
     tokCommentSL    : Result := rs_CommentSL;    // singleline: //
-    tokCommentMLB1  : Result := rs_CommentMLB1;  // multiline-begin: {. (*
-    tokCommentMLE1  : Result := rs_CommentMLE1;  // multiline-end  : .} *)
-    tokCommentMLB2  : Result := rs_CommentMLB2;  // multiline-begin: {. (*
-    tokCommentMLE2  : Result := rs_CommentMLE2;  // multiline-end  : .} *)
+    tokCommentMLB   : Result := rs_CommentMLB;   // multiline-begin: /.
+    tokCommentMLE   : Result := rs_CommentMLE;   // multiline-end  : ./
+    tokCommentMLB1  : Result := rs_CommentMLB1;  // multiline-begin: {.
+    tokCommentMLE1  : Result := rs_CommentMLE1;  // multiline-end  : .}
+    tokCommentMLB2  : Result := rs_CommentMLB2;  // multiline-begin: (*
+    tokCommentMLE2  : Result := rs_CommentMLE2;  // multiline-end  : *)
     tokDoubleDot    : Result := rs_DoubleDot;    // ..
     tokAssign       : Result := rs_Assign;       // :=
     tokLessEqual    : Result := rs_LessEqual;    // <=
     tokGreaterEqual : Result := rs_GreaterEqual; // >=
     tokNotEqual1    : Result := rs_NotEqual1;    // != - alias for '<>': same as not (A = B) used like in C++: A != B
     tokNotEqual2    : Result := rs_NotEqual2;    // != - alias for '<>': same as not (A = B) used like in C++: A != B
+    tokDoublePlus   : Result := rs_DoublePlus;   // ++
+    tokDoubleMinus  : Result := rs_DoubleMinus;  // --
+    tokPlusEqual    : Result := rs_PlusEqual;    // +=
+    tokMinusEqual   : Result := rs_MinusEqual;   // -=
+    tokMulEqual     : Result := rs_MulEqual;     // *=
+    tokDivEqual     : Result := rs_DivEqual;     // /=
+    tokModEqual     : Result := rs_ModEqual;     // %=
   end;
 end;
 

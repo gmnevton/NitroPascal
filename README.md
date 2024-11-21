@@ -24,9 +24,10 @@ Maybe in the future there will be a compiler and debugger.
   
   
 A typical compiler consists of key components such as:  
-- lexical analyser (TNPCLexer and TNPCTokenizer and TNPCTokensParser),  
-- syntax analyser (TNPCSourceParser),  
-- semantic analyser (TNPCASTGenerator),  
+- source code parser (TNPCSourceParser) wich contains:  
+  - lexical analyser (TNPCLexer and TNPCTokenizer),  
+  - syntax analyser (TNPCTokensParser),  
+  - semantic analyser (TNPCASTGenerator and TNPCTypeChecker),  
 - intermediate code generator (TNPCINTGenerator),  
 - code optimiser (TNPCOptimization),  
 - byte code generator (TNPCBYTEGenerator).  
