@@ -37,7 +37,31 @@
 {$program-type Android64 GUI}
 {$program-type WebAssembly DLL}
 
+/.
+  {$search-path[ recursive] 'directory'}
+  defines path(s) that project can use to search imported code files
+  you can define multiple search paths for project by repeating this directive as many times as is needed
+
+  defining search path adds it to the project internal list of paths
+  single directive adds single choosen path without looking into specified directory
+  to automatically add children directories inside specified path you may use optional switch 'recursive'
+
+  specified path can be of type:
+    - relative  - to project directory, using '.\\' or '..\\' specifier to go in or out of project directory,
+    - absolute - specifying full path to desired directory
+
+  compiler checks if specified path exists and produces error if path is not existant or not reachable
+
+  you can modify compiler behavior by supplaing additional directive:
+  {$warn-on-path-error enabled}
+  which disables underlying path error message and produces only warning
+
+  to disable previously enabled directive, you should use directive:
+  {$warn-on-path-error disabled}
+./
+
 {$search-path '..\\..\\concepts\\'}
+{$search-path recursive '..\\..\\concepts\\'}
 
 imports
   // imports section
