@@ -22,6 +22,7 @@ uses
   SysUtils,
   Windows,
   StrUtils,
+  Math,
   npc_lexer,
   npc_parser,
   npc_project,
@@ -33,6 +34,8 @@ var
   temp: String;
   start_time: Real;
   total_time: Real;
+//  h,
+  m, s, ms: LongWord;
   i, start_idx, decrement: Integer;
   cmd_params: String;
 
@@ -99,8 +102,14 @@ begin
     //
     start_time := getTime;
     //
-    if not NPC_CompileProject(PChar(input_path), PChar(output_path)) then
+    if NPC_CompileProject(PChar(input_path), PChar(output_path)) then begin
+      Writeln;
+      Writeln('Project compiled ' + IfThen(CanUseExtendedConsole, #$1b'[92m') + 'successfully' + IfThen(CanUseExtendedConsole, #$1b'[0m') + '.');
+    end
+    else begin
       Writeln(NPC_ReportErrors);
+      Writeln;
+    end;
     //
     total_time := getTime - start_time;
     //Writeln(total_time:0:8);
@@ -108,8 +117,12 @@ begin
       total_time := total_time + 3600.0 * 24;
     if Round(Frac(Total_time) * 1000) >= 1000 then
       total_time := Trunc(total_time) + 1;
-    Writeln;
-    Writeln(Format('Total time (m:s.ms): %d:%d.%.3d', [Trunc(total_time) div 60, Trunc(total_time) mod 60, Round(Frac(total_time) * 1000)]));
+    //Writeln(Format('Total time (m:s.ms): %d:%d.%.3d', [Trunc(total_time) div 60, Trunc(total_time) mod 60, Round(Frac(total_time) * 1000)]));
+//    h := Trunc(total_time) div 3600;
+    m := Trunc(total_time) div 60;
+    s := Trunc(total_time) mod 60;
+    ms := Round(Frac(total_time) * 1000);
+    Writeln('Total time: ' + IfThen(m > 0, IntToStr(m) + 'm : ') + IfThen(s > 0, IfThen(s < 10, '0') + IntToStr(s) + 's') + IntToStr(ms) + 'ms');
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);

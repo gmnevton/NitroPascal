@@ -17,8 +17,6 @@ uses
   npc_error;
 
 type
-  NPCProjectParserException = class(TNPCError);
-
   TNPCProjectParser = class
   private
     Source: TNPCSourceParser;

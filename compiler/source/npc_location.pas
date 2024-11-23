@@ -29,10 +29,14 @@ type
     procedure SetEndRowCol(const AEndRow, AEndCol: Integer); inline;
     procedure SetEndAsStart;
     function Copy: TNPCLocation; inline;
+    function After: TNPCLocation; inline;
     function ToString: String; inline;
   end;
 
 implementation
+
+uses
+  Math;
 
 { TNPCLocation }
 
@@ -69,6 +73,14 @@ begin
   Result := TNPCLocation.Create(FilePath + FileName, StartRow, StartCol);
   Result.EndRow := Self.EndRow;
   Result.EndCol := Self.EndCol;
+end;
+
+function TNPCLocation.After: TNPCLocation;
+begin
+  Result := TNPCLocation.Create(FilePath + FileName, StartRow, StartCol);
+  Result.EndRow := Self.EndRow;
+  Result.StartCol := IfThen(Self.EndCol > -1, Self.EndCol, Self.StartCol) + 1;
+  Result.EndCol := -1;
 end;
 
 function TNPCLocation.ToString: String;

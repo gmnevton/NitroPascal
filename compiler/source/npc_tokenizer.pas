@@ -17,12 +17,9 @@ uses
   npc_reserved_symbols,
   npc_tokens,
   npc_location,
-  npc_utils,
-  npc_error;
+  npc_utils;
 
 type
-//  NPCTokenizerException = class(TNPCError);
-
   TNPCTokenizer = class
   private
     Lexer: TNPCLexer;
@@ -84,7 +81,8 @@ uses
   npc_consts,
   npc_project,
   npc_md5,
-  npc_types;
+  npc_types,
+  npc_error;
 
 { TNPCTokenizer }
 
@@ -349,7 +347,7 @@ begin
   else
     Result := GetToken;
   if Result = Nil then begin
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
+    raise NPCSyntaxError.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
   end;
 
   for token in ATokens do begin
@@ -357,33 +355,33 @@ begin
       Exit;
   end;
 
-  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
+  raise NPCSyntaxError.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
 end;
 
 function TNPCTokensParser.ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken;
 begin
   Result := GetToken;
   if Result = Nil then begin
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', ['ident']));
+    raise NPCSyntaxError.LexerError(Location, Format('expected "%s" but got end of file', ['ident']));
   end;
 
   if (Result.&Type = tokIdent) and Result.ReservedWord and (MD5ToReservedWord(Result.ValueHash) = AReservedWord) then
     Exit;
 
-  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedIdentifiers[AReservedWord].Ident, Result.TokenToString]));
+  raise NPCSyntaxError.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedIdentifiers[AReservedWord].Ident, Result.TokenToString]));
 end;
 
 function TNPCTokensParser.ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken;
 begin
   Result := GetToken;
   if Result = Nil then begin
-    raise NPCLexerException.LexerError(Location, Format('expected "%s" but got end of file', ['symbol']));
+    raise NPCSyntaxError.LexerError(Location, Format('expected "%s" but got end of file', ['symbol']));
   end;
 
   if (Result.&Type in [tokOParen..tokNotEqual]) and not Result.ReservedWord and Result.ReservedSymbol and (TokenTypeToReservedSymbol(Result.&Type) = AReservedSymbol) then
     Exit;
 
-  raise NPCLexerException.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedSymbolToString(AReservedSymbol), Result.TokenToString]));
+  raise NPCSyntaxError.LexerError(Result.Location, Format('expected "%s" but got "%s"', [NPCReservedSymbolToString(AReservedSymbol), Result.TokenToString]));
 end;
 
 end.

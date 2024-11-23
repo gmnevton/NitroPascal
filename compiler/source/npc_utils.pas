@@ -36,6 +36,7 @@ function ConsoleAvailable: Boolean;
 procedure ConsoleWriteln(const Value: String);
 function IsANSIConsoleSupported: Boolean;
 procedure SetConsoleANSIMode;
+function CanUseExtendedConsole: Boolean;
 
 //function ParamValue(P: PChar; Index: Integer): String;
 function explode_quotes(const Spliter: Char; const Value: String; const TrimParts: Boolean = True; const PreserveQuotes: Boolean = False): TStringArray; overload;
@@ -210,6 +211,17 @@ begin
     dwOutMode := dwOriginalOutMode or dwRequestedOutModes;
     if not SetConsoleMode(hOut, dwOutMode) then // Failed to set any VT mode, can't do anything here.
       Exit;
+  end;
+end;
+
+function CanUseExtendedConsole: Boolean;
+begin
+  if ConsoleAvailable then begin
+    Result := IsANSIConsoleSupported;
+    if not Result then begin
+      SetConsoleANSIMode;
+      Result := IsANSIConsoleSupported;
+    end;
   end;
 end;
 

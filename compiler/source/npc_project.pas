@@ -12,6 +12,7 @@ interface
 uses
   SysUtils,
   Classes,
+  npc_lexer,
   npc_parser;
 
 type
@@ -38,8 +39,9 @@ type
     //InputStream: TMemoryStream;
     OutputStream: TMemoryStream;
     //
-    ProjectTypes: TNPCProjectTypes;
-    ProjectExtension: String;
+    CompilationType: TNPCProjectTypes;
+    CompilationExtension: String;
+    CompilationSearchPaths: Array of String;
   end;
 
   TNPCProjectOutputTokensType = (otNone, otProjectOnly, otSourcesOnly, otProjectAndSources);
@@ -59,6 +61,7 @@ type
 
     ProjectEncoding: TEncoding;
     ProjectFormatSettings: PFormatSettings;
+    ProjectSearchPaths: Array of String;
 
     OutputTypes: Array of TNPCProjectOutputType;
     OutputTokens: TNPCProjectOutputTokensType;
@@ -88,11 +91,16 @@ procedure NPC_InitCompiler(const AParams: String; AParamsCount: Byte); stdcall;
 function NPC_CompileProject(const AProjectFileName, AProjectOutputPath: PChar): Boolean; stdcall;
 function NPC_ReportErrors: PChar; stdcall;
 
+//------------------------------------------------------------------------------------------------------------------------------
+
+function ProjectTypeToString(const ProjectTypes: TNPCProjectTypes): String;
+function ProjectTypeToIdent(const ProjectTypes: TNPCProjectTypes; const ProjectExtension: String; const OutputPath: String): String;
+function EnsureTypeIsNotSet(Token: TNPCToken; const CurrentProjectTypes: TNPCProjectTypes; ProjectTypes: TNPCProjectTypes): Boolean;
+
 implementation
 
 uses
   StrUtils,
-  npc_lexer,
   npc_tokenizer,
   npc_source_parser,
   npc_consts,
@@ -105,6 +113,88 @@ var
   gReportedErrors: String;
   //
   commandLineSettings: TNPCCommandLineSettings;
+
+function ProjectTypeToString(const ProjectTypes: TNPCProjectTypes): String;
+begin
+  Result := '';
+  if ptWindows in ProjectTypes then
+    Result := Result + 'Windows'
+  else if ptLinux in ProjectTypes then
+    Result := Result + 'Linux'
+  else if ptAndroid in ProjectTypes then
+    Result := Result + 'Android'
+  else if ptWebAssembly in ProjectTypes then
+    Result := Result + 'WebAssembly';
+
+  if Length(Result) > 0 then
+    Result := Result + ' ';
+
+  if pt32Bit in ProjectTypes then
+    Result := Result + '32 bit'
+  else if pt64Bit in ProjectTypes then
+    Result := Result + '64 bit';
+
+  if Length(Result) > 0 then
+    Result := Result + ' ';
+
+  if ptCONSOLE in ProjectTypes then
+    Result := Result + 'CONSOLE'
+  else if ptGUI in ProjectTypes then
+    Result := Result + 'GUI'
+  else if ptDLL in ProjectTypes then
+    Result := Result + 'DLL'
+  else if ptTEXT in ProjectTypes then
+    Result := Result + 'TEXT';
+
+  Result := SysUtils.Trim(Result);
+end;
+
+function ProjectTypeToIdent(const ProjectTypes: TNPCProjectTypes; const ProjectExtension: String; const OutputPath: String): String;
+begin
+  Result := '';
+  if ptWindows in ProjectTypes then
+    Result := Result + 'Windows'
+  else if ptLinux in ProjectTypes then
+    Result := Result + 'Linux'
+  else if ptAndroid in ProjectTypes then
+    Result := Result + 'Android'
+  else if ptWebAssembly in ProjectTypes then
+    Result := Result + 'WebAssembly';
+
+  Result := Result + ';';
+
+  if pt32Bit in ProjectTypes then
+    Result := Result + '32'
+  else if pt64Bit in ProjectTypes then
+    Result := Result + '64';
+
+  Result := Result + ';';
+
+  if ptCONSOLE in ProjectTypes then
+    Result := Result + 'CONSOLE'
+  else if ptGUI in ProjectTypes then
+    Result := Result + 'GUI'
+  else if ptDLL in ProjectTypes then
+    Result := Result + 'DLL'
+  else if ptTEXT in ProjectTypes then
+    Result := Result + 'TEXT';
+
+  Result := Result + ';';
+  Result := Result + ProjectExtension;
+  Result := Result + ';';
+  Result := Result + OutputPath;
+end;
+
+function EnsureTypeIsNotSet(Token: TNPCToken; const CurrentProjectTypes: TNPCProjectTypes; ProjectTypes: TNPCProjectTypes): Boolean;
+begin
+  Result := (CurrentProjectTypes * ProjectTypes = []);
+  if Result then
+    Exit;
+  //
+  raise NPCSyntaxError.ParserError(Token.Location, Format(sParserUnexpectedTokenIn, [Token.TokenToString, '', sProjectFile]));
+end;
+
+//------------------------------------------------------------------------------------------------------------------------------
 
 procedure NPC_SetProjectEncoding(const AEncoding: TEncoding);
 begin
@@ -271,8 +361,9 @@ begin
   Settings.OutputTypes[0].OutputPath := '';
   //Settings.OutputTypes[0].InputStream := AInput;
   Settings.OutputTypes[0].OutputStream := AOutput;
-  Settings.OutputTypes[0].ProjectTypes := [];
-  Settings.OutputTypes[0].ProjectExtension := '';
+  Settings.OutputTypes[0].CompilationType := [];
+  Settings.OutputTypes[0].CompilationExtension := '';
+  SetLength(Settings.OutputTypes[0].CompilationSearchPaths, 0);
   //
   Errors := TStringList.Create;
   //
@@ -281,7 +372,7 @@ end;
 
 destructor TNPCProject.Destroy;
 var
-  i: Integer;
+  i, j: Integer;
 begin
   FreeAndNil(Parser);
   FreeAndNil(Errors);
@@ -293,8 +384,11 @@ begin
   for i:=0 to High(Settings.OutputTypes) do begin
     Settings.OutputTypes[i].OutputPath := '';
     Settings.OutputTypes[i].OutputStream := Nil;
-    Settings.OutputTypes[i].ProjectTypes := [];
-    Settings.OutputTypes[i].ProjectExtension := '';
+    Settings.OutputTypes[i].CompilationType := [];
+    Settings.OutputTypes[i].CompilationExtension := '';
+    for j:=0 to High(Settings.OutputTypes[i].CompilationSearchPaths) do
+      Settings.OutputTypes[i].CompilationSearchPaths[j]:='';
+    SetLength(Settings.OutputTypes[i].CompilationSearchPaths, 0);
   end;
   SetLength(Settings.OutputTypes, 0);
   inherited;
@@ -306,19 +400,15 @@ begin
   try
     Parser.ParseProject;
   except
-    on E: NPCLexerException do begin
+    on E: NPCCompilerError do begin
       Result := False;
       Errors.Add(E.Message);
     end;
-//    on E: NPCTokenizerException do begin
-//      Result := False;
-//      Errors.Add(E.Message);
-//    end;
-    on E: NPCSourceParserException do begin
+    on E: NPCProjectError do begin
       Result := False;
       Errors.Add(E.Message);
     end;
-    on E: NPCProjectParserException do begin
+    on E: NPCSyntaxError do begin
       Result := False;
       Errors.Add(E.Message);
     end;

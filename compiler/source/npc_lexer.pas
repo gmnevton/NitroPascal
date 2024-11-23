@@ -15,7 +15,6 @@ uses
   npc_md5,
   npc_location,
   npc_tokens,
-  npc_error,
   npc_reserved_words,
   npc_reserved_symbols;
 
@@ -41,8 +40,6 @@ type
   end;
 
   TNPCTokens = Array of TNPCToken;
-
-  NPCLexerException = class(TNPCError);
 
   TNPCCharset = set of AnsiChar;
 
@@ -123,7 +120,8 @@ uses
 //  Types,
   Character,
   Hash,
-  npc_consts;
+  npc_consts,
+  npc_error;
 
 { TNPCToken }
 
@@ -251,7 +249,7 @@ begin
     FEncoding := AEncoding;
   //
   if AStream = Nil then
-    raise Exception.CreateFmt(sLexerStreamNotSpecified, [FFileName]);
+    raise NPCCompilerError.CreateFmt(sLexerStreamNotSpecified, [FFileName]);
   //
   FSource := Copy(AStream.Bytes, 0, AStream.Size);
   PSource := PByte(FSource);
@@ -292,7 +290,7 @@ begin
     FEncoding := AEncoding;
   //
   if AStream = Nil then
-    raise Exception.Create(sLexerStreamNotSpecifiedStream);
+    raise NPCCompilerError.Create(sLexerStreamNotSpecifiedStream);
   //
   FSource := Copy(AStream.Bytes, 0, AStream.Size);
   PSource := PByte(FSource);
@@ -675,7 +673,7 @@ begin
           '\': begin // escaping string
             SkipChar;
             if IsEmpty then
-              raise NPCLexerException.LexerError(loc, 'unfinished escape sequence');
+              raise NPCSyntaxError.LexerError(loc, 'unfinished escape sequence');
 
             escape := GetChar;
             case escape of
@@ -702,7 +700,7 @@ begin
             else
               Inc(loc.StartCol);
               loc.SetEndRowCol(row, cur - bol + 1);
-              raise NPCLexerException.LexerError(loc, 'unknown escape sequence starts with \' + escape);
+              raise NPCSyntaxError.LexerError(loc, 'unknown escape sequence starts with \' + escape);
             end;
           end;
         else
@@ -723,10 +721,10 @@ begin
         Exit;
       end
       else
-        raise NPCLexerException.LexerError(loc, Format('unclosed string literal "%s"', [stemp]));
+        raise NPCSyntaxError.LexerError(loc, Format('unclosed string literal "%s"', [stemp]));
     end;
 
-    raise NPCLexerException.LexerError(loc, Format('unknown token starts with "%s"', [first]));
+    raise NPCSyntaxError.LexerError(loc, Format('unknown token starts with "%s"', [first]));
   finally
     if loIdentWithMinus in FOptions then
       IdentifierCharset := IdentifierCharset - ['-'];

@@ -19,16 +19,19 @@ const
   sLexerStreamNotSpecified = 'Stream not specified while trying to read from file "%s".';
   sLexerStreamNotSpecifiedStream = 'Stream not specified while trying to read from stream.';
 
-  sProjectFile = 'project file';
-  sSection     = 'section';
-  sDeclaration = 'declaration';
-  sStatement   = 'statement';
-  sExpression  = 'expression';
+  sProjectFile    = 'project file';
+  sProjectSetting = 'project setting';
+  sSection        = 'section';
+  sDeclaration    = 'declaration';
+  sStatement      = 'statement';
+  sExpression     = 'expression';
 
   sParserUnexpectedTokenIn      = 'unexpected token "%s" in %s%s';
   sParserUnexpectedType         = 'unexpected type "%s", expected "%s"';
   sParserSectionHasNoBody       = '"%s" section has no body';
+  sParserUnknownIdentIn         = 'unknown identifier "%s" in %s%s';
   sParserUnknownDirectiveNameIn = 'unknown setting or define directive name "%s" in %s%s';
+  sParserExpectedButGot         = 'expected "%s", but got "%s"';
 
   sProjectError = '%s - ProjectError(%s): %s';
 
@@ -47,3 +50,4 @@ begin
 end;
 
 end.
+

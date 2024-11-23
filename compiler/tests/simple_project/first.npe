@@ -85,12 +85,12 @@ var
   FirstProgram: Boolean;
   ErrorMessage: String;
   SomeEnum: Enum = eiThree;
-  
+
 //const
 //  SomeConst: Boolean = True;
 //  SomeOtherConst1: Boolean = True;
 //  SomeOtherConst2: Boolean = True;
-{.
+
 initialization
   // initialization code
   if ConsoleAvailable then
@@ -159,12 +159,12 @@ initialization
     if .eiFive: {
     };
   };
-.}
+
 finalization
   // finalization code
   for i := 0; i < 10; i += 1 {
     // loop
-  }
+  };
 
 begin
   // program initialization code

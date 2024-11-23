@@ -26,6 +26,10 @@ type
     destructor Destroy; override;
   end;
 
+  NPCCompilerError = class(TNPCError);
+  NPCProjectError = class(TNPCError);
+  NPCSyntaxError = class(TNPCError);
+
 function GetExceptionStackTrace(const E: Exception): String;
 
 implementation
@@ -333,15 +337,7 @@ var
   i, j, num_len, line_len, line_start, line_end, ident_start, ident_end: Integer;
   line: String;
 begin
-  ansi := False;
-  if ConsoleAvailable then begin
-    ansi := IsANSIConsoleSupported;
-    if not ansi then begin
-      SetConsoleANSIMode;
-      ansi := IsANSIConsoleSupported;
-    end;
-  end;
-
+  ansi := CanUseExtendedConsole;
   in_comment := 0;
   Result := '';
   try
@@ -354,8 +350,8 @@ begin
         line_start := 0;
 
       line_end := ALocation.EndRow - 1 + ALines;
-      if line_end > list.Count then
-        line_end := list.Count;
+      if line_end > list.Count - 1 then
+        line_end := list.Count - 1;
 
       while (line_start < ALocation.StartRow - 1) and (Length(list.Strings[line_start]) = 0) do
         Inc(line_start);
