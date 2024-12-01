@@ -20,6 +20,7 @@ const
   sLexerStreamNotSpecifiedStream = 'Stream not specified while trying to read from stream.';
 
   sProjectFile    = 'project file';
+  sCodeFile       = 'code file';
   sProjectSetting = 'project setting';
   sSection        = 'section';
   sDeclaration    = 'declaration';

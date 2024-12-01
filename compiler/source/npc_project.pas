@@ -54,15 +54,25 @@ type
     SetOutputTokens: Boolean;
   end;
 
+  TNPCImportInfo = packed record
+    InputPath: String;
+    //
+    CodeName: String;
+    //
+    Imports: Array of TNPCImportInfo;
+  end;
+
   TNPCProjectSettings = packed record
     InputPath: String;
-
+    //
     ProjectName: String;
-
+    //
     ProjectEncoding: TEncoding;
     ProjectFormatSettings: PFormatSettings;
     ProjectSearchPaths: Array of String;
-
+    //
+    Imports: Array of TNPCImportInfo;
+    //
     OutputTypes: Array of TNPCProjectOutputType;
     OutputTokens: TNPCProjectOutputTokensType;
   end;
@@ -316,6 +326,8 @@ begin
   Settings.ProjectName := '';
   Settings.ProjectEncoding := AEncoding;
   Settings.ProjectFormatSettings := AFormatSettings;
+  SetLength(Settings.ProjectSearchPaths, 0);
+  SetLength(Settings.Imports, 0);
   SetLength(Settings.OutputTypes, 0);
   Settings.OutputTokens := otNone;
   //
@@ -348,6 +360,8 @@ begin
   Settings.ProjectName := '';
   Settings.ProjectEncoding := AEncoding;
   Settings.ProjectFormatSettings := AFormatSettings;
+  SetLength(Settings.ProjectSearchPaths, 0);
+  SetLength(Settings.Imports, 0);
   SetLength(Settings.OutputTypes, 1);
   Settings.OutputTokens := otNone;
   //
@@ -372,7 +386,7 @@ end;
 
 destructor TNPCProject.Destroy;
 var
-  i, j: Integer;
+   i, j: Integer;
 begin
   FreeAndNil(Parser);
   FreeAndNil(Errors);
@@ -386,8 +400,20 @@ begin
     Settings.OutputTypes[i].OutputStream := Nil;
     Settings.OutputTypes[i].CompilationType := [];
     Settings.OutputTypes[i].CompilationExtension := '';
+    //
+    for j:=0 to High(Settings.ProjectSearchPaths) do
+      Settings.ProjectSearchPaths[j] := '';
+    SetLength(Settings.ProjectSearchPaths, 0);
+    //
+    for j:=0 to High(Settings.Imports) do begin
+      Settings.Imports[j].InputPath := '';
+      Settings.Imports[j].CodeName := '';
+      SetLength(Settings.Imports[j].Imports, 0);
+    end;
+    SetLength(Settings.Imports, 0);
+    //
     for j:=0 to High(Settings.OutputTypes[i].CompilationSearchPaths) do
-      Settings.OutputTypes[i].CompilationSearchPaths[j]:='';
+      Settings.OutputTypes[i].CompilationSearchPaths[j] := '';
     SetLength(Settings.OutputTypes[i].CompilationSearchPaths, 0);
   end;
   SetLength(Settings.OutputTypes, 0);

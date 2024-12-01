@@ -385,7 +385,7 @@ end;
 
 function TNPCLexer.GetChar: Char;
 begin
-  if cur^ < 128 then begin
+  if cur^ < 128 then begin // @??: what about ASCII
     Result := Char(cur^);
     Exit;
   end;
@@ -399,7 +399,7 @@ var
 begin
   x := PSource;
   Inc(x, Index);
-  if x^ < 128 then begin
+  if x^ < 128 then begin // @??: what about ASCII
     Result := Char(x^);
     Exit;
   end;
@@ -422,7 +422,7 @@ var
 begin
   x := cur;
   try
-    if cur^ < 128 then
+    if cur^ < 128 then // @??: what about ASCII
       Inc(x)
     else
       Inc(x, FEncoding.GetCharCount(FSource, cur - PSource, 1));
@@ -443,7 +443,7 @@ begin
   //
   if IsNotEmpty then begin
     x := GetChar;
-    if cur^ < 128 then
+    if cur^ < 128 then // @??: what about ASCII
       Inc(cur, xadd)
     else
       Inc(cur, FEncoding.GetCharCount(FSource, cur - PSource, xadd));

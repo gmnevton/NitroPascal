@@ -22,6 +22,7 @@ type
     ri_break,
     ri_case,
     ri_class,
+    ri_code,
     ri_const,
     ri_constructor,
     ri_destructor,
@@ -100,6 +101,7 @@ const
     (Ident: 'break';          MD5: (A: $1cbfb724; B: $ceee46cd; C: $879df7c7; D: $cfbe7dca)), // 1cbfb724 ceee46cd 879df7c7 cfbe7dca
     (Ident: 'case';           MD5: (A: $cd14c323; B: $902024e7; C: $2c850aa8; D: $28d634a7)), // cd14c323 902024e7 2c850aa8 28d634a7
     (Ident: 'class';          MD5: (A: $a2f2ed4f; B: $8ebc2cbb; C: $4c21a29d; D: $c40ab61d)), // a2f2ed4f 8ebc2cbb 4c21a29d c40ab61d
+    (Ident: 'code';           MD5: (A: $c1336794; B: $5d5d4c91; C: $047b3b50; D: $234aa7ab)), // c1336794 5d5d4c91 047b3b50 234aa7ab
     (Ident: 'const';          MD5: (A: $6680dba0; B: $0f3a88f6; C: $6f8029a9; D: $3d71d93c)), // 6680dba0 0f3a88f6 6f8029a9 3d71d93c
     (Ident: 'constructor';    MD5: (A: $6ca26837; B: $1eeb5d93; C: $eefeb68f; D: $96157666)), // 6ca26837 1eeb5d93 eefeb68f 96157666
     (Ident: 'destructor';     MD5: (A: $334baa9d; B: $da4aaf36; C: $7f0efb87; D: $b12c824e)), // 334baa9d da4aaf36 7f0efb87 b12c824e

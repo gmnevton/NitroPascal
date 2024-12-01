@@ -40,7 +40,8 @@ type
     //
     procedure Clear;
     //
-    procedure TokenizeFile(const AFileName: String; const AEncoding: TEncoding);
+    procedure TokenizeFile(const AFileName: String; const AEncoding: TEncoding); overload;
+    procedure TokenizeFile(const AFileName: String; const AFile: TStringStream; const AEncoding: TEncoding); overload;
     procedure OutputTokens;
     //
     property Tokens: TNPCTokens read TokensArray;
@@ -192,12 +193,24 @@ begin
   FFileName := AFileName;
   FEncoding := AEncoding;
   Lexer := TNPCLexer.Create(AFileName, FFormatSettings, AEncoding);
-//  while Lexer.IsNotEmpty do begin
   repeat
     token := Lexer.GetToken;
     AddToken(token);
   until token.&Type = tokEOF;
-//  end;
+  Trim;
+end;
+
+procedure TNPCTokenizer.TokenizeFile(const AFileName: String; const AFile: TStringStream; const AEncoding: TEncoding);
+var
+  token: TNPCToken;
+begin
+  FFileName := AFileName;
+  FEncoding := AEncoding;
+  Lexer := TNPCLexer.Create(AFile, AFileName, FFormatSettings, AEncoding);
+  repeat
+    token := Lexer.GetToken;
+    AddToken(token);
+  until token.&Type = tokEOF;
   Trim;
 end;
 
