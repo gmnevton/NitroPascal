@@ -638,8 +638,8 @@ begin
 //      AddToken(token);
 //      Texer.SkipToken;
       stemp := ProjectTypeToString(CompilationTypes);
-      ConsoleWriteln('Compilation target : ' + stemp + IfThen(Length(OutputExtension) > 0, ' (extension: ' + OutputExtension + ')'));
-      ConsoleWriteln('        output path: ' + OutputPath);
+      ConsoleWriteln('Compilation target___: ' + stemp + IfThen(Length(OutputExtension) > 0, ' (extension: ' + OutputExtension + ')'));
+      ConsoleWriteln('          output path: ' + OutputPath);
       stemp := '';
       OutputPath := '';
       CompilationTypes := [];
@@ -704,7 +704,7 @@ begin
       AddToken(TNPCToken.Create(tokString, AToken.Location.Copy, False, False, SearchPath + IfThen(Recursive, '{*}'), EmptyTokenMD5));
 //      AddToken(token);
 //      Texer.SkipToken;
-      ConsoleWriteln('Project search path: ' + SearchPath + IfThen(Recursive, '{*}') + IfThen(PathExists, '', ' - not exist or is not reachable'));
+      ConsoleWriteln('Project search path__: ' + SearchPath + IfThen(Recursive, '{*}') + IfThen(PathExists, '', ' - not exist or is not reachable'));
       SearchPath := '';
       Break;
     end
@@ -1863,7 +1863,6 @@ var
   sect_init: Boolean;
   sect_cond: Boolean;
   sect_post: Boolean;
-
 begin
   SkipComments;
   // determine if there is 3 sections of parameters
@@ -1946,11 +1945,14 @@ end;
 procedure TNPCSourceParser.ParseImports(const AToken: TNPCToken);
 var
   token: TNPCToken;
-  path, checked_path: String;
-  import_found: Boolean;
+  project_path, path, checked_path: String;
+  recursive, import_found: Boolean;
   i: Integer;
 begin
-  path := ExtractFilePath(TNPCProjectSettings(Settings^).InputPath);
+  project_path := ExtractFilePath(TNPCProjectSettings(Settings^).InputPath);
+  if Length(project_path) = 0 then
+    project_path := GetCurrentDir;
+  project_path := IncludeTrailingPathDelimiter(project_path);
   try
     while Texer.IsNotEmpty do begin
       SkipComments;
@@ -1963,33 +1965,52 @@ begin
         Break;
       end
       else if (token.&Type = tokIdent) or (token.&Type = tokString) then begin // search for import in $search-path if any is defined
-        checked_path := path + IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value);
+        if token.&Type = tokString then // @TODO: search all .npc files for code name specified in token.Value
+          raise NPCSyntaxError.NotSupportedError(token.Location, Format(sParserImportNotFound, [token.Value]));
+        checked_path := project_path;
+        ConsoleWriteln('Searching import path: "' + checked_path + '"');
+        checked_path := checked_path + IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value);
         import_found := FileExists(checked_path);
         if import_found then begin
           AddToken(token);
           AddImport(itCode, token.Value, path);
-          //ConsoleWriteln('Target project type: ' + stemp);
-          ConsoleWriteln('Import_____________: "' + token.Value + '"');
+          ConsoleWriteln('Import found_________: "' + token.Value + '" at: "' + checked_path  + '"');
           // @TODO: make it parallel
           ParseImportFile(checked_path);
         end
         else begin
           for i := 0 to High(TNPCProjectSettings(Settings^).ProjectSearchPaths) do begin
-            checked_path := path + TNPCProjectSettings(Settings^).ProjectSearchPaths[i] + IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value);
-            import_found := FileExists(checked_path);
-            if import_found then
-              Break;
+            path := TNPCProjectSettings(Settings^).ProjectSearchPaths[i]; // check for absolute or relative path and {*} for recursive directories
+            recursive := False;
+            if EndsText('{*}', path) then begin
+              recursive := True;
+              path := LeftStr(path, Length(path) - 3);
+            end;
+            if StartsText('.\', path) or StartsText('..\', path) then // relative path
+              checked_path := project_path + path
+            else
+              checked_path := path;
+            if recursive then begin
+
+            end
+            else begin
+              checked_path := checked_path + IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value);
+              ConsoleWriteln('Searching import path: "' + checked_path + '"');
+              import_found := FileExists(checked_path);
+              if import_found then
+                Break;
+            end;
           end;
           if import_found then begin
             AddToken(token);
             AddImport(itCode, token.Value, path);
-            //ConsoleWriteln('Target project type: ' + stemp);
-            ConsoleWriteln('Import_____________: "' + token.Value + '"');
+            ConsoleWriteln('Import found_________: "' + token.Value + '" at: "' + checked_path  + '"');
             // @TODO: make it parallel
             ParseImportFile(checked_path);
           end
           else
-            ConsoleWriteln('Import not found___: "' + token.Value + '"');
+            //ConsoleWriteln('Import not found_____: "' + token.Value + '"');
+            raise NPCSyntaxError.ParserError(token.Location, Format(sParserImportNotFound, [token.Value]));
         end;
       end
       else
@@ -2430,7 +2451,7 @@ begin
 
       token := Texer.ExpectToken([tokString]);
       TNPCProjectSettings(Settings^).ProjectName := token.Value;
-      ConsoleWriteln('Compiling project__: ' + token.Value);
+      ConsoleWriteln('Compiling project____: ' + token.Value);
       AddToken(token);
 
       AddToken(Texer.ExpectToken([tokSemicolon]));
@@ -2493,7 +2514,7 @@ begin
       TNPCProjectSettings(Settings^).Imports[idx].InputPath := ASourceFile;
       TNPCProjectSettings(Settings^).Imports[idx].CodeName := token.Value;
       SetLength(TNPCProjectSettings(Settings^).Imports[idx].Imports, 0);
-      ConsoleWriteln('Compiling source___: ' + token.Value);
+      ConsoleWriteln('Compiling source_____: ' + token.Value);
       AddToken(token);
 
       AddToken(Texer.ExpectToken([tokSemicolon]));
@@ -2519,7 +2540,6 @@ procedure TNPCSourceParser.ParseSourceCode(const ASource: TStringStream; const A
 begin
 
 end;
-
 
 end.
 

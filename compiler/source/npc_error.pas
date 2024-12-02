@@ -22,6 +22,7 @@ type
     constructor CompilerError(const AError: String);
     constructor LexerError(const ALocation: TNPCLocation; const AError: String);
     constructor ParserError(const ALocation: TNPCLocation; const AError: String);
+    constructor NotSupportedError(const ALocation: TNPCLocation; const AError: String);
     constructor ProjectError(const AError: String);
     destructor Destroy; override;
   end;
@@ -449,6 +450,16 @@ var
 begin
   Location := ALocation;
   temp := Format(sErrorBaseEx, [Location.ToString, 'ParserError', AError]);
+  temp := temp + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
+  inherited Create(temp);
+end;
+
+constructor TNPCError.NotSupportedError(const ALocation: TNPCLocation; const AError: String);
+var
+  temp: String;
+begin
+  Location := ALocation;
+  temp := Format(sErrorBaseEx, [Location.ToString, 'NotSupportedError', AError]);
   temp := temp + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
   inherited Create(temp);
 end;

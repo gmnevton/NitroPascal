@@ -386,7 +386,7 @@ end;
 
 destructor TNPCProject.Destroy;
 var
-   i, j: Integer;
+  i, j: Integer;
 begin
   FreeAndNil(Parser);
   FreeAndNil(Errors);

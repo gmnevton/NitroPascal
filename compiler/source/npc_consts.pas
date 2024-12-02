@@ -33,6 +33,7 @@ const
   sParserUnknownIdentIn         = 'unknown identifier "%s" in %s%s';
   sParserUnknownDirectiveNameIn = 'unknown setting or define directive name "%s" in %s%s';
   sParserExpectedButGot         = 'expected "%s", but got "%s"';
+  sParserImportNotFound         = 'import not found "%s"';
 
   sProjectError = '%s - ProjectError(%s): %s';
 

@@ -65,7 +65,11 @@
 
 imports
   // imports section
-  first_main;
+  first_main,
+  'case statement',
+  'class properties concept',
+  'comments',
+  'loops statements';
   
 {. OK, this is a multi-line comment. It can be one line eighter. .}
 {.
