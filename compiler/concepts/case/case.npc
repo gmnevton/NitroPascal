@@ -1,4 +1,4 @@
-code 'case statement';
+﻿code 'case statement';
 
 type
   Enum = (eiOne, eiTwo, eiThree, eiFour, eiFive);

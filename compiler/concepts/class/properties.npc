@@ -1,4 +1,4 @@
-code 'class properties concept';
+﻿code 'class properties concept';
 
 type
   TestClass = class

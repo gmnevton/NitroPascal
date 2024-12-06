@@ -65,11 +65,17 @@
 
 imports
   // imports section
+  //'Source_code_name',
   first_main,
   'case statement',
+  //case,
   'class properties concept',
+  //properties,
   'comments',
-  'loops statements';
+  //comments,
+  'loops statements'
+  //loops
+  ;
   
 {. OK, this is a multi-line comment. It can be one line eighter. .}
 {.

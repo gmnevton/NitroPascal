@@ -56,6 +56,7 @@ type
     FOptions: TNPCLexerOptions;
     //
     FSource: TBytes;
+    FSourceLen: Int64;
     PSource: PByte;
     FLines: Integer;
     //FTokens: TBytes;
@@ -71,10 +72,10 @@ type
     procedure SkipPreamble; inline;
     procedure SkipWhitespace; inline;
     procedure SkipLine; inline;
-    function GetChar: Char; overload; inline; // MBCS implementation
-    function GetChar(const Index: Integer): Char; overload; inline; // MBCS implementation
+    function GetChar: Char; overload;// inline; // MBCS implementation
+    function GetChar(const Index: Integer): Char; overload;// inline; // MBCS implementation
     function Get2Chars: TNPCDoubleLiteral; inline;
-    function NextChar: Char; inline;
+    function NextChar: Char; //inline;
     procedure SkipChar(const SkipTwoChars: Boolean = False); inline;
     function Location: TNPCLocation; inline;
     function TokenString(const AStart, ACur: PByte): String; inline;
@@ -174,6 +175,7 @@ begin
   StringCharset := ['_', '-', '.'];
   //
   SetLength(FSource, 0);
+  FSourceLen := 0;
   PSource := Nil;
   FLines := 0;
   //
@@ -252,6 +254,7 @@ begin
     raise NPCCompilerError.CreateFmt(sLexerStreamNotSpecified, [FFileName]);
   //
   FSource := Copy(AStream.Bytes, 0, AStream.Size);
+  FSourceLen := Length(FSource);
   PSource := PByte(FSource);
   FLines := 1;
 //  SetLength(FTokens, 0);
@@ -330,7 +333,7 @@ end;
 
 function TNPCLexer.IsNotEmpty: Boolean;
 begin
-  Result := (cur <> Nil) and (cur^ <> 0);
+  Result := (cur <> Nil) and ((cur - PSource) < FSourceLen) and (cur^ <> 0);
 end;
 
 function TNPCLexer.IsEmpty: Boolean;
@@ -397,6 +400,9 @@ function TNPCLexer.GetChar(const Index: Integer): Char;
 var
   x: PByte;
 begin
+  if Index >= FSourceLen then
+    Exit(#0);
+  //
   x := PSource;
   Inc(x, Index);
   if x^ < 128 then begin // @??: what about ASCII

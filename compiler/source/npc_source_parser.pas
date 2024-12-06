@@ -42,7 +42,7 @@ type
     Tokenizer: TNPCTokenizer;
     Texer: TNPCTokensParser;
     TokensArray: TNPCTokens;
-    Settings: Pointer;
+    SettingsPtr: Pointer;
     Imports: TNPCImportArray;
     FIndex: UInt64;
     FLevel: Integer;
@@ -64,6 +64,7 @@ type
     function LastToken: TNPCToken;
     procedure SkipComments;
     function SkipComment(const AToken: TNPCToken; const ConsumeToken: Boolean = False): Boolean;
+    function IsCodeFileNamedAs(const FileName: String; const CodeName: String): Boolean;
     //
     procedure ParseProjectBody;
     procedure ParseCodeBody;
@@ -112,6 +113,8 @@ type
     procedure ParseForStatements(const for_do: Boolean);
     procedure ParseForExpression;
 
+    procedure SearchImportByCodeName(const AToken: TNPCToken; const SearchPath: String; const SearchFileName: String);
+    procedure SearchImportByFileName(const AToken: TNPCToken; const SearchPath: String; const SearchFileName: String);
     procedure ParseImports(const AToken: TNPCToken);
     procedure ParseExports(const AToken: TNPCToken);
     procedure ParseTypes(const AToken: TNPCToken);
@@ -139,18 +142,20 @@ type
 implementation
 
 uses
+  Math,
   StrUtils,
   npc_consts,
   npc_project,
   npc_md5,
   npc_tokens,
+  npc_location,
   npc_types;
 
 { TNPCSourceParser }
 
 constructor TNPCSourceParser.Create(const PSettings: Pointer);
 begin
-  Settings := PSettings;
+  SettingsPtr := PSettings;
   Tokenizer := Nil;
   Texer := Nil;
   SetLength(TokensArray, 0);
@@ -543,7 +548,7 @@ end;
 
 procedure TNPCSourceParser.ParseSettingProgramType(AToken: TNPCToken);
 
-  procedure AddCompilationType(Settings: TNPCProjectSettings; const OutputPath: String; const CompilationType: TNPCProjectTypes; const OutputExtension: String);
+  procedure AddCompilationType(var Settings: TNPCProjectSettings; const OutputPath: String; const CompilationType: TNPCProjectTypes; const OutputExtension: String);
   var
     idx: Integer;
   begin
@@ -633,7 +638,7 @@ begin
         raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
     end
     else if TokenIsReservedSymbol(token, rs_CCurly) then begin
-      AddCompilationType(TNPCProjectSettings(Settings^), OutputPath, CompilationTypes, OutputExtension);
+      AddCompilationType(TNPCProjectSettings(SettingsPtr^), OutputPath, CompilationTypes, OutputExtension);
       AddToken(TNPCToken.Create(tokIdent, AToken.Location.Copy, False, False, ProjectTypeToIdent(CompilationTypes, OutputExtension, OutputPath), EmptyTokenMD5));
 //      AddToken(token);
 //      Texer.SkipToken;
@@ -653,14 +658,35 @@ end;
 
 procedure TNPCSourceParser.ParseSearchPath(AToken: TNPCToken);
 
-  procedure AddProjectSearchPath(Settings: TNPCProjectSettings; const SearchPath: String; const Recursive: Boolean);
+  function AddProjectSearchPath(var Settings: TNPCProjectSettings; const SearchPath: String; const Recursive: Boolean): Boolean;
   var
-    idx: Integer;
+    i, idx: Integer;
+    checked_path: String;
+    is_recursive: Boolean;
   begin
+    Result := False;
+    for i:=0 to High(Settings.ProjectSearchPaths) do begin
+      checked_path := Settings.ProjectSearchPaths[i];
+      is_recursive := False;
+      if EndsText('{*}', checked_path) then begin
+        checked_path := LeftStr(checked_path, Length(checked_path) - 3);
+        is_recursive := True;
+      end;
+      if SameText(checked_path, SearchPath) then begin
+        if is_recursive and not Recursive then
+          Exit;
+        if not is_recursive and Recursive then
+          ConsoleWriteln('Search path update___: ' + SearchPath + IfThen(Recursive, '{*}'));
+          Settings.ProjectSearchPaths[i] := SearchPath + IfThen(Recursive, '{*}');
+        Exit;
+      end;
+    end;
+    //
     idx := Length(Settings.ProjectSearchPaths);
     SetLength(Settings.ProjectSearchPaths, idx + 1);
     //
     Settings.ProjectSearchPaths[idx] := SearchPath + IfThen(Recursive, '{*}');
+    Result := True;
   end;
 
 var
@@ -700,11 +726,10 @@ begin
     end
     else if TokenIsReservedSymbol(token, rs_CCurly) then begin
       PathExists := DirectoryExists(SearchPath);
-      AddProjectSearchPath(TNPCProjectSettings(Settings^), SearchPath, Recursive);
-      AddToken(TNPCToken.Create(tokString, AToken.Location.Copy, False, False, SearchPath + IfThen(Recursive, '{*}'), EmptyTokenMD5));
-//      AddToken(token);
-//      Texer.SkipToken;
-      ConsoleWriteln('Project search path__: ' + SearchPath + IfThen(Recursive, '{*}') + IfThen(PathExists, '', ' - not exist or is not reachable'));
+      if AddProjectSearchPath(TNPCProjectSettings(SettingsPtr^), SearchPath, Recursive) then begin
+        AddToken(TNPCToken.Create(tokString, AToken.Location.Copy, False, False, SearchPath + IfThen(Recursive, '{*}'), EmptyTokenMD5));
+        ConsoleWriteln('Project search path__: ' + SearchPath + IfThen(Recursive, '{*}') + IfThen(PathExists, '', ' - not exist or is not reachable'));
+      end;
       SearchPath := '';
       Break;
     end
@@ -750,8 +775,8 @@ end;
 // param_list = ('(' | '[') ident { ',' ident } (')' | ']')
 
 procedure TNPCSourceParser.ParseAssignment(const AToken: TNPCToken);
-var
-  token: TNPCToken;
+//var
+//  token: TNPCToken;
 begin
   AddToken(AToken); // ':='
   Texer.SkipToken;
@@ -1269,7 +1294,7 @@ procedure TNPCSourceParser.ParseIfStatementFuncParams(const AToken: TNPCToken);
 var
   token: TNPCToken;
 begin
-  AddToken(token);
+  AddToken(AToken);
   Texer.SkipToken;
   while Texer.IsNotEmpty do begin
     token := Texer.PeekToken;
@@ -1758,7 +1783,7 @@ procedure TNPCSourceParser.ParseCaseIfStatementFuncParams(const AToken: TNPCToke
 var
   token: TNPCToken;
 begin
-  AddToken(token);
+  AddToken(AToken);
   Texer.SkipToken;
   while Texer.IsNotEmpty do begin
     token := Texer.PeekToken;
@@ -1942,14 +1967,281 @@ begin
   Texer.SkipToken;
 end;
 
-procedure TNPCSourceParser.ParseImports(const AToken: TNPCToken);
+function TNPCSourceParser.IsCodeFileNamedAs(const FileName: String; const CodeName: String): Boolean;
 var
+  LTokenizer: TNPCTokenizer;
+  LTexer: TNPCTokensParser;
   token: TNPCToken;
-  project_path, path, checked_path: String;
+begin
+  Result := False;
+  LTokenizer := TNPCTokenizer.Create(TNPCProjectSettings(SettingsPtr^).ProjectFormatSettings^);
+  try
+    LTokenizer.TokenizeFile(FileName, TNPCProjectSettings(SettingsPtr^).ProjectEncoding);
+    LTexer := TNPCTokensParser.Create(FileName, LTokenizer.Tokens);
+    try
+      token := LTexer.GetToken;
+      if (token.&Type = tokEOF) or not TokenIsReservedIdent(token, ri_code) then
+        Exit;
+      //
+      // ok we are inside code file
+      //
+      token := LTexer.GetToken;
+      if (token.&Type = tokEOF) or not (token.&Type = tokString) then
+        Exit;
+
+      if not SameText(token.Value, CodeName) then
+        Exit;
+
+      token := LTexer.GetToken;
+      if (token.&Type = tokEOF) or not TokenIsReservedSymbol(token, rs_Semicolon) then
+        Exit;
+
+      Result := True;
+    finally
+      LTexer.Free;
+    end;
+  finally
+    LTokenizer.Free;
+  end;
+end;
+
+function SearchInFiles(const Parser: TNPCSourceParser; Path: String; const FileName: String; const Settings: TNPCProjectSettings; var FoundInPath: String; const SearchForText: String): Boolean;
+var
+  SearchRec: TSearchRec;
+  iResult: Integer;
+  ext: String;
+begin
+  Result := False;
+  if Path[Length(Path)] <> '\' then
+    Path := Path + '\';
+  if SysUtils.FindFirst(Path + FileName, faAnyFile - faDirectory, SearchRec) = 0 then begin
+    repeat
+      if (SearchRec.Attr and faDirectory = 0) and (SearchRec.Size > 0) then begin
+        ext := ExtractFileExt(SearchRec.Name);
+        Result:=not ((ext = '.exe') or
+                     (ext = '.bat') or
+                     (ext = '.manifest') or
+                     (ext = '.bpl') or
+                     (ext = '.dll') or
+                     (ext = '.jar') or
+                     // configs
+                     (ext = '.ini') or
+                     (ext = '.json') or
+                     // program data
+                     (ext = '.xml') or
+                     (ext = '.xsd') or
+                     (ext = '.xsl') or
+                     (ext = '.otf') or
+                     (ext = '.ttf') or
+                     // apps
+                     (ext = '.pdf') or
+                     (ext = '.doc') or
+                     (ext = '.docx') or
+                     (ext = '.xls') or
+                     (ext = '.xlsx') or
+                     (ext = '.txt') or
+                     (ext = '.csv') or
+                     (ext = '.npe') or
+                     (ext = '.tokens') or
+                     // certs
+                     (ext = '.crt') or
+                     (ext = '.pem'));
+        if Result then begin
+          Result := Parser.IsCodeFileNamedAs(Path + SearchRec.Name, SearchForText);
+          if Result then begin
+            FoundInPath := Path + SearchRec.Name;
+            Break;
+          end;
+        end;
+      end;
+      iResult := SysUtils.FindNext(SearchRec);
+    until iResult <> 0;
+    SysUtils.FindClose(SearchRec);
+  end;
+end;
+
+function SearchSubDirectoriesForCodeName(const Parser: TNPCSourceParser; Path: String; const CodeName: String; var FoundInPath: String): Boolean;
+var
+  SearchRec: TSearchRec;
+  checked_path, checked_file, found_path: String;
+  iResult: Integer;
+begin
+  Result := False;
+  if Path[Length(Path)] <> '\' then
+    Path := Path + '\';
+  if SysUtils.FindFirst(Path + '*.*', faDirectory, SearchRec) = 0 then begin
+    repeat
+      if SearchRec.Attr and faDirectory = faDirectory then begin
+        if (SearchRec.Name <> '.') and (SearchRec.Name <> '..') then begin
+          checked_path := Path + SearchRec.Name + '\';
+          ConsoleWriteln('Searching import path: "' + checked_path + '"');
+          Result := SearchInFiles(Parser, checked_path, '*.*', TNPCProjectSettings(Parser.SettingsPtr^), found_path, CodeName);
+          if Result then begin
+            FoundInPath := found_path;
+            Break;
+          end;
+          Result := SearchSubDirectoriesForCodeName(Parser, checked_path, CodeName, FoundInPath);
+          if Result then
+            Break;
+        end;
+      end;
+      iResult:=SysUtils.FindNext(SearchRec);
+    until iResult <> 0;
+    SysUtils.FindClose(SearchRec);
+  end;
+end;
+
+function SearchSubDirectories(Path: String; const FileName: String; var FoundInPath: String): Boolean;
+var
+  SearchRec: TSearchRec;
+  checked_path, checked_file: String;
+  iResult: Integer;
+begin
+  Result := False;
+  if Path[Length(Path)] <> '\' then
+    Path := Path + '\';
+  if SysUtils.FindFirst(Path + '*.*', faDirectory, SearchRec) = 0 then begin
+    repeat
+      if SearchRec.Attr and faDirectory = faDirectory then begin
+        if (SearchRec.Name <> '.') and (SearchRec.Name <> '..') then begin
+          checked_path := Path + SearchRec.Name + '\';
+          ConsoleWriteln('Searching import path: "' + checked_path + '"');
+          checked_file := checked_path + FileName;
+          Result := FileExists(checked_file);
+          if Result then begin
+            FoundInPath := checked_file;
+            Break;
+          end;
+          Result := SearchSubDirectories(checked_path, FileName, FoundInPath);
+          if Result then
+            Break;
+        end;
+      end;
+      iResult:=SysUtils.FindNext(SearchRec);
+    until iResult <> 0;
+    SysUtils.FindClose(SearchRec);
+  end;
+end;
+
+procedure TNPCSourceParser.SearchImportByCodeName(const AToken: TNPCToken; const SearchPath: String; const SearchFileName: String);
+var
+  path, checked_path, checked_file, found_path: String;
   recursive, import_found: Boolean;
   i: Integer;
 begin
-  project_path := ExtractFilePath(TNPCProjectSettings(Settings^).InputPath);
+  checked_path := SearchPath;
+  ConsoleWriteln('Searching import path: "' + checked_path + '"');
+  import_found := SearchInFiles(Self, checked_path, '*.*', TNPCProjectSettings(SettingsPtr^), found_path, SearchFileName);
+  if import_found then begin
+    checked_file := found_path;
+    AddToken(AToken);
+    AddImport(itCode, AToken.Value, checked_file);
+    ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
+    // @TODO: make it parallel
+    ParseImportFile(checked_file);
+  end
+  else begin
+    for i := 0 to High(TNPCProjectSettings(SettingsPtr^).ProjectSearchPaths) do begin
+      path := TNPCProjectSettings(SettingsPtr^).ProjectSearchPaths[i]; // check for absolute or relative path and {*} for recursive directories
+      recursive := False;
+      if EndsText('{*}', path) then begin // check if we should search inside subdirectories if any exists
+        recursive := True;
+        path := LeftStr(path, Length(path) - 3);
+      end;
+      if StartsText('.\', path) or StartsText('..\', path) then // relative path
+        checked_path := SearchPath + path
+      else
+        checked_path := path;
+      checked_path := ExpandFileName(checked_path);
+      //
+      ConsoleWriteln('Searching import path: "' + checked_path + '"');
+      import_found := SearchInFiles(Self, checked_path, '*.*', TNPCProjectSettings(SettingsPtr^), found_path, SearchFileName);;
+      if not import_found and recursive then begin
+        found_path := '';
+        import_found := SearchSubDirectoriesForCodeName(Self, checked_path, SearchFileName, found_path);
+        if import_found then
+          checked_file := found_path;
+        found_path := '';
+      end;
+      if import_found then
+        Break;
+    end;
+    if import_found then begin
+      AddToken(AToken);
+      AddImport(itCode, AToken.Value, checked_file);
+      ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
+      // @TODO: make it parallel
+      ParseImportFile(checked_file);
+    end
+    else
+      //ConsoleWriteln('Import not found_____: "' + token.Value + '"');
+      raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserImportNotFound, [AToken.Value]));
+  end;
+end;
+
+procedure TNPCSourceParser.SearchImportByFileName(const AToken: TNPCToken; const SearchPath: String; const SearchFileName: String);
+var
+  path, checked_path, checked_file, found_path: String;
+  recursive, import_found: Boolean;
+  i: Integer;
+begin
+  checked_path := SearchPath;
+  ConsoleWriteln('Searching import path: "' + checked_path + '"');
+  checked_file := checked_path + SearchFileName;
+  import_found := FileExists(checked_file);
+  if import_found then begin
+    AddToken(AToken);
+    AddImport(itCode, AToken.Value, checked_file);
+    ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
+    // @TODO: make it parallel
+    ParseImportFile(checked_file);
+  end
+  else begin
+    for i := 0 to High(TNPCProjectSettings(SettingsPtr^).ProjectSearchPaths) do begin
+      path := TNPCProjectSettings(SettingsPtr^).ProjectSearchPaths[i]; // check for absolute or relative path and {*} for recursive directories
+      recursive := False;
+      if EndsText('{*}', path) then begin // check if we should search inside subdirectories if any exists
+        recursive := True;
+        path := LeftStr(path, Length(path) - 3);
+      end;
+      if StartsText('.\', path) or StartsText('..\', path) then // relative path
+        checked_path := SearchPath + path
+      else
+        checked_path := path;
+      checked_path := ExpandFileName(checked_path);
+      //
+      ConsoleWriteln('Searching import path: "' + checked_path + '"');
+      checked_file := checked_path + SearchFileName;
+      import_found := FileExists(checked_file);
+      if not import_found and recursive then begin
+        found_path := '';
+        import_found := SearchSubDirectories(checked_path, SearchFileName, found_path);
+        if import_found then
+          checked_file := found_path;
+        found_path := '';
+      end;
+      if import_found then
+        Break;
+    end;
+    if import_found then begin
+      AddToken(AToken);
+      AddImport(itCode, AToken.Value, checked_file);
+      ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
+      // @TODO: make it parallel
+      ParseImportFile(checked_file);
+    end
+    else
+      //ConsoleWriteln('Import not found_____: "' + token.Value + '"');
+      raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserImportNotFound, [AToken.Value]));
+  end;
+end;
+
+procedure TNPCSourceParser.ParseImports(const AToken: TNPCToken);
+var
+  token: TNPCToken;
+  project_path: String;
+begin
+  project_path := ExtractFilePath(TNPCProjectSettings(SettingsPtr^).InputPath);
   if Length(project_path) = 0 then
     project_path := GetCurrentDir;
   project_path := IncludeTrailingPathDelimiter(project_path);
@@ -1966,58 +2258,16 @@ begin
       end
       else if (token.&Type = tokIdent) or (token.&Type = tokString) then begin // search for import in $search-path if any is defined
         if token.&Type = tokString then // @TODO: search all .npc files for code name specified in token.Value
-          raise NPCSyntaxError.NotSupportedError(token.Location, Format(sParserImportNotFound, [token.Value]));
-        checked_path := project_path;
-        ConsoleWriteln('Searching import path: "' + checked_path + '"');
-        checked_path := checked_path + IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value);
-        import_found := FileExists(checked_path);
-        if import_found then begin
-          AddToken(token);
-          AddImport(itCode, token.Value, path);
-          ConsoleWriteln('Import found_________: "' + token.Value + '" at: "' + checked_path  + '"');
-          // @TODO: make it parallel
-          ParseImportFile(checked_path);
-        end
-        else begin
-          for i := 0 to High(TNPCProjectSettings(Settings^).ProjectSearchPaths) do begin
-            path := TNPCProjectSettings(Settings^).ProjectSearchPaths[i]; // check for absolute or relative path and {*} for recursive directories
-            recursive := False;
-            if EndsText('{*}', path) then begin
-              recursive := True;
-              path := LeftStr(path, Length(path) - 3);
-            end;
-            if StartsText('.\', path) or StartsText('..\', path) then // relative path
-              checked_path := project_path + path
-            else
-              checked_path := path;
-            if recursive then begin
-
-            end
-            else begin
-              checked_path := checked_path + IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value);
-              ConsoleWriteln('Searching import path: "' + checked_path + '"');
-              import_found := FileExists(checked_path);
-              if import_found then
-                Break;
-            end;
-          end;
-          if import_found then begin
-            AddToken(token);
-            AddImport(itCode, token.Value, path);
-            ConsoleWriteln('Import found_________: "' + token.Value + '" at: "' + checked_path  + '"');
-            // @TODO: make it parallel
-            ParseImportFile(checked_path);
-          end
-          else
-            //ConsoleWriteln('Import not found_____: "' + token.Value + '"');
-            raise NPCSyntaxError.ParserError(token.Location, Format(sParserImportNotFound, [token.Value]));
-        end;
+          //raise NPCSyntaxError.NotSupportedError(token.Location, Format(sParserImportNotFound, [token.Value]));
+          SearchImportByCodeName(token, project_path, token.Value)
+        else
+          SearchImportByFileName(token, project_path, IfThen(Pos('.', token.Value) = 0, token.Value + '.npc', token.Value));
       end
       else
         raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
     end;
   finally
-    path := '';
+    project_path := '';
   end;
 end;
 
@@ -2429,15 +2679,15 @@ procedure TNPCSourceParser.ParseProject;
 var
   token: TNPCToken;
 begin
-  Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(Settings^).ProjectFormatSettings^);
+  Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(SettingsPtr^).ProjectFormatSettings^);
   try
-    Tokenizer.TokenizeFile(TNPCProjectSettings(Settings^).InputPath, TNPCProjectSettings(Settings^).ProjectEncoding);
-    if TNPCProjectSettings(Settings^).OutputTokens in [otProjectOnly, otProjectAndSources] then
+    Tokenizer.TokenizeFile(TNPCProjectSettings(SettingsPtr^).InputPath, TNPCProjectSettings(SettingsPtr^).ProjectEncoding);
+    if TNPCProjectSettings(SettingsPtr^).OutputTokens in [otProjectOnly, otProjectAndSources] then
       Tokenizer.OutputTokens;
     //
     if Assigned(Texer) then
       FreeAndNil(Texer);
-    Texer := TNPCTokensParser.Create(TNPCProjectSettings(Settings^).InputPath, Tokenizer.Tokens);
+    Texer := TNPCTokensParser.Create(TNPCProjectSettings(SettingsPtr^).InputPath, Tokenizer.Tokens);
     try
       token := Texer.ExpectToken([tokIdent]);
       if not TokenIsReservedIdent(token, ri_project) then begin
@@ -2450,7 +2700,7 @@ begin
       AddToken(token);
 
       token := Texer.ExpectToken([tokString]);
-      TNPCProjectSettings(Settings^).ProjectName := token.Value;
+      TNPCProjectSettings(SettingsPtr^).ProjectName := token.Value;
       ConsoleWriteln('Compiling project____: ' + token.Value);
       AddToken(token);
 
@@ -2472,7 +2722,7 @@ procedure TNPCSourceParser.ParseImportFile(const ASourceFile: String);
 var
   source_file: TStringStream;
 begin
-  source_file := TStringStream.Create('', TNPCProjectSettings(Settings^).ProjectEncoding, False);
+  source_file := TStringStream.Create('', TNPCProjectSettings(SettingsPtr^).ProjectEncoding, False);
   try
     source_file.LoadFromFile(ASourceFile);
     ParseImportFile(source_file, ASourceFile);
@@ -2488,10 +2738,10 @@ var
 begin
   ASource.Position := 0;
   //
-  Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(Settings^).ProjectFormatSettings^);
+  Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(SettingsPtr^).ProjectFormatSettings^);
   try
-    Tokenizer.TokenizeFile(ASourceFile, ASource, TNPCProjectSettings(Settings^).ProjectEncoding);
-    if TNPCProjectSettings(Settings^).OutputTokens in [otProjectOnly, otProjectAndSources] then
+    Tokenizer.TokenizeFile(ASourceFile, ASource, TNPCProjectSettings(SettingsPtr^).ProjectEncoding);
+    if TNPCProjectSettings(SettingsPtr^).OutputTokens in [otProjectOnly, otProjectAndSources] then
       Tokenizer.OutputTokens;
     //
     if Assigned(Texer) then
@@ -2509,11 +2759,11 @@ begin
       AddToken(token);
 
       token := Texer.ExpectToken([tokString]);
-      idx := Length(TNPCProjectSettings(Settings^).Imports);
-      SetLength(TNPCProjectSettings(Settings^).Imports, idx + 1);
-      TNPCProjectSettings(Settings^).Imports[idx].InputPath := ASourceFile;
-      TNPCProjectSettings(Settings^).Imports[idx].CodeName := token.Value;
-      SetLength(TNPCProjectSettings(Settings^).Imports[idx].Imports, 0);
+      idx := Length(TNPCProjectSettings(SettingsPtr^).Imports);
+      SetLength(TNPCProjectSettings(SettingsPtr^).Imports, idx + 1);
+      TNPCProjectSettings(SettingsPtr^).Imports[idx].InputPath := ASourceFile;
+      TNPCProjectSettings(SettingsPtr^).Imports[idx].CodeName := token.Value;
+      SetLength(TNPCProjectSettings(SettingsPtr^).Imports[idx].Imports, 0);
       ConsoleWriteln('Compiling source_____: ' + token.Value);
       AddToken(token);
 
