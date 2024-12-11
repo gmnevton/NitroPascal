@@ -1,0 +1,50 @@
+﻿code 'enum type';
+
+imports
+  Console as con;
+
+type
+  Enum = (eiOne, eiTwo, eiThree, eiFour, eiFive);
+  
+var
+  SomeEnum: Enum = eiThree;
+
+SomeTestProc {
+  case 2 > 1 of
+    if True: {
+    };
+    if False: {
+    };
+  end;
+  //
+  case SomeEnum of
+    if .eiOne: {
+    };
+    if .eiTwo: {
+    };
+    if .eiThree: {
+    };
+    if .eiFour: {
+    };
+    if .eiFive: {
+    };
+  end;
+  
+  for var i: Int = 0; i < Enum.Count; ++i {
+    con.writeln('Enum[%d] = %s\n', [i, Enum[i].Key]);
+  };
+  
+/. 
+  this loop should write to console something like this:
+
+  Enum[0] = eione
+  Enum[1] = eiTwo
+  Enum[2] = eiThree
+  Enum[3] = eiFour
+  Enum[4] = eiFive
+
+./  
+  
+};
+
+end.
