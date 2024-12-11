@@ -101,6 +101,8 @@ var
 //  SomeOtherConst1: Boolean = True;
 //  SomeOtherConst2: Boolean = True;
 
+//  SomeConst: Int = 20; @ensure: SomeConst % 2 = 0; // add compile-time assertion when condition is not met
+
 initialization
   // initialization code
   if ConsoleAvailable then

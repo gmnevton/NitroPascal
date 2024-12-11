@@ -28,7 +28,8 @@ type
     ptCONSOLE,
     ptGUI,
     ptDLL,
-    ptTEXT
+    ptTEXT,
+    ptSCRIPT // no runtime, executing during compilation; * no rumtime - means that project main begin...end is not fired and thus not needed
   );
   TNPCProjectTypes = set of TNPCProjectType;
 

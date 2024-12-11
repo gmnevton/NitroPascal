@@ -1,0 +1,6 @@
+﻿code 'compile-time condition checing and assert when condition is not met';
+
+const
+  SomeConst: Int = 20; @ensure: SomeConst % 2 = 0; // add compile-time assertion when condition is not met
+
+end.
