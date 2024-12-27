@@ -15,10 +15,25 @@ uses
   npc_location;
 
 type
-  TNPCTypes = (
+  TNPCType = (
+    _UNKNOWN,
+    
     _BOOLEAN,
     _INTEGER,
     _FLOAT,
+
+    _UINT8,
+    _UINT16,
+    _UINT32,
+    _UINT64,
+
+    _SINT8,
+    _SINT16,
+    _SINT32,
+    _SINT64,
+
+    _FLOAT32,
+    _FLOAT64,
 
     _STRING,
 
@@ -39,7 +54,7 @@ type
 
   TNPCTypeInfo = class
   public
-    &Type: TNPCTypes;
+    &Type: TNPCType;
     RunTimeSize: UInt64; // ??? why so big ???
     Name: ShortString;
     Location: TNPCLocation;

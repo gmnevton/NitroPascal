@@ -13,77 +13,12 @@ uses
   SysUtils,
   Classes,
   npc_lexer,
-  npc_parser;
+  npc_parser,
+  npc_project_settings;
 
 type
-  TNPCProjectType = (
-    ptWindows,
-    ptLinux,
-    ptAndroid,
-    ptWebAssembly,
-
-    pt32Bit,
-    pt64Bit,
-
-    ptCONSOLE,
-    ptGUI,
-    ptDLL,
-    ptTEXT,
-    ptSCRIPT // no runtime, executing during compilation; * no rumtime - means that project main begin...end is not fired and thus not needed
-  );
-  TNPCProjectTypes = set of TNPCProjectType;
-
-  PFormatSettings = ^TFormatSettings;
-
-  TNPCProjectOutputType = packed record
-    OutputPath: String;
-    //InputStream: TMemoryStream;
-    OutputStream: TMemoryStream;
-    //
-    CompilationType: TNPCProjectTypes;
-    CompilationExtension: String;
-    CompilationSearchPaths: Array of String;
-  end;
-
-  TNPCProjectOutputTokensType = (otNone, otProjectOnly, otSourcesOnly, otProjectAndSources);
-
-  TNPCCommandLineSettings = packed record
-    FormatSettings: TFormatSettings;
-    SetFormatSettings: Boolean;
-    //
-    OutputTokens: TNPCProjectOutputTokensType;
-    SetOutputTokens: Boolean;
-  end;
-
-  TNPCImportInfo = packed record
-    InputPath: String;
-    //
-    CodeName: String;
-    //
-    Imports: Array of TNPCImportInfo;
-  end;
-
-  TNPCProjectSettings = packed record
-    InputPath: String;
-    //
-    ProjectName: String;
-    //
-    ProjectEncoding: TEncoding;
-    ProjectFormatSettings: PFormatSettings;
-    ProjectSearchPaths: Array of String;
-    //
-    Imports: Array of TNPCImportInfo;
-    //
-    OutputTypes: Array of TNPCProjectOutputType;
-    OutputTokens: TNPCProjectOutputTokensType;
-  end;
-
   TNPCProject = class
   private
-    Settings: TNPCProjectSettings;
-    Errors: TStringList;
-    //
-    Parser: TNPCProjectParser;
   protected
     procedure ReportErrors;
   public
@@ -95,6 +30,9 @@ type
     function Compile: Boolean;
   end;
 
+//------------------------------------------------------------------------------------------------------------------------------
+// this calls are exported in a library
+
 procedure NPC_SetProjectEncoding(const AEncoding: TEncoding); stdcall;
 procedure NPC_SetProjectFormatSettings(const AFormatSettings: PFormatSettings); stdcall;
 
@@ -103,6 +41,7 @@ function NPC_CompileProject(const AProjectFileName, AProjectOutputPath: PChar): 
 function NPC_ReportErrors: PChar; stdcall;
 
 //------------------------------------------------------------------------------------------------------------------------------
+// this is for our internal use
 
 function ProjectTypeToString(const ProjectTypes: TNPCProjectTypes): String;
 function ProjectTypeToIdent(const ProjectTypes: TNPCProjectTypes; const ProjectExtension: String; const OutputPath: String): String;
@@ -289,7 +228,6 @@ begin
   Project := TNPCProject.Create(AProjectFileName, AProjectOutputPath, commandLineSettings);
   try
     Result := Project.Compile;
-    Project.Parser.OutputTokens;
     if not Result then
       Project.ReportErrors;
   finally
@@ -316,32 +254,24 @@ begin
   if AFormatSettings = Nil then
     AFormatSettings := @FormatSettings;
   //
-//  TNPCProjectSettings = packed record
-//    InputPath: String;
-//    ProjectName: String;
-//    ProjectEncoding: TEncoding;
-//    ProjectFormatSettings: PFormatSettings;
-//    OutputTypes: Array of TNPCProjectOutputType;
-  //
-  Settings.InputPath := AInputPath; // main project path
-  Settings.ProjectName := '';
-  Settings.ProjectEncoding := AEncoding;
-  Settings.ProjectFormatSettings := AFormatSettings;
-  SetLength(Settings.ProjectSearchPaths, 0);
-  SetLength(Settings.Imports, 0);
-  SetLength(Settings.OutputTypes, 0);
-  Settings.OutputTokens := otNone;
+  GetSettings.InputPath := AInputPath; // main project path
+  GetSettings.ProjectName := '';
+  GetSettings.ProjectEncoding := AEncoding;
+  GetSettings.ProjectFormatSettings := AFormatSettings;
+  SetLength(GetSettings.ProjectSearchPaths, 0);
+  SetLength(GetSettings.Imports, 0);
+  SetLength(GetSettings.Defines, 0);
+  SetLength(GetSettings.OutputTypes, 0);
+  GetSettings.OutputTokens := otNone;
   //
   if ASettings.SetFormatSettings then begin
-    Settings.ProjectFormatSettings := @ASettings.FormatSettings;
+    GetSettings.ProjectFormatSettings := @ASettings.FormatSettings;
   end;
   if ASettings.SetOutputTokens then begin
-    Settings.OutputTokens := ASettings.OutputTokens;
+    GetSettings.OutputTokens := ASettings.OutputTokens;
   end;
   //
-  Errors := TStringList.Create;
-  //
-  Parser := TNPCProjectParser.Create(@Settings);
+  GetSettings.Errors.Clear;
 end;
 
 constructor TNPCProject.Create(const AInput, AOutput: TMemoryStream; const ASettings: TNPCCommandLineSettings; AEncoding: TEncoding; AFormatSettings: PFormatSettings);
@@ -357,100 +287,111 @@ begin
     else
       AFormatSettings := @FormatSettings;
   //
-  Settings.InputPath := '';
-  Settings.ProjectName := '';
-  Settings.ProjectEncoding := AEncoding;
-  Settings.ProjectFormatSettings := AFormatSettings;
-  SetLength(Settings.ProjectSearchPaths, 0);
-  SetLength(Settings.Imports, 0);
-  SetLength(Settings.OutputTypes, 1);
-  Settings.OutputTokens := otNone;
+  GetSettings.InputPath := '';
+  GetSettings.ProjectName := '';
+  GetSettings.ProjectEncoding := AEncoding;
+  GetSettings.ProjectFormatSettings := AFormatSettings;
+  SetLength(GetSettings.ProjectSearchPaths, 0);
+  SetLength(GetSettings.Imports, 0);
+  SetLength(GetSettings.Defines, 0);
+  SetLength(GetSettings.OutputTypes, 1);
+  GetSettings.OutputTokens := otNone;
   //
   if ASettings.SetFormatSettings then begin
-    Settings.ProjectFormatSettings := @ASettings.FormatSettings;
+    GetSettings.ProjectFormatSettings := @ASettings.FormatSettings;
   end;
   if ASettings.SetOutputTokens then begin
-    Settings.OutputTokens := ASettings.OutputTokens;
+    GetSettings.OutputTokens := ASettings.OutputTokens;
   end;
   //
-  Settings.OutputTypes[0].OutputPath := '';
+  GetSettings.OutputTypes[0].OutputPath := '';
   //Settings.OutputTypes[0].InputStream := AInput;
-  Settings.OutputTypes[0].OutputStream := AOutput;
-  Settings.OutputTypes[0].CompilationType := [];
-  Settings.OutputTypes[0].CompilationExtension := '';
-  SetLength(Settings.OutputTypes[0].CompilationSearchPaths, 0);
+  GetSettings.OutputTypes[0].OutputStream := AOutput;
+  GetSettings.OutputTypes[0].CompilationType := [];
+  GetSettings.OutputTypes[0].CompilationExtension := '';
+  SetLength(GetSettings.OutputTypes[0].CompilationSearchPaths, 0);
   //
-  Errors := TStringList.Create;
-  //
-  Parser := TNPCProjectParser.Create(@Settings);
+  GetSettings.Errors.Clear;
 end;
 
 destructor TNPCProject.Destroy;
 var
   i, j: Integer;
 begin
-  FreeAndNil(Parser);
-  FreeAndNil(Errors);
+  //FreeAndNil(GetSettings.Errors);
+  GetSettings.Errors.Clear;
   //
-  Settings.InputPath := '';
-  Settings.ProjectName := '';
+  GetSettings.InputPath := '';
+  GetSettings.ProjectName := '';
   //Settings.ProjectEncoding := Nil;
-  Settings.ProjectFormatSettings := Nil;
-  for i:=0 to High(Settings.OutputTypes) do begin
-    Settings.OutputTypes[i].OutputPath := '';
-    Settings.OutputTypes[i].OutputStream := Nil;
-    Settings.OutputTypes[i].CompilationType := [];
-    Settings.OutputTypes[i].CompilationExtension := '';
+  GetSettings.ProjectFormatSettings := Nil;
+  for i:=0 to High(GetSettings.OutputTypes) do begin
+    GetSettings.OutputTypes[i].OutputPath := '';
+    GetSettings.OutputTypes[i].OutputStream := Nil;
+    GetSettings.OutputTypes[i].CompilationType := [];
+    GetSettings.OutputTypes[i].CompilationExtension := '';
     //
-    for j:=0 to High(Settings.ProjectSearchPaths) do
-      Settings.ProjectSearchPaths[j] := '';
-    SetLength(Settings.ProjectSearchPaths, 0);
-    //
-    for j:=0 to High(Settings.Imports) do begin
-      Settings.Imports[j].InputPath := '';
-      Settings.Imports[j].CodeName := '';
-      SetLength(Settings.Imports[j].Imports, 0);
-    end;
-    SetLength(Settings.Imports, 0);
-    //
-    for j:=0 to High(Settings.OutputTypes[i].CompilationSearchPaths) do
-      Settings.OutputTypes[i].CompilationSearchPaths[j] := '';
-    SetLength(Settings.OutputTypes[i].CompilationSearchPaths, 0);
+    for j:=0 to High(GetSettings.OutputTypes[i].CompilationSearchPaths) do
+      GetSettings.OutputTypes[i].CompilationSearchPaths[j] := '';
+    SetLength(GetSettings.OutputTypes[i].CompilationSearchPaths, 0);
   end;
-  SetLength(Settings.OutputTypes, 0);
+  SetLength(GetSettings.OutputTypes, 0);
+  //
+  for i:=0 to High(GetSettings.ProjectSearchPaths) do
+    GetSettings.ProjectSearchPaths[i] := '';
+  SetLength(GetSettings.ProjectSearchPaths, 0);
+  //
+  for i:=0 to High(GetSettings.Imports) do begin
+    GetSettings.Imports[i].InputPath := '';
+    GetSettings.Imports[i].CodeName := '';
+    SetLength(GetSettings.Imports[i].Imports, 0);
+  end;
+  SetLength(GetSettings.Imports, 0);
+  //
+  for i:=0 to High(GetSettings.Defines) do begin
+    //Settings.Defines[i]. := '';
+  end;
+  SetLength(GetSettings.Defines, 0);
   inherited;
 end;
 
 function TNPCProject.Compile: Boolean;
+var
+  Parser: TNPCProjectParser;
 begin
   Result := True;
   try
-    Parser.ParseProject;
+    Parser := TNPCProjectParser.Create(Nil);
+    try
+      Parser.ParseProject;
+    finally
+      Parser.Free;
+    end;
   except
     on E: NPCCompilerError do begin
       Result := False;
-      Errors.Add(E.Message);
+      GetSettings.Errors.Add(E.Message);
     end;
     on E: NPCProjectError do begin
       Result := False;
-      Errors.Add(E.Message);
+      GetSettings.Errors.Add(E.Message);
     end;
     on E: NPCSyntaxError do begin
       Result := False;
-      Errors.Add(E.Message);
+      GetSettings.Errors.Add(E.Message);
     end;
     on E: Exception do begin
       Result := False;
-      Errors.Add(Format(sProjectError, [ExtractFileName(Settings.InputPath), E.ClassName, E.Message]));
-      Errors.Add(GetExceptionStackTrace(E));
+      GetSettings.Errors.Add(Format(sProjectError, [ExtractFileName(GetSettings.InputPath), E.ClassName, E.Message]));
+      GetSettings.Errors.Add(GetExceptionStackTrace(E));
     end;
   end;
 end;
 
 procedure TNPCProject.ReportErrors;
 begin
-  gReportedErrors := #13#10 + Trim(Errors.Text);
-  Errors.Clear;
+  gReportedErrors := #13#10 + Trim(GetSettings.Errors.Text);
+  GetSettings.Errors.Clear;
 end;
 
 initialization

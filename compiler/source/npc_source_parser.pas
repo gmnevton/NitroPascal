@@ -18,16 +18,27 @@ uses
   npc_tokenizer,
   npc_utils,
   npc_error;
+//  npc_ast;
 
 type
+  TNPCParsingType = (
+    PROJECT,
+    SOURCE
+  );
+
   TNPCSettingType = (
     setProgram,
     setProgramType,
     setSearchPath,
+    setDefines,
     setResources
   );
 
-  TNPCImportType = (itCode, itExternalObject, itDLL);
+  TNPCImportType = (
+    itCode,
+    itExternalObject,
+    itDLL
+  );
 
   TNPCImport = packed record
     &Type: TNPCImportType;
@@ -39,6 +50,7 @@ type
 
   TNPCSourceParser = class
   private
+    ParentParser: TNPCSourceParser;
     Tokenizer: TNPCTokenizer;
     Texer: TNPCTokensParser;
     TokensArray: TNPCTokens;
@@ -47,6 +59,8 @@ type
     FIndex: UInt64;
     FLevel: Integer;
   protected
+    ParsingType: TNPCParsingType;
+    //
     function Unescape(const Value: String): String;
     procedure IncLevel; inline;
     procedure DecLevel; inline;
@@ -66,16 +80,19 @@ type
     function SkipComment(const AToken: TNPCToken; const ConsumeToken: Boolean = False): Boolean;
     function IsCodeFileNamedAs(const FileName: String; const CodeName: String): Boolean;
     //
+    procedure Parse(const ASource: TStringStream; const ASourceFile: String);
+    //
     procedure ParseProjectBody;
     procedure ParseCodeBody;
     procedure ParseSettingDefineCondition;
     procedure ParseSettingOrDefineDirective;
     procedure ParseSettings(const AToken: TNPCToken; const ASettingType: TNPCSettingType);
     procedure ParseSettingProgram(const AToken: TNPCToken);
-    procedure ParseSettingProgramType(AToken: TNPCToken);
-    procedure ParseSearchPath(AToken: TNPCToken);
+    procedure ParseSettingProgramType(const AToken: TNPCToken);
+    procedure ParseSearchPath(const AToken: TNPCToken);
 
-    procedure ParseDefines();
+    procedure ParseDefines(const AToken: TNPCToken);
+    procedure ParseDefinition;
     procedure ParseDirectives();
     procedure ParseComment;
 
@@ -129,15 +146,18 @@ type
     function  ParseStatements(var AToken: TNPCToken; const AExitOnReservedIdents: Array of TNPCReservedIdents; const ALevel: Integer): Boolean;
     procedure ParseLambdaParams(const AToken: TNPCToken);
   public
-    constructor Create(const PSettings: Pointer);
+    constructor Create(const AParentParser: TNPCSourceParser);
     destructor Destroy; override;
     //
-    procedure ParseProject;
     procedure ParseImportFile(const ASourceFile: String); overload;
     procedure ParseImportFile(const ASource: TStringStream; const ASourceFile: String); overload;
     procedure ParseSourceCode(const ASourceCode: String); overload;
     procedure ParseSourceCode(const ASource: TStringStream; const ASourceFile: String); overload;
   end;
+
+//function NPC_CompileSourceFile(const ASourceFileName: PChar): Boolean; stdcall; overload;
+function NPC_CompileSource(const ASourceFileName: PChar; const ParentParser: TNPCSourceParser): Boolean; stdcall; overload;
+function NPC_CompileSource(const ASourceStream: TStringStream; const ASourceFileName: PChar; const ParentParser: TNPCSourceParser): Boolean; stdcall; overload;
 
 implementation
 
@@ -146,16 +166,49 @@ uses
   StrUtils,
   npc_consts,
   npc_project,
+  npc_project_settings,
   npc_md5,
   npc_tokens,
   npc_location,
   npc_types;
 
+function NPC_CompileSource(const ASourceFileName: PChar; const ParentParser: TNPCSourceParser): Boolean;
+var
+  Source: TNPCSourceParser;
+begin
+  Source := TNPCSourceParser.Create(ParentParser);
+  try
+    Source.ParseImportFile(ASourceFileName);
+    if ParentParser <> Nil then begin
+      ParentParser.Imports[High(ParentParser.Imports)].Resolved := True;
+    end;
+  finally
+    Source.Free;
+  end;
+end;
+
+function NPC_CompileSource(const ASourceStream: TStringStream; const ASourceFileName: PChar; const ParentParser: TNPCSourceParser): Boolean;
+var
+  Source: TNPCSourceParser;
+begin
+  Source := TNPCSourceParser.Create(ParentParser);
+  try
+    Source.ParseImportFile(ASourceStream, ASourceFileName);
+    if ParentParser <> Nil then begin
+      ParentParser.Imports[High(ParentParser.Imports)].Resolved := True;
+    end;
+  finally
+    Source.Free;
+  end;
+end;
+
 { TNPCSourceParser }
 
-constructor TNPCSourceParser.Create(const PSettings: Pointer);
+constructor TNPCSourceParser.Create(const AParentParser: TNPCSourceParser);
 begin
-  SettingsPtr := PSettings;
+  ParentParser := AParentParser;
+  SettingsPtr := GetSettings;
+  ParsingType := SOURCE;
   Tokenizer := Nil;
   Texer := Nil;
   SetLength(TokensArray, 0);
@@ -512,6 +565,10 @@ begin
         ParseSettings(token, setSearchPath);
         Break;
       end
+      else if (token.&Type = tokIdent) and SameText(token.Value, 'defines') then begin
+        ParseSettings(token, setSearchPath);
+        Break;
+      end
       else
         raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownDirectiveNameIn, [token.Value, '', sProjectFile]));
     finally
@@ -523,10 +580,11 @@ end;
 procedure TNPCSourceParser.ParseSettings(const AToken: TNPCToken; const ASettingType: TNPCSettingType);
 begin
   case ASettingType of
-    setProgram: ParseSettingProgram(AToken);
+    setProgram    : ParseSettingProgram(AToken);
     setProgramType: ParseSettingProgramType(AToken);
-    setSearchPath: ParseSearchPath(AToken);
-    setResources: ;
+    setSearchPath : ParseSearchPath(AToken);
+    setDefines    : ParseDefines(AToken);
+    setResources  : ;
   end;
 end;
 
@@ -546,7 +604,7 @@ begin
   end;
 end;
 
-procedure TNPCSourceParser.ParseSettingProgramType(AToken: TNPCToken);
+procedure TNPCSourceParser.ParseSettingProgramType(const AToken: TNPCToken);
 
   procedure AddCompilationType(var Settings: TNPCProjectSettings; const OutputPath: String; const CompilationType: TNPCProjectTypes; const OutputExtension: String);
   var
@@ -656,7 +714,7 @@ begin
   end;
 end;
 
-procedure TNPCSourceParser.ParseSearchPath(AToken: TNPCToken);
+procedure TNPCSourceParser.ParseSearchPath(const AToken: TNPCToken);
 
   function AddProjectSearchPath(var Settings: TNPCProjectSettings; const SearchPath: String; const Recursive: Boolean): Boolean;
   var
@@ -739,6 +797,41 @@ begin
 end;
 
 procedure TNPCSourceParser.ParseDefines;
+var
+  token: TNPCToken;
+begin
+  Assert(Assigned(AToken), 'no token passed');
+  AddToken(TNPCToken.Create(tokSetting, AToken.Location.Copy, False, False, '$defines', EmptyTokenMD5));
+  //
+  while Texer.IsNotEmpty do begin
+    token := Texer.PeekToken;
+    if token.&Type = tokString then begin
+      Texer.SkipToken;
+      if Length(token.Value) > 0 then begin // defines section name
+        //TNPCProjectSettings(SettingsPtr^).Defines
+
+      end;
+    end
+    else if TokenIsReservedSymbol(token, rs_OCurly) then begin
+      AddToken(token);
+      Texer.SkipToken;
+      ParseDefinition;
+    end
+//    else if TokenIsReservedSymbol(token, rs_Dollar) then begin
+//      Texer.SkipToken;
+//      ParseSettingOrDefineDirective;
+//    end
+    else if TokenIsReservedSymbol(token, rs_CCurly) then begin
+      AddToken(token);
+      Texer.SkipToken;
+      Break;
+    end
+    else
+      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
+  end;
+end;
+
+procedure TNPCSourceParser.ParseDefinition;
 begin
 
 end;
@@ -2138,7 +2231,8 @@ begin
     AddImport(itCode, AToken.Value, checked_file);
     ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
     // @TODO: make it parallel
-    ParseImportFile(checked_file);
+    // @TODO: create new source parser class, because we now have critical error in file processing, we clear self properties with newly loaded file, which is wrong
+    NPC_CompileSource(PChar(checked_file), Self);
   end
   else begin
     for i := 0 to High(TNPCProjectSettings(SettingsPtr^).ProjectSearchPaths) do begin
@@ -2171,7 +2265,7 @@ begin
       AddImport(itCode, AToken.Value, checked_file);
       ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
       // @TODO: make it parallel
-      ParseImportFile(checked_file);
+      NPC_CompileSource(PChar(checked_file), Self);
     end
     else
       //ConsoleWriteln('Import not found_____: "' + token.Value + '"');
@@ -2194,7 +2288,7 @@ begin
     AddImport(itCode, AToken.Value, checked_file);
     ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
     // @TODO: make it parallel
-    ParseImportFile(checked_file);
+    NPC_CompileSource(PChar(checked_file), Self);
   end
   else begin
     for i := 0 to High(TNPCProjectSettings(SettingsPtr^).ProjectSearchPaths) do begin
@@ -2228,7 +2322,7 @@ begin
       AddImport(itCode, AToken.Value, checked_file);
       ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
       // @TODO: make it parallel
-      ParseImportFile(checked_file);
+      NPC_CompileSource(PChar(checked_file), Self);
     end
     else
       //ConsoleWriteln('Import not found_____: "' + token.Value + '"');
@@ -2675,41 +2769,85 @@ begin
 
 end;
 
-procedure TNPCSourceParser.ParseProject;
+procedure TNPCSourceParser.Parse(const ASource: TStringStream; const ASourceFile: String);
 var
   token: TNPCToken;
+  idx: Integer;
 begin
   Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(SettingsPtr^).ProjectFormatSettings^);
   try
-    Tokenizer.TokenizeFile(TNPCProjectSettings(SettingsPtr^).InputPath, TNPCProjectSettings(SettingsPtr^).ProjectEncoding);
+    if ASource <> Nil then
+      Tokenizer.TokenizeFile(ASourceFile, ASource, TNPCProjectSettings(SettingsPtr^).ProjectEncoding)
+    else
+      Tokenizer.TokenizeFile(TNPCProjectSettings(SettingsPtr^).InputPath, TNPCProjectSettings(SettingsPtr^).ProjectEncoding);
     if TNPCProjectSettings(SettingsPtr^).OutputTokens in [otProjectOnly, otProjectAndSources] then
       Tokenizer.OutputTokens;
     //
     if Assigned(Texer) then
       FreeAndNil(Texer);
-    Texer := TNPCTokensParser.Create(TNPCProjectSettings(SettingsPtr^).InputPath, Tokenizer.Tokens);
+    if ASource <> Nil then
+      Texer := TNPCTokensParser.Create(ASourceFile, Tokenizer.Tokens)
+    else
+      Texer := TNPCTokensParser.Create(TNPCProjectSettings(SettingsPtr^).InputPath, Tokenizer.Tokens);
     try
-      token := Texer.ExpectToken([tokIdent]);
-      if not TokenIsReservedIdent(token, ri_project) then begin
-        token.Free;
-        raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedType, [token.TokenToString, NPCReservedIdentifiers[ri_project].Ident]));
+      if ParsingType = PROJECT then begin
+        token := Texer.ExpectToken([tokIdent]);
+        if not TokenIsReservedIdent(token, ri_project) then begin
+          token.Free;
+          raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedType, [token.TokenToString, NPCReservedIdentifiers[ri_project].Ident]));
+        end;
+        //
+        // ok we are inside project file
+        //
+        AddToken(token);
+
+        token := Texer.ExpectToken([tokString]);
+        TNPCProjectSettings(SettingsPtr^).ProjectName := token.Value;
+        ConsoleWriteln('Compiling project____: ' + token.Value);
+        AddToken(token);
+
+        AddToken(Texer.ExpectToken([tokSemicolon]));
+        //
+        // we have collected basic info about project, its name
+        // go collect the rest of the project body
+        //
+        ParseProjectBody;
+      end
+      else begin // SOURCE
+        token := Texer.ExpectToken([tokIdent]);
+        if not TokenIsReservedIdent(token, ri_code) then begin
+          token.Free;
+          raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedType, [token.TokenToString, NPCReservedIdentifiers[ri_code].Ident]));
+        end;
+        //
+        // ok we are inside code file
+        //
+        AddToken(token);
+
+        token := Texer.ExpectToken([tokString]);
+        idx := Length(TNPCProjectSettings(SettingsPtr^).Imports);
+        SetLength(TNPCProjectSettings(SettingsPtr^).Imports, idx + 1);
+        TNPCProjectSettings(SettingsPtr^).Imports[idx].InputPath := ASourceFile;
+        TNPCProjectSettings(SettingsPtr^).Imports[idx].CodeName := token.Value;
+        SetLength(TNPCProjectSettings(SettingsPtr^).Imports[idx].Imports, 0);
+
+        idx := Length(Imports);
+        SetLength(Imports, idx + 1);
+        Imports[idx].&Type := itCode;
+        Imports[idx].Name := ExtractFileName(ASourceFile);
+        Imports[idx].Path := ExtractFilePath(ASourceFile);
+        Imports[idx].Resolved := False;
+
+        ConsoleWriteln('Compiling source_____: ' + token.Value);
+        AddToken(token);
+
+        AddToken(Texer.ExpectToken([tokSemicolon]));
+        //
+        // we have collected basic info about code file, its name
+        // go collect the rest of the code file body
+        //
+        ParseCodeBody;
       end;
-      //
-      // ok we are inside project file
-      //
-      AddToken(token);
-
-      token := Texer.ExpectToken([tokString]);
-      TNPCProjectSettings(SettingsPtr^).ProjectName := token.Value;
-      ConsoleWriteln('Compiling project____: ' + token.Value);
-      AddToken(token);
-
-      AddToken(Texer.ExpectToken([tokSemicolon]));
-      //
-      // we have collected basic info about project, its name
-      // go collect the rest of the project body
-      //
-      ParseProjectBody;
     finally
       FreeAndNil(Texer);
     end;
@@ -2732,63 +2870,27 @@ begin
 end;
 
 procedure TNPCSourceParser.ParseImportFile(const ASource: TStringStream; const ASourceFile: String);
-var
-  token: TNPCToken;
-  idx: Integer;
 begin
   ASource.Position := 0;
-  //
-  Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(SettingsPtr^).ProjectFormatSettings^);
-  try
-    Tokenizer.TokenizeFile(ASourceFile, ASource, TNPCProjectSettings(SettingsPtr^).ProjectEncoding);
-    if TNPCProjectSettings(SettingsPtr^).OutputTokens in [otProjectOnly, otProjectAndSources] then
-      Tokenizer.OutputTokens;
-    //
-    if Assigned(Texer) then
-      FreeAndNil(Texer);
-    Texer := TNPCTokensParser.Create(ASourceFile, Tokenizer.Tokens);
-    try
-      token := Texer.ExpectToken([tokIdent]);
-      if not TokenIsReservedIdent(token, ri_code) then begin
-        token.Free;
-        raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedType, [token.TokenToString, NPCReservedIdentifiers[ri_code].Ident]));
-      end;
-      //
-      // ok we are inside code file
-      //
-      AddToken(token);
-
-      token := Texer.ExpectToken([tokString]);
-      idx := Length(TNPCProjectSettings(SettingsPtr^).Imports);
-      SetLength(TNPCProjectSettings(SettingsPtr^).Imports, idx + 1);
-      TNPCProjectSettings(SettingsPtr^).Imports[idx].InputPath := ASourceFile;
-      TNPCProjectSettings(SettingsPtr^).Imports[idx].CodeName := token.Value;
-      SetLength(TNPCProjectSettings(SettingsPtr^).Imports[idx].Imports, 0);
-      ConsoleWriteln('Compiling source_____: ' + token.Value);
-      AddToken(token);
-
-      AddToken(Texer.ExpectToken([tokSemicolon]));
-      //
-      // we have collected basic info about code file, its name
-      // go collect the rest of the code file body
-      //
-      ParseCodeBody;
-    finally
-      FreeAndNil(Texer);
-    end;
-  finally
-    FreeAndNil(Tokenizer);
-  end;
+  Parse(ASource, ASourceFile);
 end;
 
 procedure TNPCSourceParser.ParseSourceCode(const ASourceCode: String);
+var
+  source_file: TStringStream;
 begin
-
+  source_file := TStringStream.Create(ASourceCode, TNPCProjectSettings(SettingsPtr^).ProjectEncoding, False);
+  try
+    ParseSourceCode(source_file, '');
+  finally
+    source_file.Free;
+  end;
 end;
 
 procedure TNPCSourceParser.ParseSourceCode(const ASource: TStringStream; const ASourceFile: String);
 begin
-
+  ASource.Position := 0;
+  Parse(ASource, ASourceFile);
 end;
 
 end.
