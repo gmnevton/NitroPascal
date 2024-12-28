@@ -2,8 +2,8 @@ object NEDMainForm: TNEDMainForm
   Left = 0
   Top = 0
   Caption = 'NED'
-  ClientHeight = 520
-  ClientWidth = 800
+  ClientHeight = 800
+  ClientWidth = 1200
   Color = clBtnFace
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
@@ -19,9 +19,10 @@ object NEDMainForm: TNEDMainForm
   object UCaptionBar1: TUCaptionBar
     Left = 0
     Top = 0
-    Width = 800
+    Width = 1200
     Height = 40
     ThemeManager = UThemeManager1
+    Caption = '   Caption bar'
     DoubleBuffered = True
     ParentDoubleBuffered = False
     ShowCaption = False
@@ -77,8 +78,9 @@ object NEDMainForm: TNEDMainForm
     MenuOffset = 45
     UseSystemCaptionColor = True
     CaptionHeight = 40
+    ExplicitWidth = 800
     object btnClose: TUQuickButton
-      Left = 755
+      Left = 1155
       Top = 0
       Height = 40
       Align = alRight
@@ -99,10 +101,10 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 32
     end
     object btnMax: TUQuickButton
-      Left = 710
+      Left = 1065
       Top = 0
       Height = 40
-      Align = alRight
+      Align = alCustom
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -13
@@ -121,10 +123,10 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 32
     end
     object btnMin: TUQuickButton
-      Left = 665
+      Left = 1110
       Top = 0
       Height = 40
-      Align = alRight
+      Align = alCustom
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -13
@@ -167,8 +169,8 @@ object NEDMainForm: TNEDMainForm
   object UPanel1: TUPanel
     Left = 0
     Top = 40
-    Width = 185
-    Height = 440
+    Width = 45
+    Height = 720
     Align = alLeft
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
@@ -182,12 +184,671 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitHeight = 420
+    ExplicitHeight = 440
+    object USeparator2: TUSeparator
+      Left = 0
+      Top = 120
+      Width = 45
+      Height = 20
+      Align = alTop
+      Orientation = oHorizontal
+    end
+    object UPanel5: TUPanel
+      Left = 0
+      Top = 140
+      Width = 45
+      Height = 220
+      Align = alTop
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWhite
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      ParentFont = False
+      ShowCaption = False
+      TabOrder = 0
+      BackColor.Enabled = False
+      BackColor.Color = clBlack
+      BackColor.LightColor = 15132390
+      BackColor.DarkColor = 2039583
+      object UQuickButton1: TUQuickButton
+        Left = 0
+        Top = 0
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #59240
+      end
+      object UQuickButton2: TUQuickButton
+        Left = 0
+        Top = 40
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #59241
+      end
+      object UQuickButton3: TUQuickButton
+        Left = 0
+        Top = 80
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #59162
+      end
+      object USeparator1: TUSeparator
+        Left = 0
+        Top = 120
+        Width = 45
+        Height = 20
+        Align = alTop
+        Orientation = oHorizontal
+        ExplicitTop = 135
+        ExplicitWidth = 305
+      end
+      object UQuickButton4: TUQuickButton
+        Left = 0
+        Top = 140
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #59539
+      end
+      object UQuickButton5: TUQuickButton
+        Left = 0
+        Top = 180
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #59542
+      end
+    end
+    object UPanel7: TUPanel
+      Left = 0
+      Top = 0
+      Width = 45
+      Height = 120
+      Align = alTop
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWhite
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      ParentFont = False
+      ShowCaption = False
+      TabOrder = 1
+      BackColor.Enabled = False
+      BackColor.Color = clBlack
+      BackColor.LightColor = 15132390
+      BackColor.DarkColor = 2039583
+      object UQuickButton7: TUQuickButton
+        Left = 0
+        Top = 0
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #57615
+      end
+      object UQuickButton8: TUQuickButton
+        Left = 0
+        Top = 40
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #57615
+      end
+      object UQuickButton9: TUQuickButton
+        Left = 0
+        Top = 80
+        Height = 40
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -13
+        Font.Name = 'Segoe MDL2 Assets'
+        Font.Style = []
+        ParentFont = False
+        BackColors.Enabled = False
+        BackColors.Color = clBlack
+        BackColors.LightColor = 13619151
+        BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
+        Caption = #57615
+      end
+    end
+  end
+  object UPanel2: TUPanel
+    Left = 0
+    Top = 760
+    Width = 1200
+    Height = 40
+    Align = alBottom
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWhite
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+    ShowCaption = False
+    TabOrder = 2
+    BackColor.Enabled = True
+    BackColor.Color = 10436448
+    BackColor.LightColor = 15132390
+    BackColor.DarkColor = 10436448
+    ExplicitTop = 480
+    ExplicitWidth = 800
+  end
+  object UPanel3: TUPanel
+    Left = 230
+    Top = 40
+    Width = 970
+    Height = 720
+    Align = alClient
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWhite
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+    ShowCaption = False
+    TabOrder = 3
+    BackColor.Enabled = False
+    BackColor.Color = clBlack
+    BackColor.LightColor = 15132390
+    BackColor.DarkColor = 2039583
+    ExplicitLeft = 465
+    ExplicitTop = 56
+    ExplicitWidth = 615
+    ExplicitHeight = 440
+    object UPanel4: TUPanel
+      Left = 0
+      Top = 0
+      Width = 970
+      Height = 40
+      Align = alTop
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWhite
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      ParentFont = False
+      ShowCaption = False
+      TabOrder = 0
+      BackColor.Enabled = False
+      BackColor.Color = clBlack
+      BackColor.LightColor = 15132390
+      BackColor.DarkColor = 2039583
+      ExplicitWidth = 615
+      object UScrollBox1: TUScrollBox
+        Left = 0
+        Top = 0
+        Width = 970
+        Height = 40
+        HorzScrollBar.Tracking = True
+        VertScrollBar.Tracking = True
+        Align = alClient
+        BevelEdges = []
+        BevelInner = bvNone
+        BevelOuter = bvNone
+        Color = 2039583
+        ParentColor = False
+        TabOrder = 0
+        StyleElements = []
+        BackColor.Enabled = False
+        BackColor.Color = clBlack
+        BackColor.LightColor = 15132390
+        BackColor.DarkColor = 2039583
+        ExplicitWidth = 570
+        object USymbolButton1: TUSymbolButton
+          Left = 0
+          Top = 0
+          Align = alLeft
+          TabOrder = 1
+          SymbolFont.Charset = DEFAULT_CHARSET
+          SymbolFont.Color = clWindowText
+          SymbolFont.Height = -16
+          SymbolFont.Name = 'Segoe MDL2 Assets'
+          SymbolFont.Style = []
+          DetailFont.Charset = DEFAULT_CHARSET
+          DetailFont.Color = clWindowText
+          DetailFont.Height = -11
+          DetailFont.Name = 'Tahoma'
+          DetailFont.Style = []
+          SymbolChar = #61440
+          Text = 'first.npe'
+          Detail = 'Project file'
+          KeepOrginalColor = False
+          Caption = 'USymbolButton1'
+        end
+        object USymbolButton2: TUSymbolButton
+          Left = 250
+          Top = 0
+          Align = alLeft
+          TabOrder = 2
+          SymbolFont.Charset = DEFAULT_CHARSET
+          SymbolFont.Color = clWindowText
+          SymbolFont.Height = -16
+          SymbolFont.Name = 'Segoe MDL2 Assets'
+          SymbolFont.Style = []
+          DetailFont.Charset = DEFAULT_CHARSET
+          DetailFont.Color = clWindowText
+          DetailFont.Height = -11
+          DetailFont.Name = 'Tahoma'
+          DetailFont.Style = []
+          SymbolChar = #61440
+          Text = 'first_main.npc'
+          Detail = 'Source file'
+          KeepOrginalColor = False
+          Caption = 'USymbolButton1'
+        end
+      end
+    end
+    object SynEdit1: TSynEdit
+      Left = 0
+      Top = 40
+      Width = 970
+      Height = 680
+      Align = alClient
+      Color = 2039583
+      Ctl3D = True
+      ParentCtl3D = False
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clSilver
+      Font.Height = -16
+      Font.Name = 'Consolas'
+      Font.Style = []
+      Font.Quality = fqClearTypeNatural
+      TabOrder = 1
+      UseCodeFolding = False
+      BorderStyle = bsNone
+      Gutter.Color = 2039583
+      Gutter.BorderColor = clGray
+      Gutter.Font.Charset = DEFAULT_CHARSET
+      Gutter.Font.Color = clGray
+      Gutter.Font.Height = -16
+      Gutter.Font.Name = 'Consolas'
+      Gutter.Font.Style = []
+      Gutter.Font.Quality = fqClearTypeNatural
+      Gutter.ShowLineNumbers = True
+      Gutter.TrackChanges.Visible = True
+      Gutter.Bands = <
+        item
+          Kind = gbkMarks
+          Width = 13
+        end
+        item
+          Kind = gbkLineNumbers
+        end
+        item
+          Kind = gbkFold
+        end
+        item
+          Kind = gbkTrackChanges
+        end
+        item
+          Kind = gbkMargin
+          Width = 3
+        end>
+      Highlighter = SynGeneralSyn1
+      InsertCaret = ctBlock
+      Lines.Strings = (
+        'project '#39'First_Test_Project'#39';'
+        ''
+        '/.'
+        
+          '  {$program-type output-type output-subtype[ output-extension][ ' +
+          'output-path]}'
+        '  defines what type of compilation can be done:'
+        '  you can define multiple compilation types in single project'
+        ''
+        '  supported output-type:'
+        '    - Windows(32/64)'
+        '    - Linux(32/64)'
+        '    - Android(32/64)'
+        '    - WebAssembly(32/64)'
+        ''
+        '  supported output-subtype:'
+        
+          '    - GUI     - means program that uses operating system Graphic' +
+          ' User Interface like in eg.: Windows,'
+        
+          '    - CONSOLE - means program that outputs to the operating syst' +
+          'em console (if available),'
+        '    - DLL     - dynamically loaded library,'
+        '    - TEXT    - text format'
+        ''
+        '  extension will be given to output of compiler, eg.:'
+        
+          '    if Windows(32/64) is defined than extension will be '#39'.exe'#39' o' +
+          'r '#39'.dll'#39
+        
+          '    if Linux(32/64) is defined than extension will be '#39'.elf'#39' or ' +
+          #39'.so'#39
+        '    if Android(32/64) is defined than extension will be '#39'.apk'#39
+        
+          '    if WebAssembly is defined than extension will be '#39'.wasm'#39' or ' +
+          #39'.wat'#39
+        ''
+        
+          '  custom extension can be set by declaring {$extension '#39'.ext'#39'} f' +
+          'or every project'
+        '  example: {$program-type Windows32 DLL {$extension '#39'.dll'#39'}}'
+        '    or short form {$program-type Windows32 DLL '#39'.dll'#39'}'
+        
+          '    or for every project type using concatenated version {$exten' +
+          'sion '#39'* .dll * *'#39'}'
+        
+          '  extension that will not change are not required to specify, so' +
+          ' usage of * is not required also'
+        
+          '  but if you want to specify extension using {$extension } that ' +
+          'is second or third or fourth, but not changing'
+        
+          '  previous ones, than you must use * to let complier know what y' +
+          'ou are up to'
+        './'
+        ''
+        '{$program-type Windows32 GUI}'
+        '{$program-type Windows32 DLL '#39'.dll'#39'}'
+        '{$program-type Android64 GUI}'
+        '{$program-type WebAssembly DLL}'
+        ''
+        '/.'
+        '  {$search-path[ recursive] '#39'directory'#39'}'
+        
+          '  defines path(s) that project can use to search imported code f' +
+          'iles'
+        
+          '  you can define multiple search paths for project by repeating ' +
+          'this directive as many times as is needed'
+        ''
+        
+          '  defining search path adds it to the project internal list of p' +
+          'aths'
+        
+          '  single directive adds single choosen path without looking into' +
+          ' specified directory'
+        
+          '  to automatically add children directories inside specified pat' +
+          'h you may use optional switch '#39'recursive'#39
+        ''
+        '  specified path can be of type:'
+        
+          '    - relative  - to project directory, using '#39'.\\'#39' or '#39'..\\'#39' sp' +
+          'ecifier to go in or out of project directory,'
+        '    - absolute - specifying full path to desired directory'
+        ''
+        
+          '  compiler checks if specified path exists and produces error if' +
+          ' path is not existant or not reachable'
+        ''
+        
+          '  you can modify compiler behavior by supplaing additional direc' +
+          'tive:'
+        '  {$warn-on-path-error enabled}'
+        
+          '  which disables underlying path error message and produces only' +
+          ' warning'
+        ''
+        
+          '  to disable previously enabled directive, you should use direct' +
+          'ive:'
+        '  {$warn-on-path-error disabled}'
+        './'
+        ''
+        '{$search-path '#39'..\\..\\concepts\\'#39'}'
+        '{$search-path recursive '#39'..\\..\\concepts\\'#39'}'
+        ''
+        'imports'
+        '  // imports section'
+        '  //'#39'Source_code_name'#39','
+        '  first_main,'
+        '  '#39'case statement'#39','
+        '  //case,'
+        '  '#39'class properties concept'#39','
+        '  //properties,'
+        '  '#39'comments'#39','
+        '  //comments,'
+        '  '#39'loops statements'#39
+        '  //loops'
+        '  ;'
+        '  '
+        
+          '{. OK, this is a multi-line comment. It can be one line eighter.' +
+          ' .}'
+        '{.'
+        
+          '  But for now we need to test this compiler at every possible wa' +
+          'y we could imagine.'
+        '  So to do this we need some test cases, like this comment.'
+        '.}'
+        ''
+        '(*'
+        '  After that there will be one more comment to test.'
+        '*)'
+        ''
+        '//type'
+        '// Enum = (eiOne, eiTwo, eiThree, eiFour, eiFive);'
+        ''
+        'var'
+        '  SomeString: String;'
+        '  FirstProgram: Boolean;'
+        '  ErrorMessage: String;'
+        '  SomeEnum: Enum = eiThree;'
+        ''
+        '//const'
+        '//  SomeConst: Boolean = True;'
+        '//  SomeOtherConst1: Boolean = True;'
+        '//  SomeOtherConst2: Boolean = True;'
+        ''
+        
+          '//  SomeConst: Int = 20; @ensure: SomeConst % 2 = 0; // add comp' +
+          'ile-time assertion when condition is not met'
+        ''
+        'initialization'
+        '  // initialization code'
+        '  if ConsoleAvailable then'
+        '    ConsoleTitle := %project-name%;'
+        '  //'
+        '  FirstProgram := True;'
+        '  //'
+        '  if not FirstProgram then {'
+        '    // nothing here'
+        '  };'
+        '  //'
+        '  if 1 + 2 = 3 + 4 then {'
+        '    if ConsoleAvailable then {'
+        
+          '      Writeln('#39'We are testing our compiler.'#39'#13#10'#39'\rIf everythi' +
+          'ng will be ok, than\rmaybe we make a change in programming in Pa' +
+          'scal.'#39');'
+        
+          '      Writeln('#39'This line shows that we are not limited by line l' +
+          'ength and string literal length like in Delphi where you can not' +
+          ' use lines that are longer than 255 characters. In NitroPascal Y' +
+          'ou can have lines that are 2GB characters long. We are not sure ' +
+          'why You may need it, but when we can have it, than why not ?'#39');'
+        '    };'
+        '  } else {'
+        '    ErrorMessage := '#39'This is expected !'#39';'
+        '  };'
+        '  //'
+        '  if ConsoleAvailable and (Length(ErrorMessage) > 0) then {'
+        
+          '      Writeln('#39'We are testing our compiler.'#39'#13#10'#39'\rIf everythi' +
+          'ng will be ok, than\rmaybe we make a change in programming in Pa' +
+          'scal.'#39');'
+        
+          '      Writeln('#39'This line shows that we are not limited by line l' +
+          'ength and string literal length like in Delphi where you can not' +
+          ' use lines that are longer than 255 characters. In NitroPascal Y' +
+          'ou can have lines that are 2GB characters long. We are not sure ' +
+          'why You may need it, but when we can have it, than why not ?'#39');'
+        '  };'
+        '  //'
+        '  if SomeConst then {'
+        '    // maybe some statements'
+        '    SomeConst := False;'
+        '    SomeOtherConst1 := False;'
+        '    SomeOtherConst2 := False;'
+        
+          '  } else // test comments in various places, @TODO: use other ty' +
+          'pes of comments as well'
+        '  if SomeOtherConst1 then {'
+        '    // maybe some statements'
+        '    SomeConst := False;'
+        '    SomeOtherConst1 := False;'
+        '    SomeOtherConst2 := False;'
+        '  } // else in next line, because we commented here'
+        '  else if SomeOtherConst2 then {'
+        '    // maybe some statements'
+        '    SomeConst := False;'
+        '    SomeOtherConst1 := False;'
+        '    SomeOtherConst2 := False;'
+        '  } else {'
+        '    // maybe some statements'
+        '    SomeConst := False;'
+        '    SomeOtherConst1 := False;'
+        '    SomeOtherConst2 := False;'
+        '  };'
+        '  //'
+        '  case 2 > 1 {'
+        '    if True: {'
+        '    };'
+        '    if False: {'
+        '    };'
+        '  };'
+        '  //'
+        '  case SomeEnum {'
+        '    if .eiOne: {'
+        '    };'
+        '    if .eiTwo: {'
+        '    };'
+        '    if .eiThree: {'
+        '    };'
+        '    if .eiFour: {'
+        '    };'
+        '    if .eiFive: {'
+        '    };'
+        '  };'
+        ''
+        'finalization'
+        '  // finalization code'
+        '  for i := 0; i < 10; i += 1 {'
+        '    // loop'
+        '  };'
+        ''
+        'begin'
+        '  // program initialization code'
+        '  SomeString := '#39'this is a text'#39';'
+        '  if ConsoleAvailable then {'
+        '    Writeln(SomeString);'
+        '    ConsolePause;'
+        '  };'
+        'end.')
+      Options = [eoAutoIndent, eoDisableScrollArrows, eoDragDropEditing, eoEnhanceHomeKey, eoEnhanceEndKey, eoGroupUndo, eoHideShowScrollbars, eoKeepCaretX, eoShowScrollHint, eoSmartTabDelete, eoTabIndent, eoTabsToSpaces, eoTrimTrailingSpaces, eoShowLigatures, eoCopyPlainText]
+      RightEdge = 128
+      RightEdgeColor = clYellow
+      SelectedColor.Alpha = 0.400000005960464500
+      ExplicitWidth = 570
+      ExplicitHeight = 400
+    end
+  end
+  object UPanel6: TUPanel
+    Left = 45
+    Top = 40
+    Width = 185
+    Height = 720
+    Align = alLeft
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWhite
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+    ShowCaption = False
+    TabOrder = 4
+    BackColor.Enabled = False
+    BackColor.Color = clBlack
+    BackColor.LightColor = 15132390
+    BackColor.DarkColor = 2039583
+    ExplicitLeft = 256
+    ExplicitTop = 248
+    ExplicitHeight = 41
     object UScrollBox2: TUScrollBox
       Left = 0
       Top = 0
       Width = 185
-      Height = 440
+      Height = 720
       HorzScrollBar.Tracking = True
       VertScrollBar.Tracking = True
       Align = alClient
@@ -202,6 +863,9 @@ object NEDMainForm: TNEDMainForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
+      ExplicitLeft = -6
+      ExplicitTop = 6
+      ExplicitHeight = 440
       object UItemButton1: TUItemButton
         Left = 0
         Top = 0
@@ -279,7 +943,6 @@ object NEDMainForm: TNEDMainForm
         Text = 'Text'
         Detail = 'Detail'
         RightIcon = #59198
-        ExplicitTop = 8
       end
       object UItemButton2: TUItemButton
         Left = 0
@@ -359,8 +1022,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton2'
-        ExplicitLeft = -6
-        ExplicitTop = 86
       end
       object UItemButton3: TUItemButton
         Left = 0
@@ -440,8 +1101,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton3'
-        ExplicitLeft = 3
-        ExplicitTop = 126
       end
       object UItemButton4: TUItemButton
         Left = 0
@@ -521,8 +1180,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton4'
-        ExplicitLeft = 3
-        ExplicitTop = 166
       end
       object UItemButton5: TUItemButton
         Left = 0
@@ -602,8 +1259,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton5'
-        ExplicitLeft = -6
-        ExplicitTop = 206
       end
       object UItemButton6: TUItemButton
         Left = 0
@@ -683,8 +1338,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton6'
-        ExplicitLeft = 3
-        ExplicitTop = 256
       end
       object UItemButton7: TUItemButton
         Left = 0
@@ -764,7 +1417,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton7'
-        ExplicitTop = 304
       end
       object UItemButton8: TUItemButton
         Left = 0
@@ -844,8 +1496,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton8'
-        ExplicitLeft = -6
-        ExplicitTop = 336
       end
       object UItemButton9: TUItemButton
         Left = 0
@@ -925,220 +1575,6 @@ object NEDMainForm: TNEDMainForm
         Detail = 'Detail'
         RightIcon = #59198
         Caption = 'UItemButton9'
-        ExplicitLeft = 16
-        ExplicitTop = 397
-      end
-    end
-  end
-  object UPanel2: TUPanel
-    Left = 0
-    Top = 480
-    Width = 800
-    Height = 40
-    Align = alBottom
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWhite
-    Font.Height = -11
-    Font.Name = 'Tahoma'
-    Font.Style = []
-    ParentFont = False
-    ShowCaption = False
-    TabOrder = 2
-    BackColor.Enabled = False
-    BackColor.Color = clBlack
-    BackColor.LightColor = 15132390
-    BackColor.DarkColor = 2039583
-    ExplicitTop = 460
-  end
-  object UPanel3: TUPanel
-    Left = 185
-    Top = 40
-    Width = 615
-    Height = 440
-    Align = alClient
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWhite
-    Font.Height = -11
-    Font.Name = 'Tahoma'
-    Font.Style = []
-    ParentFont = False
-    ShowCaption = False
-    TabOrder = 3
-    BackColor.Enabled = False
-    BackColor.Color = clBlack
-    BackColor.LightColor = 15132390
-    BackColor.DarkColor = 2039583
-    ExplicitHeight = 420
-    object UPanel4: TUPanel
-      Left = 0
-      Top = 0
-      Width = 615
-      Height = 40
-      Align = alTop
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWhite
-      Font.Height = -11
-      Font.Name = 'Tahoma'
-      Font.Style = []
-      ParentFont = False
-      ShowCaption = False
-      TabOrder = 0
-      BackColor.Enabled = False
-      BackColor.Color = clBlack
-      BackColor.LightColor = 15132390
-      BackColor.DarkColor = 2039583
-      object UScrollBox1: TUScrollBox
-        Left = 250
-        Top = 0
-        Width = 365
-        Height = 40
-        HorzScrollBar.Tracking = True
-        VertScrollBar.Tracking = True
-        Align = alClient
-        BevelEdges = []
-        BevelInner = bvNone
-        BevelOuter = bvNone
-        Color = 2039583
-        ParentColor = False
-        TabOrder = 0
-        StyleElements = []
-        BackColor.Enabled = False
-        BackColor.Color = clBlack
-        BackColor.LightColor = 15132390
-        BackColor.DarkColor = 2039583
-        ExplicitLeft = 168
-        ExplicitTop = -1
-        ExplicitWidth = 447
-        ExplicitHeight = 41
-      end
-      object UPanel5: TUPanel
-        Left = 0
-        Top = 0
-        Width = 250
-        Height = 40
-        Align = alLeft
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWhite
-        Font.Height = -11
-        Font.Name = 'Tahoma'
-        Font.Style = []
-        ParentFont = False
-        ShowCaption = False
-        TabOrder = 1
-        BackColor.Enabled = False
-        BackColor.Color = clBlack
-        BackColor.LightColor = 15132390
-        BackColor.DarkColor = 2039583
-        object UQuickButton1: TUQuickButton
-          Left = 0
-          Top = 0
-          Height = 40
-          Align = alLeft
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -13
-          Font.Name = 'Segoe MDL2 Assets'
-          Font.Style = []
-          ParentFont = False
-          BackColors.Enabled = False
-          BackColors.Color = clBlack
-          BackColors.LightColor = 13619151
-          BackColors.DarkColor = 3947580
-          ButtonStyle = qbsNone
-          Caption = #59240
-          ExplicitLeft = 32
-          ExplicitTop = 16
-          ExplicitHeight = 32
-        end
-        object UQuickButton2: TUQuickButton
-          Left = 45
-          Top = 0
-          Height = 40
-          Align = alLeft
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -13
-          Font.Name = 'Segoe MDL2 Assets'
-          Font.Style = []
-          ParentFont = False
-          BackColors.Enabled = False
-          BackColors.Color = clBlack
-          BackColors.LightColor = 13619151
-          BackColors.DarkColor = 3947580
-          ButtonStyle = qbsNone
-          Caption = #59241
-          ExplicitLeft = 72
-          ExplicitTop = 6
-        end
-        object UQuickButton3: TUQuickButton
-          Left = 90
-          Top = 0
-          Height = 40
-          Align = alLeft
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -13
-          Font.Name = 'Segoe MDL2 Assets'
-          Font.Style = []
-          ParentFont = False
-          BackColors.Enabled = False
-          BackColors.Color = clBlack
-          BackColors.LightColor = 13619151
-          BackColors.DarkColor = 3947580
-          ButtonStyle = qbsNone
-          Caption = #59162
-          ExplicitLeft = 141
-          ExplicitTop = 6
-        end
-        object USeparator1: TUSeparator
-          Left = 135
-          Top = 0
-          Height = 40
-          Align = alLeft
-          ExplicitLeft = 168
-          ExplicitTop = 8
-          ExplicitHeight = 50
-        end
-        object UQuickButton4: TUQuickButton
-          Left = 155
-          Top = 0
-          Height = 40
-          Align = alLeft
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -13
-          Font.Name = 'Segoe MDL2 Assets'
-          Font.Style = []
-          ParentFont = False
-          BackColors.Enabled = False
-          BackColors.Color = clBlack
-          BackColors.LightColor = 13619151
-          BackColors.DarkColor = 3947580
-          ButtonStyle = qbsNone
-          Caption = #59539
-          ExplicitLeft = 206
-          ExplicitTop = 6
-        end
-        object UQuickButton5: TUQuickButton
-          Left = 200
-          Top = 0
-          Height = 40
-          Align = alLeft
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -13
-          Font.Name = 'Segoe MDL2 Assets'
-          Font.Style = []
-          ParentFont = False
-          BackColors.Enabled = False
-          BackColors.Color = clBlack
-          BackColors.LightColor = 13619151
-          BackColors.DarkColor = 3947580
-          ButtonStyle = qbsNone
-          Caption = #59542
-          ExplicitLeft = 235
-          ExplicitTop = 6
-        end
       end
     end
   end
@@ -1232,12 +1668,12 @@ object NEDMainForm: TNEDMainForm
     Colors.ItemButtonColors.ActiveColors.DarkPress = clBlack
     Colors.ItemButtonColors.ActiveColors.DarkDisabled = clBlack
     Colors.ItemButtonColors.ActiveColors.DarkFocused = clBlack
-    Left = 448
-    Top = 8
+    Left = 592
+    Top = 80
   end
   object MainMenu1: TMainMenu
-    Left = 201
-    Top = 96
+    Left = 689
+    Top = 80
     object File1: TMenuItem
       AutoHotkeys = maManual
       Caption = 'File'
@@ -1433,5 +1869,89 @@ object NEDMainForm: TNEDMainForm
         Caption = 'About NED...'
       end
     end
+  end
+  object SynGeneralSyn1: TSynGeneralSyn
+    CommentAttri.Foreground = clGray
+    CommentAttri.Style = []
+    Comments = [csCStyle, csCPPStyle]
+    DetectPreprocessor = False
+    IdentifierAttri.Foreground = clMenuHighlight
+    KeyAttri.Foreground = clFuchsia
+    KeyAttri.Style = []
+    KeyWords.Strings = (
+      'AND'
+      'ARRAY'
+      'AS'
+      'ASM'
+      'BEGIN'
+      'BREAK'
+      'CASE'
+      'CLASS'
+      'CODE'
+      'CONST'
+      'CONSTRUCTOR'
+      'DESTRUCTOR'
+      'DISPINTERFACE'
+      'DIV'
+      'DO'
+      'ELSE'
+      'END'
+      'EXCEPT'
+      'EXPORT'
+      'EXPORTS'
+      'FILE'
+      'FINALIZATION'
+      'FINALLY'
+      'FOR'
+      'FUNCTION'
+      'GOTO'
+      'IF'
+      'IMPLEMENTATION'
+      'IMPORT'
+      'IMPORTS'
+      'IN'
+      'INHERITED'
+      'INITIALIZATION'
+      'INLINE'
+      'INTERFACE'
+      'IS'
+      'LABEL'
+      'LIBRARY'
+      'MOD'
+      'NIL'
+      'NOT'
+      'OBJECT'
+      'OF'
+      'OR'
+      'PACKED'
+      'PROCEDURE'
+      'PROJECT'
+      'PROPERTY'
+      'RAISE'
+      'RECORD'
+      'REPEAT'
+      'RESOURCESTRING'
+      'SET'
+      'SHL'
+      'SHR'
+      'STRING'
+      'THEN'
+      'THREADVAR'
+      'TO'
+      'TRY'
+      'TYPE'
+      'UNIT'
+      'UNTIL'
+      'USES'
+      'VAR'
+      'WHILE'
+      'WITH'
+      'XOR')
+    NumberAttri.Foreground = clRed
+    PreprocessorAttri.Foreground = clLime
+    StringAttri.Foreground = clAqua
+    SymbolAttri.Foreground = clWhite
+    Left = 782
+    Top = 80
   end
 end

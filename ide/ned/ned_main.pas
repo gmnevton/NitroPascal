@@ -8,6 +8,7 @@ uses
   Controls,
   ExtCtrls,
   Forms,
+  Menus,
   UCL.Form,
   UCL.ThemeManager,
   UCL.Types,
@@ -15,7 +16,12 @@ uses
   UCL.CaptionBar,
   UCL.ScrollBox,
   UCL.ItemButton,
-  UCL.SymbolButton, UCL.QuickButton, UCL.Separator, Vcl.Menus;
+  UCL.SymbolButton, 
+  UCL.QuickButton, 
+  UCL.Separator, 
+  SynEditHighlighter, 
+  SynHighlighterGeneral, 
+  SynEdit;
 
 type
   TNEDMainForm = class(TUForm)
@@ -26,29 +32,12 @@ type
     UPanel3: TUPanel;
     UPanel4: TUPanel;
     UScrollBox1: TUScrollBox;
-    UPanel5: TUPanel;
     btnClose: TUQuickButton;
     btnMax: TUQuickButton;
     btnMin: TUQuickButton;
-    UQuickButton1: TUQuickButton;
-    UQuickButton2: TUQuickButton;
-    UQuickButton3: TUQuickButton;
-    USeparator1: TUSeparator;
-    UQuickButton4: TUQuickButton;
-    UQuickButton5: TUQuickButton;
     MainMenu1: TMainMenu;
     File1: TMenuItem;
     UQuickButton6: TUQuickButton;
-    UScrollBox2: TUScrollBox;
-    UItemButton1: TUItemButton;
-    UItemButton2: TUItemButton;
-    UItemButton3: TUItemButton;
-    UItemButton4: TUItemButton;
-    UItemButton5: TUItemButton;
-    UItemButton6: TUItemButton;
-    UItemButton7: TUItemButton;
-    UItemButton8: TUItemButton;
-    UItemButton9: TUItemButton;
     New1: TMenuItem;
     Open1: TMenuItem;
     History1: TMenuItem;
@@ -103,6 +92,33 @@ type
     NEDprojectwebsite1: TMenuItem;
     NitroPascalwebsite1: TMenuItem;
     N9: TMenuItem;
+    UPanel6: TUPanel;
+    UScrollBox2: TUScrollBox;
+    UItemButton1: TUItemButton;
+    UItemButton2: TUItemButton;
+    UItemButton3: TUItemButton;
+    UItemButton4: TUItemButton;
+    UItemButton5: TUItemButton;
+    UItemButton6: TUItemButton;
+    UItemButton7: TUItemButton;
+    UItemButton8: TUItemButton;
+    UItemButton9: TUItemButton;
+    UPanel5: TUPanel;
+    UQuickButton1: TUQuickButton;
+    UQuickButton2: TUQuickButton;
+    UQuickButton3: TUQuickButton;
+    USeparator1: TUSeparator;
+    UQuickButton4: TUQuickButton;
+    UQuickButton5: TUQuickButton;
+    UPanel7: TUPanel;
+    UQuickButton7: TUQuickButton;
+    UQuickButton8: TUQuickButton;
+    UQuickButton9: TUQuickButton;
+    USeparator2: TUSeparator;
+    USymbolButton1: TUSymbolButton;
+    USymbolButton2: TUSymbolButton;
+    SynEdit1: TSynEdit;
+    SynGeneralSyn1: TSynGeneralSyn;
     procedure FormCreate(Sender: TObject);
   private
   public
