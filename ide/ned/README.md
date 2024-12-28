@@ -12,3 +12,5 @@ NED project uses this components:
 ![Nitro EDitor](../../git_res/ned1.png)
 
 ![Nitro EDitor](../../git_res/ned2.png)
+
+![Nitro EDitor](../../git_res/ned3.png)
