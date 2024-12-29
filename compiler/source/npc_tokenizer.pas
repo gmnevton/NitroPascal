@@ -66,6 +66,7 @@ type
     //
     function GetToken: TNPCToken; inline; // grabs token and moves index forward
     function GetTokenWithMinus: TNPCToken; // combine tokens if there is minus between them
+    function LastToken: TNPCToken; // grabs last token
     function PeekToken: TNPCToken; inline; // grabs current token and preserves actual index
     function NextToken: TNPCToken; inline; // grabs next token and preserves actual index
     procedure SkipToken; inline; // increase index to next position
@@ -326,6 +327,17 @@ begin
     location.SetEndRowCol(token.Location.EndRow, token.Location.EndCol);
   end;
   Result := TNPCToken.Create(tokIdent, location, False, False, ident, EmptyTokenMD5);
+end;
+
+function TNPCTokensParser.LastToken: TNPCToken;
+//var
+//  cnt: Integer;
+begin
+  Result := Nil;
+  if FIndex = 0 then
+    Exit;
+  //
+  Result := TokensArray[FIndex - 1];
 end;
 
 function TNPCTokensParser.PeekToken: TNPCToken;

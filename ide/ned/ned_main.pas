@@ -21,7 +21,7 @@ uses
   UCL.Separator, 
   SynEditHighlighter, 
   SynHighlighterGeneral, 
-  SynEdit;
+  SynEdit, Vcl.WinXCtrls;
 
 type
   TNEDMainForm = class(TUForm)
@@ -117,8 +117,11 @@ type
     USeparator2: TUSeparator;
     USymbolButton1: TUSymbolButton;
     USymbolButton2: TUSymbolButton;
-    SynEdit1: TSynEdit;
     SynGeneralSyn1: TSynGeneralSyn;
+    GridPanel1: TGridPanel;
+    SynEdit1: TSynEdit;
+    GridPanel2: TGridPanel;
+    SynEdit2: TSynEdit;
     procedure FormCreate(Sender: TObject);
   private
   public
