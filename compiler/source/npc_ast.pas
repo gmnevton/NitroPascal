@@ -162,7 +162,8 @@ type
     LITERAL_True,
     LITERAL_False,
     LITERAL_Number,
-    LITERAL_String
+    LITERAL_String,
+    LITERAL_Array
   );
 
   TNPC_ASTLiteral = class(TNPC_ASTExpression)
@@ -170,9 +171,13 @@ type
     // &Type = AST_LITERAL
     ValueType: TNPC_LiteralValueType; // = LITERAL_Uninitialized
     StringValue: UTF8String;
-    IntegerValue: Int64;
-    FloatValue: Double;
+    IntegerValue: Int64; // = 0
+    FloatValue: Double; // = 0
     NumberFlags: LongWord;
+    ArrayType: TNPC_ASTTypeDefinition; // = null
+    ArrayMembers: Array of TNPC_ASTLiteral;
+    //
+    ArrayBaseAddress: Int64; // = -1
     //
     constructor Create; override;
     destructor Destroy; override;

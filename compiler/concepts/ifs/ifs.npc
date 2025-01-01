@@ -1,0 +1,35 @@
+﻿code 'if statement';
+
+var
+  SomeBool: Boolean = True;
+
+SomeValueForTrue(): Integer {
+  Result := 69;
+};
+
+SomeValueForFalse(): Integer {
+  Result := 420;
+};
+
+SomeTestProc() {
+
+  // simple if-then
+  if SomeBool then {
+    // statements
+  };
+
+
+  // if as an expression, it allways have to be if-then-else
+
+  x := if SomeBool then 69 else 420;
+  
+  x := if 1 = 2 then SomeValueForTrue else SomeValueForFalse;
+
+  x := if SomeValueForTrue = 69 then True else False;
+
+  x := if False then 
+         if SomeValueForTrue = 69 then 1 else -1
+       else 0;
+};
+
+end.

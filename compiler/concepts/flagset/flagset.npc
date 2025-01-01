@@ -1,0 +1,35 @@
+﻿code 'flag set';
+
+type
+  Flags: FlagSet = (
+    One, 
+    Two, 
+    Three, 
+    Four, 
+    Five
+  );
+  
+var
+  SomeEnum: Flags = Three;
+  
+type
+  MyRecord: record = {
+    flags: Flags;
+  };
+
+/.
+  SomeEnum is a 32 bits or 64 bits value
+  
+  in example abowe the value of SomeEnum is: 0b00000000_00000000_00000000_00000100 in bits
+  
+  in MyRecord we could say:
+  
+  MyRecord.flags.One   := True;
+  MyRecord.flags.Three := True;
+  MyRecord.flags.Five  := True;
+  
+  which would by equal to: 0b00010101 in bits set to 1
+
+./
+
+end.
