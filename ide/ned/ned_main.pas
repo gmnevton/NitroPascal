@@ -14,6 +14,7 @@ uses
   SysUtils,
   Classes,
   Controls,
+  StdCtrls,
   ExtCtrls,
   Forms,
   Menus,
@@ -24,22 +25,22 @@ uses
   UCL.CaptionBar,
   UCL.ScrollBox,
   UCL.ItemButton,
-  UCL.SymbolButton, 
-  UCL.QuickButton, 
-  UCL.Separator, 
-  SynEditHighlighter, 
-  SynHighlighterGeneral, 
-  SynEdit, Vcl.WinXCtrls;
+  UCL.SymbolButton,
+  UCL.QuickButton,
+  UCL.Separator,
+  UCL.PopupMenu,
+  UCL.Text,
+  UCL.Slider,
+  SynEditHighlighter,
+  SynHighlighterGeneral,
+  SynEdit, UCL.ProgressBar, UCL.HyperLink;
 
 type
   TNEDMainForm = class(TUForm)
-    UThemeManager1: TUThemeManager;
     UCaptionBar1: TUCaptionBar;
     UPanel1: TUPanel;
     UPanel2: TUPanel;
     UPanel3: TUPanel;
-    UPanel4: TUPanel;
-    UScrollBox1: TUScrollBox;
     btnClose: TUQuickButton;
     btnMax: TUQuickButton;
     btnMin: TUQuickButton;
@@ -123,14 +124,34 @@ type
     UQuickButton8: TUQuickButton;
     UQuickButton9: TUQuickButton;
     USeparator2: TUSeparator;
-    USymbolButton1: TUSymbolButton;
-    USymbolButton2: TUSymbolButton;
-    SynGeneralSyn1: TSynGeneralSyn;
-    GridPanel1: TGridPanel;
-    SynEdit1: TSynEdit;
-    GridPanel2: TGridPanel;
-    SynEdit2: TSynEdit;
+    txtFilePath: TUText;
+    UPopupMenu1: TUPopupMenu;
+    sliFileZoom: TUSlider;
+    USeparator3: TUSeparator;
+    btnFileZoomIn: TUQuickButton;
+    btnFileZoomOut: TUQuickButton;
+    txtFileEncoding: TUText;
+    USeparator4: TUSeparator;
+    txtFileLineBreaks: TUText;
+    USeparator5: TUSeparator;
+    txtFileEditMode: TUText;
+    USeparator6: TUSeparator;
+    txtFileEditPosition: TUText;
+    barStatus: TUProgressBar;
+    sepStatus: TUSeparator;
+    txtStatus: TUText;
+    UHyperLink1: TUHyperLink;
+    //
     procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure FormCanResize(Sender: TObject; var NewWidth, NewHeight: Integer; var Resize: Boolean);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormKeyPress(Sender: TObject; var Key: Char);
+    procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormResize(Sender: TObject);
   private
   public
   end;
@@ -145,6 +166,58 @@ implementation
 procedure TNEDMainForm.FormCreate(Sender: TObject);
 begin
   CaptionBar := UCaptionBar1;
+  //
+  txtFilePath.Caption := '---';
+  txtFileEncoding.Caption := '---';
+  txtFileLineBreaks.Caption := '---';
+  txtFileEditMode.Caption := '---';
+  txtFileEditPosition.Caption := '---';
+end;
+
+procedure TNEDMainForm.FormDestroy(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormShow(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormCanResize(Sender: TObject; var NewWidth, NewHeight: Integer; var Resize: Boolean);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormKeyPress(Sender: TObject; var Key: Char);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+//
+end;
+
+procedure TNEDMainForm.FormResize(Sender: TObject);
+begin
+//
 end;
 
 end.
+
