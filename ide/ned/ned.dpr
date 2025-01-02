@@ -1,3 +1,11 @@
+//
+// Nitro EDitor
+// version 1.0
+//
+// Author: Grzegorz Molenda
+// Created: 2024-12-27
+//
+
 program ned;
 
 uses

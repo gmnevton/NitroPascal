@@ -27,7 +27,7 @@ A typical compiler consists of key components such as:
 - source code parser (TNPCSourceParser) wich contains:  
   - lexical analyser (TNPCLexer and TNPCTokenizer),  
   - syntax analyser (TNPCTokensParser),  
-  - semantic analyser (TNPCASTGenerator and TNPCTypeChecker),  
+  - semantic analyser (generating AST and type checking),  
 - intermediate code generator (TNPCINTGenerator),  
 - code optimiser (TNPCOptimization),  
 - byte code generator (TNPCBYTEGenerator).  
@@ -44,7 +44,7 @@ Stages completed/under development:
             |?| - repeat statement,  
             | | - goto statement,  
             | | - with statement,  
-| |( 50%) - semantic analyser,  
+|?|( 50%) - semantic analyser,  
 | |( 67%) - intermediate code generator,  
 | |( 84%) - code optimiser,  
 | |(100%) - byte code generator.  
@@ -278,7 +278,7 @@ MyExample(var C: String) {
   var i: Int32;
   // procedure/function instructions
   C:='';
-  for i :=0 to i_max - 1 {
+  for i := 0; i < i_max - 1; i += 1 {
     C:=C + IntToStr(i) + ' ';
   }
 };
@@ -290,7 +290,7 @@ MyExample(var C: String) {
   const i_max: Int32 = 123_456_789;
   // procedure/function instructions with inlined var declaration
   C:='';
-  for var i: Int32 := 0 to i_max - 1 {
+  for var i: Int32 = 0; i < i_max - 1; i += 1 {
     C:=C + IntToStr(i) + ' ';
   }
 };
