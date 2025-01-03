@@ -2,9 +2,11 @@ object NEDMainForm: TNEDMainForm
   Left = 0
   Top = 0
   Caption = 'NED'
-  ClientHeight = 800
-  ClientWidth = 1200
+  ClientHeight = 561
+  ClientWidth = 884
   Color = clBtnFace
+  Constraints.MinHeight = 600
+  Constraints.MinWidth = 900
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -25,10 +27,23 @@ object NEDMainForm: TNEDMainForm
   OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
-  object UCaptionBar1: TUCaptionBar
+  object splLeft: TSplitterEx
+    Left = 245
+    Top = 40
+    Width = 7
+    Height = 489
+    AssignedControl = pnlLeft
+    AutoSnap = False
+    DrawSpacer = True
+    MinSize = 200
+    ResizeStyle = rsUpdate
+    ExplicitLeft = 230
+    ExplicitHeight = 728
+  end
+  object barCaption: TUCaptionBar
     Left = 0
     Top = 0
-    Width = 1200
+    Width = 884
     Height = 40
     Caption = '                  Nitro EDitor'
     DoubleBuffered = True
@@ -40,7 +55,7 @@ object NEDMainForm: TNEDMainForm
     BackColors.DarkColor = 2829099
     BackColors.FocusedLightColor = 14120960
     BackColors.FocusedDarkColor = 1525760
-    Menu = MainMenu1
+    Menu = mnuMain
     MenuController.ButtonWidth = 54
     MenuController.ButtonHeight = 40
     MenuController.PosX = 180
@@ -85,8 +100,9 @@ object NEDMainForm: TNEDMainForm
     MenuOffset = 180
     UseSystemCaptionColor = True
     CaptionHeight = 40
+    ExplicitWidth = 1200
     object btnClose: TUQuickButton
-      Left = 1155
+      Left = 839
       Top = 0
       Height = 40
       Align = alRight
@@ -107,7 +123,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 32
     end
     object btnMax: TUQuickButton
-      Left = 1110
+      Left = 794
       Top = 0
       Height = 40
       Align = alCustom
@@ -122,6 +138,7 @@ object NEDMainForm: TNEDMainForm
       BackColors.LightColor = 13619151
       BackColors.DarkColor = 3947580
       ButtonStyle = qbsMax
+      StickAlign = alRight
       StickToControl = btnClose
       Caption = #59683
       ExplicitLeft = 640
@@ -129,7 +146,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 32
     end
     object btnMin: TUQuickButton
-      Left = 1065
+      Left = 749
       Top = 0
       Height = 40
       Align = alCustom
@@ -144,6 +161,7 @@ object NEDMainForm: TNEDMainForm
       BackColors.LightColor = 13619151
       BackColors.DarkColor = 3947580
       ButtonStyle = qbsMin
+      StickAlign = alRight
       StickToControl = btnMax
       Caption = #57608
       ExplicitLeft = 1030
@@ -160,6 +178,7 @@ object NEDMainForm: TNEDMainForm
       Font.Name = 'Segoe MDL2 Assets'
       Font.Style = []
       ParentFont = False
+      OnClick = UQuickButton6Click
       BackColors.Enabled = False
       BackColors.Color = clBlack
       BackColors.LightColor = 13619151
@@ -171,11 +190,11 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 32
     end
   end
-  object UPanel1: TUPanel
+  object pnlShortCuts: TUPanel
     Left = 0
     Top = 40
     Width = 45
-    Height = 728
+    Height = 489
     Align = alLeft
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
@@ -189,7 +208,7 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitHeight = 720
+    ExplicitHeight = 728
     object USeparator2: TUSeparator
       Left = 0
       Top = 120
@@ -216,7 +235,7 @@ object NEDMainForm: TNEDMainForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      object UQuickButton1: TUQuickButton
+      object btnDebugRun: TUQuickButton
         Left = 0
         Top = 0
         Height = 40
@@ -234,7 +253,7 @@ object NEDMainForm: TNEDMainForm
         ButtonStyle = qbsNone
         Caption = #59240
       end
-      object UQuickButton2: TUQuickButton
+      object btnDebugPause: TUQuickButton
         Left = 0
         Top = 40
         Height = 40
@@ -252,7 +271,7 @@ object NEDMainForm: TNEDMainForm
         ButtonStyle = qbsNone
         Caption = #59241
       end
-      object UQuickButton3: TUQuickButton
+      object btnDebugStop: TUQuickButton
         Left = 0
         Top = 80
         Height = 40
@@ -280,7 +299,7 @@ object NEDMainForm: TNEDMainForm
         ExplicitTop = 135
         ExplicitWidth = 305
       end
-      object UQuickButton4: TUQuickButton
+      object btnDebugStepOver: TUQuickButton
         Left = 0
         Top = 140
         Height = 40
@@ -298,7 +317,7 @@ object NEDMainForm: TNEDMainForm
         ButtonStyle = qbsNone
         Caption = #59539
       end
-      object UQuickButton5: TUQuickButton
+      object btnDebugStepInto: TUQuickButton
         Left = 0
         Top = 180
         Height = 40
@@ -335,10 +354,11 @@ object NEDMainForm: TNEDMainForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      object UQuickButton7: TUQuickButton
+      object btnHome: TUQuickButton
         Left = 0
         Top = 0
         Height = 40
+        Hint = 'Start page'
         Align = alTop
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -353,10 +373,11 @@ object NEDMainForm: TNEDMainForm
         ButtonStyle = qbsNone
         Caption = #57615
       end
-      object UQuickButton8: TUQuickButton
+      object btnProject: TUQuickButton
         Left = 0
         Top = 40
         Height = 40
+        Hint = 'Project'
         Align = alTop
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -369,12 +390,13 @@ object NEDMainForm: TNEDMainForm
         BackColors.LightColor = 13619151
         BackColors.DarkColor = 3947580
         ButtonStyle = qbsNone
-        Caption = #57615
+        Caption = #60358
       end
-      object UQuickButton9: TUQuickButton
+      object btnSearch: TUQuickButton
         Left = 0
         Top = 80
         Height = 40
+        Hint = 'Search'
         Align = alTop
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -387,14 +409,14 @@ object NEDMainForm: TNEDMainForm
         BackColors.LightColor = 13619151
         BackColors.DarkColor = 3947580
         ButtonStyle = qbsNone
-        Caption = #57615
+        Caption = #63371
       end
     end
   end
-  object UPanel2: TUPanel
+  object pnlStatus: TUPanel
     Left = 0
-    Top = 768
-    Width = 1200
+    Top = 529
+    Width = 884
     Height = 32
     Align = alBottom
     FullRepaint = False
@@ -410,6 +432,8 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = 10444863
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 10444863
+    ExplicitTop = 768
+    ExplicitWidth = 1200
     object txtFilePath: TUText
       AlignWithMargins = True
       Left = 8
@@ -429,7 +453,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitTop = 3
       ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
@@ -443,7 +466,7 @@ object NEDMainForm: TNEDMainForm
     end
     object btnFileZoomIn: TUQuickButton
       AlignWithMargins = True
-      Left = 1079
+      Left = 763
       Top = 0
       Margins.Left = 0
       Margins.Top = 0
@@ -465,7 +488,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitLeft = 1151
     end
     object btnFileZoomOut: TUQuickButton
-      Left = 826
+      Left = 510
       Top = 0
       Align = alRight
       Font.Charset = DEFAULT_CHARSET
@@ -622,7 +645,7 @@ object NEDMainForm: TNEDMainForm
     end
     object UHyperLink1: TUHyperLink
       AlignWithMargins = True
-      Left = 1140
+      Left = 824
       Top = 4
       Width = 52
       Height = 24
@@ -633,7 +656,7 @@ object NEDMainForm: TNEDMainForm
       Align = alRight
       Caption = 'NED v. 1.0'
       Font.Charset = DEFAULT_CHARSET
-      Font.Color = 10549416
+      Font.Color = 6318152
       Font.Height = -11
       Font.Name = 'Tahoma'
       Font.Style = []
@@ -652,11 +675,12 @@ object NEDMainForm: TNEDMainForm
       TextColors.DarkDisabled = clGray
       TextColors.DarkFocused = 14120960
       URL = 'https://github.com/gmnevton/NitroPascal/tree/main/ide/ned'
+      ExplicitLeft = 1140
       ExplicitHeight = 13
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True
-      Left = 875
+      Left = 559
       Top = 0
       Width = 200
       Height = 32
@@ -692,20 +716,19 @@ object NEDMainForm: TNEDMainForm
       Min = 50
       Max = 250
       Value = 100
-      ExplicitLeft = 943
-      ExplicitTop = 3
+      ExplicitLeft = 875
     end
     object barStatus: TUProgressBar
       AlignWithMargins = True
       Left = 387
       Top = 12
-      Width = 200
+      Width = 123
       Height = 8
       Margins.Left = 8
       Margins.Top = 12
       Margins.Right = 0
       Margins.Bottom = 12
-      Align = alLeft
+      Align = alClient
       TabOrder = 1
       Visible = False
       AniSet.AniKind = akOut
@@ -723,15 +746,14 @@ object NEDMainForm: TNEDMainForm
       FillColor.DarkColor = 3355443
       Value = 0
       Orientation = oHorizontal
-      ExplicitLeft = 676
-      ExplicitTop = 15
+      ExplicitWidth = 200
     end
   end
-  object UPanel3: TUPanel
-    Left = 230
+  object pnlWorkSpace: TUPanel
+    Left = 252
     Top = 40
-    Width = 970
-    Height = 728
+    Width = 632
+    Height = 489
     Align = alClient
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
@@ -745,13 +767,16 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitHeight = 720
+    ExplicitLeft = 502
+    ExplicitTop = 104
+    ExplicitWidth = 970
+    ExplicitHeight = 728
   end
-  object UPanel6: TUPanel
+  object pnlLeft: TUPanel
     Left = 45
     Top = 40
-    Width = 185
-    Height = 728
+    Width = 200
+    Height = 489
     Align = alLeft
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
@@ -761,17 +786,74 @@ object NEDMainForm: TNEDMainForm
     ParentFont = False
     ShowCaption = False
     TabOrder = 4
-    Visible = False
     BackColor.Enabled = False
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitHeight = 720
-    object UScrollBox2: TUScrollBox
+    ExplicitHeight = 728
+    object boxSearch: TUScrollBox
       Left = 0
       Top = 0
-      Width = 185
-      Height = 728
+      Width = 200
+      Height = 489
+      HorzScrollBar.Tracking = True
+      VertScrollBar.Tracking = True
+      Align = alClient
+      BevelEdges = []
+      BevelInner = bvNone
+      BevelOuter = bvNone
+      Color = 2039583
+      ParentColor = False
+      TabOrder = 1
+      StyleElements = []
+      BackColor.Enabled = False
+      BackColor.Color = clBlack
+      BackColor.LightColor = 15132390
+      BackColor.DarkColor = 2039583
+      ExplicitLeft = 81
+      ExplicitTop = 22
+      ExplicitWidth = 185
+      ExplicitHeight = 382
+      object barSearch: TUTitleBar
+        Left = 0
+        Top = 0
+        Width = 200
+        Height = 24
+        Align = alTop
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWhite
+        Font.Height = -11
+        Font.Name = 'Tahoma'
+        Font.Style = []
+        ParentFont = False
+        DragMovement = False
+        EnableSystemMenu = False
+        Caption = 'Search'
+        ExplicitWidth = 185
+      end
+      object vstSearch: TVirtualStringTree
+        Left = 0
+        Top = 24
+        Width = 200
+        Height = 465
+        Align = alClient
+        BevelInner = bvNone
+        BevelOuter = bvNone
+        BorderStyle = bsNone
+        Header.AutoSizeIndex = 0
+        Header.MainColumn = -1
+        ParentColor = True
+        TabOrder = 1
+        ExplicitWidth = 185
+        ExplicitHeight = 704
+        Columns = <>
+      end
+    end
+    object boxProject: TUScrollBox
+      Left = 0
+      Top = 0
+      Width = 200
+      Height = 489
       HorzScrollBar.Tracking = True
       VertScrollBar.Tracking = True
       Align = alClient
@@ -786,721 +868,49 @@ object NEDMainForm: TNEDMainForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      ExplicitHeight = 720
-      object UItemButton1: TUItemButton
+      ExplicitLeft = 27
+      ExplicitTop = 280
+      ExplicitWidth = 185
+      ExplicitHeight = 382
+      object barProject: TUTitleBar
         Left = 0
         Top = 0
-        Width = 185
+        Width = 200
+        Height = 24
         Align = alTop
-        DragCursor = crDefault
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWhite
+        Font.Height = -11
+        Font.Name = 'Tahoma'
+        Font.Style = []
+        ParentFont = False
+        DragMovement = False
+        EnableSystemMenu = False
+        Caption = 'Project'
+        ExplicitWidth = 185
+      end
+      object vstProject: TVirtualStringTree
+        Left = 0
+        Top = 24
+        Width = 200
+        Height = 465
+        Align = alClient
+        BevelInner = bvNone
+        BevelOuter = bvNone
+        BorderStyle = bsNone
+        Header.AutoSizeIndex = 0
+        Header.MainColumn = -1
+        ParentColor = True
         TabOrder = 1
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-      end
-      object UItemButton2: TUItemButton
-        Left = 0
-        Top = 40
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 2
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton2'
-      end
-      object UItemButton3: TUItemButton
-        Left = 0
-        Top = 80
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 3
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton3'
-      end
-      object UItemButton4: TUItemButton
-        Left = 0
-        Top = 120
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 4
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton4'
-      end
-      object UItemButton5: TUItemButton
-        Left = 0
-        Top = 160
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 5
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton5'
-      end
-      object UItemButton6: TUItemButton
-        Left = 0
-        Top = 200
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 6
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton6'
-      end
-      object UItemButton7: TUItemButton
-        Left = 0
-        Top = 240
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 7
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton7'
-      end
-      object UItemButton8: TUItemButton
-        Left = 0
-        Top = 280
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 8
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton8'
-      end
-      object UItemButton9: TUItemButton
-        Left = 0
-        Top = 320
-        Width = 185
-        Align = alTop
-        DragCursor = crDefault
-        TabOrder = 9
-        CustomColors.BackColors.Enabled = False
-        CustomColors.BackColors.LightColor = 13421772
-        CustomColors.BackColors.LightHover = 13421772
-        CustomColors.BackColors.LightPress = 10066329
-        CustomColors.BackColors.LightDisabled = 13421772
-        CustomColors.BackColors.LightFocused = 13421772
-        CustomColors.BackColors.DarkColor = 3355443
-        CustomColors.BackColors.DarkHover = 3355443
-        CustomColors.BackColors.DarkPress = 6710886
-        CustomColors.BackColors.DarkDisabled = 3355443
-        CustomColors.BackColors.DarkFocused = 3355443
-        CustomColors.BorderColors.Enabled = False
-        CustomColors.BorderColors.LightColor = 13421772
-        CustomColors.BorderColors.LightHover = 11184810
-        CustomColors.BorderColors.LightPress = 10066329
-        CustomColors.BorderColors.LightDisabled = 8026746
-        CustomColors.BorderColors.LightFocused = 11184810
-        CustomColors.BorderColors.DarkColor = 3355443
-        CustomColors.BorderColors.DarkHover = 11184810
-        CustomColors.BorderColors.DarkPress = 6710886
-        CustomColors.BorderColors.DarkDisabled = 8750469
-        CustomColors.BorderColors.DarkFocused = 11184810
-        CustomColors.TextColors.Enabled = False
-        CustomColors.TextColors.LightColor = clBlack
-        CustomColors.TextColors.LightHover = clBlack
-        CustomColors.TextColors.LightPress = clBlack
-        CustomColors.TextColors.LightDisabled = clGray
-        CustomColors.TextColors.LightFocused = clBlack
-        CustomColors.TextColors.DarkColor = clWhite
-        CustomColors.TextColors.DarkHover = clWhite
-        CustomColors.TextColors.DarkPress = clWhite
-        CustomColors.TextColors.DarkDisabled = clGray
-        CustomColors.TextColors.DarkFocused = clWhite
-        CustomColors.DetailColors.Enabled = False
-        CustomColors.DetailColors.LightColor = clGray
-        CustomColors.DetailColors.LightHover = clSilver
-        CustomColors.DetailColors.LightPress = clSilver
-        CustomColors.DetailColors.LightDisabled = clSilver
-        CustomColors.DetailColors.LightFocused = clSilver
-        CustomColors.DetailColors.DarkColor = 3355443
-        CustomColors.DetailColors.DarkHover = 3355443
-        CustomColors.DetailColors.DarkPress = 6710886
-        CustomColors.DetailColors.DarkDisabled = 3355443
-        CustomColors.DetailColors.DarkFocused = 3355443
-        CustomColors.ActiveColors.Enabled = False
-        CustomColors.ActiveColors.LightColor = 13421772
-        CustomColors.ActiveColors.LightHover = 13421772
-        CustomColors.ActiveColors.LightPress = 10066329
-        CustomColors.ActiveColors.LightDisabled = 13421772
-        CustomColors.ActiveColors.LightFocused = 13421772
-        CustomColors.ActiveColors.DarkColor = 3355443
-        CustomColors.ActiveColors.DarkHover = 3355443
-        CustomColors.ActiveColors.DarkPress = 6710886
-        CustomColors.ActiveColors.DarkDisabled = 3355443
-        CustomColors.ActiveColors.DarkFocused = 3355443
-        IconFont.Charset = DEFAULT_CHARSET
-        IconFont.Color = clWindowText
-        IconFont.Height = -20
-        IconFont.Name = 'Segoe MDL2 Assets'
-        IconFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        ObjectsVisible = [iokNone, iokLeftIcon, iokText]
-        LeftIcon = #57759
-        Text = 'Text'
-        Detail = 'Detail'
-        RightIcon = #59198
-        Caption = 'UItemButton9'
+        ExplicitWidth = 185
+        ExplicitHeight = 704
+        Columns = <>
       end
     end
   end
-  object MainMenu1: TMainMenu
-    Left = 777
+  object mnuMain: TMainMenu
+    Left = 289
+    Top = 56
     object File1: TMenuItem
       AutoHotkeys = maManual
       Caption = 'File'
@@ -1696,13 +1106,5 @@ object NEDMainForm: TNEDMainForm
         Caption = 'About NED...'
       end
     end
-  end
-  object UPopupMenu1: TUPopupMenu
-    AniSet.AniKind = akOut
-    AniSet.AniFunctionKind = afkQuartic
-    AniSet.DelayStartTime = 0
-    AniSet.Duration = 120
-    AniSet.Step = 20
-    Left = 870
   end
 end

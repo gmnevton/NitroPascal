@@ -110,7 +110,11 @@
             <Form>NEDMainForm</Form>
         </DCCReference>
         <DCCReference Include="ned_source_editor.pas">
-            <Form>Form1</Form>
+            <Form>NEDEditorForm</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="ned_home_page.pas">
+            <Form>NEDHomeForm</Form>
             <FormType>dfm</FormType>
         </DCCReference>
         <BuildConfiguration Include="Release">

@@ -1,6 +1,7 @@
-object Form1: TForm1
+object NEDEditorForm: TNEDEditorForm
   Left = 0
   Top = 0
+  BorderIcons = []
   BorderStyle = bsNone
   ClientHeight = 800
   ClientWidth = 600
@@ -10,6 +11,7 @@ object Form1: TForm1
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
+  KeyPreview = True
   OldCreateOrder = False
   PixelsPerInch = 96
   TextHeight = 13
@@ -320,9 +322,6 @@ object Form1: TForm1
     RightEdge = 128
     RightEdgeColor = clYellow
     SelectedColor.Alpha = 0.400000005960464500
-    ExplicitLeft = 48
-    ExplicitTop = 320
-    ExplicitHeight = 800
   end
   object UPanel4: TUPanel
     Left = 0
@@ -342,8 +341,6 @@ object Form1: TForm1
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = -370
-    ExplicitWidth = 970
     object UScrollBox1: TUScrollBox
       Left = 0
       Top = 0
@@ -366,7 +363,6 @@ object Form1: TForm1
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
       ScrollOrientation = oHorizontal
-      ExplicitWidth = 970
       object USymbolButton1: TUSymbolButton
         Left = 0
         Top = 0
@@ -388,7 +384,29 @@ object Form1: TForm1
         Detail = 'FileType'
         IsToggleButton = True
         KeepOrginalColor = False
-        ExplicitLeft = 152
+      end
+      object USymbolButton2: TUSymbolButton
+        Left = 250
+        Top = 0
+        Align = alLeft
+        ParentColor = False
+        TabOrder = 2
+        SymbolFont.Charset = DEFAULT_CHARSET
+        SymbolFont.Color = clWindowText
+        SymbolFont.Height = -16
+        SymbolFont.Name = 'Segoe MDL2 Assets'
+        SymbolFont.Style = []
+        DetailFont.Charset = DEFAULT_CHARSET
+        DetailFont.Color = clWindowText
+        DetailFont.Height = -11
+        DetailFont.Name = 'Tahoma'
+        DetailFont.Style = []
+        SymbolChar = #59715
+        Text = 'FileName'
+        Detail = 'FileType'
+        IsToggleButton = True
+        KeepOrginalColor = False
+        ExplicitLeft = 296
         ExplicitTop = 3
       end
     end
@@ -476,6 +494,15 @@ object Form1: TForm1
     StringAttri.Foreground = clAqua
     SymbolAttri.Foreground = clWhite
     Left = 343
+    Top = 16
+  end
+  object UPopupMenu1: TUPopupMenu
+    AniSet.AniKind = akOut
+    AniSet.AniFunctionKind = afkQuartic
+    AniSet.DelayStartTime = 0
+    AniSet.Duration = 120
+    AniSet.Step = 20
+    Left = 430
     Top = 16
   end
 end

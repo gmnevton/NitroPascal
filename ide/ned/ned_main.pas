@@ -28,23 +28,27 @@ uses
   UCL.SymbolButton,
   UCL.QuickButton,
   UCL.Separator,
-  UCL.PopupMenu,
   UCL.Text,
   UCL.Slider,
+  UCL.ProgressBar,
+  UCL.HyperLink,
+  UCL.TitleBar,
   SynEditHighlighter,
   SynHighlighterGeneral,
-  SynEdit, UCL.ProgressBar, UCL.HyperLink;
+  SynEdit,
+  VirtualTrees,
+  SplitEx;
 
 type
   TNEDMainForm = class(TUForm)
-    UCaptionBar1: TUCaptionBar;
-    UPanel1: TUPanel;
-    UPanel2: TUPanel;
-    UPanel3: TUPanel;
+    barCaption: TUCaptionBar;
+    pnlShortCuts: TUPanel;
+    pnlStatus: TUPanel;
+    pnlWorkSpace: TUPanel;
     btnClose: TUQuickButton;
     btnMax: TUQuickButton;
     btnMin: TUQuickButton;
-    MainMenu1: TMainMenu;
+    mnuMain: TMainMenu;
     File1: TMenuItem;
     UQuickButton6: TUQuickButton;
     New1: TMenuItem;
@@ -101,31 +105,21 @@ type
     NEDprojectwebsite1: TMenuItem;
     NitroPascalwebsite1: TMenuItem;
     N9: TMenuItem;
-    UPanel6: TUPanel;
-    UScrollBox2: TUScrollBox;
-    UItemButton1: TUItemButton;
-    UItemButton2: TUItemButton;
-    UItemButton3: TUItemButton;
-    UItemButton4: TUItemButton;
-    UItemButton5: TUItemButton;
-    UItemButton6: TUItemButton;
-    UItemButton7: TUItemButton;
-    UItemButton8: TUItemButton;
-    UItemButton9: TUItemButton;
+    pnlLeft: TUPanel;
+    boxProject: TUScrollBox;
     UPanel5: TUPanel;
-    UQuickButton1: TUQuickButton;
-    UQuickButton2: TUQuickButton;
-    UQuickButton3: TUQuickButton;
+    btnDebugRun: TUQuickButton;
+    btnDebugPause: TUQuickButton;
+    btnDebugStop: TUQuickButton;
     USeparator1: TUSeparator;
-    UQuickButton4: TUQuickButton;
-    UQuickButton5: TUQuickButton;
+    btnDebugStepOver: TUQuickButton;
+    btnDebugStepInto: TUQuickButton;
     UPanel7: TUPanel;
-    UQuickButton7: TUQuickButton;
-    UQuickButton8: TUQuickButton;
-    UQuickButton9: TUQuickButton;
+    btnHome: TUQuickButton;
+    btnProject: TUQuickButton;
+    btnSearch: TUQuickButton;
     USeparator2: TUSeparator;
     txtFilePath: TUText;
-    UPopupMenu1: TUPopupMenu;
     sliFileZoom: TUSlider;
     USeparator3: TUSeparator;
     btnFileZoomIn: TUQuickButton;
@@ -141,6 +135,12 @@ type
     sepStatus: TUSeparator;
     txtStatus: TUText;
     UHyperLink1: TUHyperLink;
+    barProject: TUTitleBar;
+    vstProject: TVirtualStringTree;
+    boxSearch: TUScrollBox;
+    barSearch: TUTitleBar;
+    vstSearch: TVirtualStringTree;
+    splLeft: TSplitterEx;
     //
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -152,6 +152,7 @@ type
     procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormResize(Sender: TObject);
+    procedure UQuickButton6Click(Sender: TObject);
   private
   public
   end;
@@ -163,25 +164,42 @@ implementation
 
 {$R *.dfm}
 
+uses
+  ned_home_page,
+  ned_source_editor;
+
+var
+  NEDHomeForm: TNEDHomeForm;
+//  NEDEditorForm: TNEDEditorForm;
+
 procedure TNEDMainForm.FormCreate(Sender: TObject);
 begin
-  CaptionBar := UCaptionBar1;
+  CaptionBar := barCaption;
+  //
+  NEDHomeForm := TNEDHomeForm.Create(Self);
+  NEDHomeForm.Parent := pnlWorkSpace;
+  NEDHomeForm.Align := alClient;
   //
   txtFilePath.Caption := '---';
   txtFileEncoding.Caption := '---';
   txtFileLineBreaks.Caption := '---';
   txtFileEditMode.Caption := '---';
   txtFileEditPosition.Caption := '---';
+  //
+  pnlLeft.Visible := False;
+  splLeft.Visible := False;
+  boxProject.BringToFront;
+  //
 end;
 
 procedure TNEDMainForm.FormDestroy(Sender: TObject);
 begin
-//
+  NEDHomeForm.Free;
 end;
 
 procedure TNEDMainForm.FormShow(Sender: TObject);
 begin
-//
+  NEDHomeForm.Show;
 end;
 
 procedure TNEDMainForm.FormCanResize(Sender: TObject; var NewWidth, NewHeight: Integer; var Resize: Boolean);
@@ -217,6 +235,18 @@ end;
 procedure TNEDMainForm.FormResize(Sender: TObject);
 begin
 //
+end;
+
+procedure TNEDMainForm.UQuickButton6Click(Sender: TObject);
+begin
+  if pnlLeft.Visible then begin
+    pnlLeft.Visible := False;
+    splLeft.Visible := False;
+  end
+  else begin
+    splLeft.Visible := True;
+    pnlLeft.Visible := True;
+  end;
 end;
 
 end.
