@@ -17,7 +17,10 @@ uses
   UCL.ScrollBox,
   UCL.CheckBox,
   UCL.SymbolButton,
-  UCL.ItemButton, UCL.RadioButton, UCL.Button, UCL.Panel;
+  UCL.ItemButton,
+  UCL.RadioButton,
+  UCL.Button,
+  UCL.Panel;
 
 type
   TNEDHomeForm = class(TUForm)
@@ -44,6 +47,7 @@ type
     UText4: TUText;
     UScrollBox2: TUScrollBox;
     UItemButton2: TUItemButton;
+    UHyperLink4: TUHyperLink;
   private
   public
   end;

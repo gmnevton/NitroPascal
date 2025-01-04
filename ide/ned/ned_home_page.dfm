@@ -71,6 +71,7 @@ object NEDHomeForm: TNEDHomeForm
     TextColors.DarkDisabled = clGray
     TextColors.DarkFocused = 14120960
     OpenLink = False
+    URL = 'https://embarcadero.com/'
   end
   object UHyperLink2: TUHyperLink
     Left = 40
@@ -96,6 +97,7 @@ object NEDHomeForm: TNEDHomeForm
     TextColors.DarkDisabled = clGray
     TextColors.DarkFocused = 14120960
     OpenLink = False
+    URL = 'https://embarcadero.com/'
   end
   object UHyperLink3: TUHyperLink
     Left = 40
@@ -121,6 +123,7 @@ object NEDHomeForm: TNEDHomeForm
     TextColors.DarkDisabled = clGray
     TextColors.DarkFocused = 14120960
     OpenLink = False
+    URL = 'https://embarcadero.com/'
   end
   object UText5: TUText
     Left = 40
@@ -149,6 +152,39 @@ object NEDHomeForm: TNEDHomeForm
     Font.Style = []
     ParentFont = False
     TextKind = tkEntry
+  end
+  object UHyperLink4: TUHyperLink
+    AlignWithMargins = True
+    Left = 1104
+    Top = 20
+    Width = 52
+    Height = 13
+    Margins.Left = 8
+    Margins.Top = 4
+    Margins.Right = 8
+    Margins.Bottom = 4
+    Anchors = [akTop, akRight]
+    Caption = 'NED v. 1.0'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = 6318152
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+    Transparent = True
+    Layout = tlCenter
+    TextColors.Enabled = True
+    TextColors.LightColor = 10549416
+    TextColors.LightHover = clBlue
+    TextColors.LightPress = clMedGray
+    TextColors.LightDisabled = clGray
+    TextColors.LightFocused = 14120960
+    TextColors.DarkColor = 10549416
+    TextColors.DarkHover = clBlue
+    TextColors.DarkPress = clMedGray
+    TextColors.DarkDisabled = clGray
+    TextColors.DarkFocused = 14120960
+    URL = 'https://github.com/gmnevton/NitroPascal/tree/main/ide/ned'
   end
   object UCheckBox1: TUCheckBox
     Left = 40
@@ -363,6 +399,8 @@ object NEDHomeForm: TNEDHomeForm
       Font.Height = -11
       Font.Name = 'Tahoma'
       Font.Style = []
+      ParentBackground = True
+      ParentColor = True
       ParentFont = False
       ShowCaption = False
       TabOrder = 0
@@ -370,9 +408,6 @@ object NEDHomeForm: TNEDHomeForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      ExplicitLeft = 8
-      ExplicitWidth = 403
-      ExplicitHeight = 572
       object UText3: TUText
         AlignWithMargins = True
         Left = 0
@@ -392,8 +427,6 @@ object NEDHomeForm: TNEDHomeForm
         Font.Style = []
         ParentFont = False
         TextKind = tkHeading
-        ExplicitLeft = -217
-        ExplicitTop = 1
         ExplicitWidth = 107
       end
       object UScrollBox1: TUScrollBox
@@ -415,10 +448,6 @@ object NEDHomeForm: TNEDHomeForm
         BackColor.Color = clBlack
         BackColor.LightColor = 15132390
         BackColor.DarkColor = 2039583
-        ExplicitLeft = 51
-        ExplicitTop = -78
-        ExplicitWidth = 304
-        ExplicitHeight = 119
         object UItemButton1: TUItemButton
           Left = 0
           Top = 0
@@ -496,9 +525,6 @@ object NEDHomeForm: TNEDHomeForm
           Detail = 'Detail'
           RightIcon = #59198
           Caption = 'UItemButton1'
-          ExplicitLeft = 48
-          ExplicitTop = 24
-          ExplicitWidth = 185
         end
       end
     end
@@ -519,6 +545,8 @@ object NEDHomeForm: TNEDHomeForm
       Font.Height = -11
       Font.Name = 'Tahoma'
       Font.Style = []
+      ParentBackground = True
+      ParentColor = True
       ParentFont = False
       ShowCaption = False
       TabOrder = 1
@@ -526,10 +554,6 @@ object NEDHomeForm: TNEDHomeForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      ExplicitLeft = 536
-      ExplicitTop = 136
-      ExplicitWidth = 185
-      ExplicitHeight = 41
       object UText4: TUText
         AlignWithMargins = True
         Left = 0
@@ -549,8 +573,6 @@ object NEDHomeForm: TNEDHomeForm
         Font.Style = []
         ParentFont = False
         TextKind = tkHeading
-        ExplicitLeft = 258
-        ExplicitTop = 96
         ExplicitWidth = 145
       end
       object UScrollBox2: TUScrollBox
@@ -572,10 +594,6 @@ object NEDHomeForm: TNEDHomeForm
         BackColor.Color = clBlack
         BackColor.LightColor = 15132390
         BackColor.DarkColor = 2039583
-        ExplicitLeft = 3
-        ExplicitTop = 109
-        ExplicitWidth = 400
-        ExplicitHeight = 463
         object UItemButton2: TUItemButton
           Left = 0
           Top = 0
@@ -653,7 +671,6 @@ object NEDHomeForm: TNEDHomeForm
           Detail = 'Detail'
           RightIcon = #59198
           Caption = 'UItemButton1'
-          ExplicitWidth = 400
         end
       end
     end

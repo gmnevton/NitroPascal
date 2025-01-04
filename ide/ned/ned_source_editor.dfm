@@ -4,7 +4,7 @@ object NEDEditorForm: TNEDEditorForm
   BorderIcons = []
   BorderStyle = bsNone
   ClientHeight = 800
-  ClientWidth = 600
+  ClientWidth = 1404
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,7 +18,7 @@ object NEDEditorForm: TNEDEditorForm
   object SynEdit1: TSynEdit
     Left = 0
     Top = 40
-    Width = 600
+    Width = 1404
     Height = 760
     Align = alClient
     Color = 2039583
@@ -31,6 +31,7 @@ object NEDEditorForm: TNEDEditorForm
     Font.Style = []
     Font.Quality = fqClearTypeNatural
     TabOrder = 0
+    CodeFolding.ShowCollapsedLine = True
     UseCodeFolding = False
     BorderStyle = bsNone
     Gutter.Color = 2039583
@@ -320,13 +321,14 @@ object NEDEditorForm: TNEDEditorForm
       'end.')
     Options = [eoAutoIndent, eoDisableScrollArrows, eoDragDropEditing, eoEnhanceHomeKey, eoEnhanceEndKey, eoGroupUndo, eoHideShowScrollbars, eoKeepCaretX, eoShowScrollHint, eoSmartTabDelete, eoTabIndent, eoTabsToSpaces, eoTrimTrailingSpaces, eoShowLigatures, eoCopyPlainText]
     RightEdge = 128
-    RightEdgeColor = clYellow
+    RightEdgeColor = 33023
     SelectedColor.Alpha = 0.400000005960464500
+    ExplicitWidth = 600
   end
   object UPanel4: TUPanel
     Left = 0
     Top = 0
-    Width = 600
+    Width = 1404
     Height = 40
     Align = alTop
     Font.Charset = DEFAULT_CHARSET
@@ -341,10 +343,11 @@ object NEDEditorForm: TNEDEditorForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
+    ExplicitWidth = 600
     object UScrollBox1: TUScrollBox
       Left = 0
       Top = 0
-      Width = 600
+      Width = 1404
       Height = 40
       HorzScrollBar.Tracking = True
       VertScrollBar.Tracking = True
@@ -363,6 +366,7 @@ object NEDEditorForm: TNEDEditorForm
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
       ScrollOrientation = oHorizontal
+      ExplicitWidth = 600
       object USymbolButton1: TUSymbolButton
         Left = 0
         Top = 0
@@ -406,8 +410,6 @@ object NEDEditorForm: TNEDEditorForm
         Detail = 'FileType'
         IsToggleButton = True
         KeepOrginalColor = False
-        ExplicitLeft = 296
-        ExplicitTop = 3
       end
     end
   end

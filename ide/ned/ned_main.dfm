@@ -100,7 +100,6 @@ object NEDMainForm: TNEDMainForm
     MenuOffset = 180
     UseSystemCaptionColor = True
     CaptionHeight = 40
-    ExplicitWidth = 1200
     object btnClose: TUQuickButton
       Left = 839
       Top = 0
@@ -167,7 +166,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitLeft = 1030
       ExplicitTop = -6
     end
-    object UQuickButton6: TUQuickButton
+    object btnShowHideToolbox: TUQuickButton
       Left = 0
       Top = 0
       Height = 40
@@ -178,7 +177,7 @@ object NEDMainForm: TNEDMainForm
       Font.Name = 'Segoe MDL2 Assets'
       Font.Style = []
       ParentFont = False
-      OnClick = UQuickButton6Click
+      OnClick = btnShowHideToolboxClick
       BackColors.Enabled = False
       BackColors.Color = clBlack
       BackColors.LightColor = 13619151
@@ -208,7 +207,6 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitHeight = 728
     object USeparator2: TUSeparator
       Left = 0
       Top = 120
@@ -366,6 +364,7 @@ object NEDMainForm: TNEDMainForm
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
+        OnClick = btnHomeClick
         BackColors.Enabled = False
         BackColors.Color = clBlack
         BackColors.LightColor = 13619151
@@ -432,8 +431,6 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = 10444863
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 10444863
-    ExplicitTop = 768
-    ExplicitWidth = 1200
     object txtFilePath: TUText
       AlignWithMargins = True
       Left = 8
@@ -463,48 +460,6 @@ object NEDMainForm: TNEDMainForm
       ExplicitLeft = 192
       ExplicitTop = 24
       ExplicitHeight = 50
-    end
-    object btnFileZoomIn: TUQuickButton
-      AlignWithMargins = True
-      Left = 763
-      Top = 0
-      Margins.Left = 0
-      Margins.Top = 0
-      Margins.Right = 8
-      Margins.Bottom = 0
-      Align = alRight
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -13
-      Font.Name = 'Segoe MDL2 Assets'
-      Font.Style = []
-      ParentFont = False
-      BackColors.Enabled = False
-      BackColors.Color = clBlack
-      BackColors.LightColor = 13619151
-      BackColors.DarkColor = 3947580
-      ButtonStyle = qbsNone
-      Caption = #59555
-      ExplicitLeft = 1151
-    end
-    object btnFileZoomOut: TUQuickButton
-      Left = 510
-      Top = 0
-      Align = alRight
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -13
-      Font.Name = 'Segoe MDL2 Assets'
-      Font.Style = []
-      ParentFont = False
-      BackColors.Enabled = False
-      BackColors.Color = clBlack
-      BackColors.LightColor = 13619151
-      BackColors.DarkColor = 3947580
-      ButtonStyle = qbsNone
-      Caption = #59167
-      ExplicitLeft = 864
-      ExplicitTop = 6
     end
     object txtFileEncoding: TUText
       AlignWithMargins = True
@@ -643,44 +598,81 @@ object NEDMainForm: TNEDMainForm
       Visible = False
       ExplicitHeight = 17
     end
-    object UHyperLink1: TUHyperLink
-      AlignWithMargins = True
-      Left = 824
-      Top = 4
-      Width = 52
-      Height = 24
-      Margins.Left = 8
-      Margins.Top = 4
-      Margins.Right = 8
-      Margins.Bottom = 4
+    object btnFileZoomOut: TUQuickButton
+      Left = 578
+      Top = 0
       Align = alRight
-      Caption = 'NED v. 1.0'
       Font.Charset = DEFAULT_CHARSET
-      Font.Color = 6318152
-      Font.Height = -11
-      Font.Name = 'Tahoma'
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe MDL2 Assets'
       Font.Style = []
       ParentFont = False
-      Transparent = True
-      Layout = tlCenter
-      TextColors.Enabled = True
-      TextColors.LightColor = 10549416
-      TextColors.LightHover = clBlue
-      TextColors.LightPress = clMedGray
-      TextColors.LightDisabled = clGray
-      TextColors.LightFocused = 14120960
-      TextColors.DarkColor = 10549416
-      TextColors.DarkHover = clBlue
-      TextColors.DarkPress = clMedGray
-      TextColors.DarkDisabled = clGray
-      TextColors.DarkFocused = 14120960
-      URL = 'https://github.com/gmnevton/NitroPascal/tree/main/ide/ned'
-      ExplicitLeft = 1140
-      ExplicitHeight = 13
+      BackColors.Enabled = False
+      BackColors.Color = clBlack
+      BackColors.LightColor = 13619151
+      BackColors.DarkColor = 3947580
+      ButtonStyle = qbsNone
+      Caption = #59167
+      ExplicitLeft = 864
+      ExplicitTop = 6
+    end
+    object btnFileZoomIn: TUQuickButton
+      AlignWithMargins = True
+      Left = 831
+      Top = 0
+      Margins.Left = 0
+      Margins.Top = 0
+      Margins.Right = 8
+      Margins.Bottom = 0
+      Align = alRight
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe MDL2 Assets'
+      Font.Style = []
+      ParentFont = False
+      BackColors.Enabled = False
+      BackColors.Color = clBlack
+      BackColors.LightColor = 13619151
+      BackColors.DarkColor = 3947580
+      ButtonStyle = qbsNone
+      Caption = #59555
+      ExplicitLeft = 1151
+    end
+    object barStatus: TUProgressBar
+      AlignWithMargins = True
+      Left = 387
+      Top = 12
+      Width = 191
+      Height = 8
+      Margins.Left = 8
+      Margins.Top = 12
+      Margins.Right = 0
+      Margins.Bottom = 12
+      Align = alClient
+      TabOrder = 1
+      Visible = False
+      AniSet.AniKind = akOut
+      AniSet.AniFunctionKind = afkQuartic
+      AniSet.DelayStartTime = 0
+      AniSet.Duration = 250
+      AniSet.Step = 25
+      BackColor.Enabled = False
+      BackColor.Color = 15132390
+      BackColor.LightColor = 13421772
+      BackColor.DarkColor = 3355443
+      FillColor.Enabled = False
+      FillColor.Color = 15132390
+      FillColor.LightColor = 13421772
+      FillColor.DarkColor = 3355443
+      Value = 0
+      Orientation = oHorizontal
+      ExplicitWidth = 123
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True
-      Left = 559
+      Left = 627
       Top = 0
       Width = 200
       Height = 32
@@ -716,37 +708,7 @@ object NEDMainForm: TNEDMainForm
       Min = 50
       Max = 250
       Value = 100
-      ExplicitLeft = 875
-    end
-    object barStatus: TUProgressBar
-      AlignWithMargins = True
-      Left = 387
-      Top = 12
-      Width = 123
-      Height = 8
-      Margins.Left = 8
-      Margins.Top = 12
-      Margins.Right = 0
-      Margins.Bottom = 12
-      Align = alClient
-      TabOrder = 1
-      Visible = False
-      AniSet.AniKind = akOut
-      AniSet.AniFunctionKind = afkQuartic
-      AniSet.DelayStartTime = 0
-      AniSet.Duration = 250
-      AniSet.Step = 25
-      BackColor.Enabled = False
-      BackColor.Color = 15132390
-      BackColor.LightColor = 13421772
-      BackColor.DarkColor = 3355443
-      FillColor.Enabled = False
-      FillColor.Color = 15132390
-      FillColor.LightColor = 13421772
-      FillColor.DarkColor = 3355443
-      Value = 0
-      Orientation = oHorizontal
-      ExplicitWidth = 200
+      ExplicitLeft = 559
     end
   end
   object pnlWorkSpace: TUPanel
@@ -767,10 +729,6 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 502
-    ExplicitTop = 104
-    ExplicitWidth = 970
-    ExplicitHeight = 728
   end
   object pnlLeft: TUPanel
     Left = 45
@@ -790,7 +748,6 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitHeight = 728
     object boxSearch: TUScrollBox
       Left = 0
       Top = 0
@@ -810,10 +767,6 @@ object NEDMainForm: TNEDMainForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      ExplicitLeft = 81
-      ExplicitTop = 22
-      ExplicitWidth = 185
-      ExplicitHeight = 382
       object barSearch: TUTitleBar
         Left = 0
         Top = 0
@@ -844,8 +797,6 @@ object NEDMainForm: TNEDMainForm
         Header.MainColumn = -1
         ParentColor = True
         TabOrder = 1
-        ExplicitWidth = 185
-        ExplicitHeight = 704
         Columns = <>
       end
     end
@@ -868,10 +819,6 @@ object NEDMainForm: TNEDMainForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      ExplicitLeft = 27
-      ExplicitTop = 280
-      ExplicitWidth = 185
-      ExplicitHeight = 382
       object barProject: TUTitleBar
         Left = 0
         Top = 0
@@ -902,8 +849,6 @@ object NEDMainForm: TNEDMainForm
         Header.MainColumn = -1
         ParentColor = True
         TabOrder = 1
-        ExplicitWidth = 185
-        ExplicitHeight = 704
         Columns = <>
       end
     end

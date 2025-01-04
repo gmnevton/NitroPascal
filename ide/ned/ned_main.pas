@@ -19,6 +19,7 @@ uses
   Forms,
   Menus,
   UCL.Form,
+  UCL.FormOverlay,
   UCL.ThemeManager,
   UCL.Types,
   UCL.Panel,
@@ -50,7 +51,7 @@ type
     btnMin: TUQuickButton;
     mnuMain: TMainMenu;
     File1: TMenuItem;
-    UQuickButton6: TUQuickButton;
+    btnShowHideToolbox: TUQuickButton;
     New1: TMenuItem;
     Open1: TMenuItem;
     History1: TMenuItem;
@@ -134,7 +135,6 @@ type
     barStatus: TUProgressBar;
     sepStatus: TUSeparator;
     txtStatus: TUText;
-    UHyperLink1: TUHyperLink;
     barProject: TUTitleBar;
     vstProject: TVirtualStringTree;
     boxSearch: TUScrollBox;
@@ -152,7 +152,8 @@ type
     procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormResize(Sender: TObject);
-    procedure UQuickButton6Click(Sender: TObject);
+    procedure btnShowHideToolboxClick(Sender: TObject);
+    procedure btnHomeClick(Sender: TObject);
   private
   public
   end;
@@ -166,7 +167,8 @@ implementation
 
 uses
   ned_home_page,
-  ned_source_editor;
+  ned_source_editor,
+  ned_dialog_open;
 
 var
   NEDHomeForm: TNEDHomeForm;
@@ -237,7 +239,7 @@ begin
 //
 end;
 
-procedure TNEDMainForm.UQuickButton6Click(Sender: TObject);
+procedure TNEDMainForm.btnShowHideToolboxClick(Sender: TObject);
 begin
   if pnlLeft.Visible then begin
     pnlLeft.Visible := False;
@@ -247,6 +249,23 @@ begin
     splLeft.Visible := True;
     pnlLeft.Visible := True;
   end;
+end;
+
+procedure TNEDMainForm.btnHomeClick(Sender: TObject);
+var
+  open: TNEDDialogOpen;
+begin
+  open := TNEDDialogOpen.Create(Self);
+  open.Parent := Self.Overlay;
+  open.Top := 200;
+  open.Left := (Self.Width - open.Width) div 2;
+  open.Margins.Top := 200;
+  open.Margins.Left := (Self.Width - open.Width) div 2;
+  open.Margins.Right := open.Margins.Left;
+  open.Margins.Bottom := 200;
+  open.AlignWithMargins := True;
+  //
+  Self.OverlayType := otTransparent;
 end;
 
 end.
