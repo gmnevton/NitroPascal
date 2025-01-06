@@ -4,7 +4,7 @@ object NEDDialogOpen: TNEDDialogOpen
   Width = 600
   Height = 448
   DoubleBuffered = True
-  Color = clBtnFace
+  Color = 4210752
   ParentBackground = False
   ParentColor = False
   ParentDoubleBuffered = False
@@ -69,9 +69,6 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 112
-    ExplicitTop = 144
-    ExplicitWidth = 185
     object UText1: TUText
       AlignWithMargins = True
       Left = 53
@@ -156,9 +153,6 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 336
-    ExplicitTop = 288
-    ExplicitWidth = 185
     object UButton1: TUButton
       Left = 0
       Top = 0
@@ -201,7 +195,6 @@ object NEDDialogOpen: TNEDDialogOpen
       CustomColors.TextColors.DarkDisabled = clGray
       CustomColors.TextColors.DarkFocused = clWhite
       Caption = 'Cancel'
-      ExplicitWidth = 273
     end
     object UButton2: TUButton
       Left = 322
@@ -245,10 +238,6 @@ object NEDDialogOpen: TNEDDialogOpen
       CustomColors.TextColors.DarkFocused = clWhite
       Highlight = True
       Caption = 'Open'
-      ExplicitLeft = 344
-      ExplicitTop = 8
-      ExplicitWidth = 135
-      ExplicitHeight = 30
     end
   end
   object UPanel4: TUPanel
@@ -269,9 +258,6 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 344
-    ExplicitTop = 288
-    ExplicitWidth = 185
     object UEdit1: TUEdit
       AlignWithMargins = True
       Left = 8
@@ -299,10 +285,6 @@ object NEDDialogOpen: TNEDDialogOpen
       BorderColor.FocusedLightColor = 14120960
       BorderColor.FocusedDarkColor = 14120960
       Transparent = True
-      ExplicitLeft = 72
-      ExplicitTop = 6
-      ExplicitWidth = 121
-      ExplicitHeight = 30
     end
   end
 end

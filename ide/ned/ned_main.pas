@@ -256,16 +256,19 @@ var
   open: TNEDDialogOpen;
 begin
   open := TNEDDialogOpen.Create(Self);
-  open.Parent := Self.Overlay;
-  open.Top := 200;
-  open.Left := (Self.Width - open.Width) div 2;
+  open.Parent := Self;
+//  open.Top := 200;
+//  open.Left := (Self.Width - open.Width) div 2;
   open.Margins.Top := 200;
   open.Margins.Left := (Self.Width - open.Width) div 2;
   open.Margins.Right := open.Margins.Left;
   open.Margins.Bottom := 200;
   open.AlignWithMargins := True;
+  open.Align := alClient;
   //
   Self.OverlayType := otTransparent;
+  open.Show;
+  open.BringToFront;
 end;
 
 end.

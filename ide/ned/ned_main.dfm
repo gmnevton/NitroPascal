@@ -668,7 +668,6 @@ object NEDMainForm: TNEDMainForm
       FillColor.DarkColor = 3355443
       Value = 0
       Orientation = oHorizontal
-      ExplicitWidth = 123
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True
@@ -708,7 +707,6 @@ object NEDMainForm: TNEDMainForm
       Min = 50
       Max = 250
       Value = 100
-      ExplicitLeft = 559
     end
   end
   object pnlWorkSpace: TUPanel
