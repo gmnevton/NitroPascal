@@ -12,6 +12,7 @@ interface
 
 uses
   SysUtils,
+  Messages,
   Classes,
   Controls,
   StdCtrls,
@@ -155,6 +156,12 @@ type
     procedure btnShowHideToolboxClick(Sender: TObject);
     procedure btnHomeClick(Sender: TObject);
   private
+    FModalForm: TForm;
+    //
+    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+    procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
   public
   end;
 
@@ -166,9 +173,13 @@ implementation
 {$R *.dfm}
 
 uses
+  Windows,
   ned_home_page,
   ned_source_editor,
   ned_dialog_open;
+
+type
+  TWinControlAccess = class(TWinControl);
 
 var
   NEDHomeForm: TNEDHomeForm;
@@ -192,11 +203,43 @@ begin
   splLeft.Visible := False;
   boxProject.BringToFront;
   //
+  FModalForm := Nil;
+end;
+
+procedure TNEDMainForm.CMDialogKey(var Message: TCMDialogKey);
+begin
+  if GetKeyState(VK_MENU) >= 0 then begin
+    case Message.CharCode of
+      VK_TAB: begin
+//        if GetKeyState(VK_CONTROL) >= 0 then begin
+//          SelectNext(FActiveControl, GetKeyState(VK_SHIFT) >= 0, True);
+//          Result := 1;
+//          Exit;
+//        end;
+        Exit;
+      end;
+    end;
+  end;
+  inherited;
+end;
+
+procedure TNEDMainForm.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  // allow navigation keys to be processed by the form
+  Params.ExStyle := Params.ExStyle or WS_EX_CONTROLPARENT;
 end;
 
 procedure TNEDMainForm.FormDestroy(Sender: TObject);
 begin
   NEDHomeForm.Free;
+end;
+
+procedure TNEDMainForm.WMGetDlgCode(var Msg: TWMGetDlgCode);
+begin
+  inherited;
+  // inform Windows that this form wants navigation keys
+  Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS;
 end;
 
 procedure TNEDMainForm.FormShow(Sender: TObject);
@@ -220,8 +263,20 @@ begin
 end;
 
 procedure TNEDMainForm.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+var
+  FocusedControl: TWinControl;
+  NextControl: TWinControl;
 begin
-//
+  if Key = VK_TAB then begin
+    FocusedControl := ActiveControl;
+    if (FocusedControl <> Nil) and (FModalForm <> Nil) then begin
+      NextControl := TWinControlAccess(FModalForm).FindNextControl(FocusedControl, not (ssShift in Shift), True, False);
+
+      if Assigned(NextControl) and ((NextControl = FModalForm) or (GetParentForm(NextControl, False) = FModalForm)) then
+        NextControl.SetFocus;
+    end;
+    Key := 0; // prevent default handling
+  end;
 end;
 
 procedure TNEDMainForm.FormKeyPress(Sender: TObject; var Key: Char);
@@ -255,12 +310,14 @@ procedure TNEDMainForm.btnHomeClick(Sender: TObject);
 var
   open: TNEDDialogOpen;
 begin
-  open := TNEDDialogOpen.Create(Self);
+  open := TNEDDialogOpen.Create(Application);
+  FModalForm := open;
   try
     if open.Execute() then begin
 
     end;
   finally
+    FModalForm := Nil;
     open.Free;
   end;
 end;

@@ -1,27 +1,36 @@
 object NEDDialogOpen: TNEDDialogOpen
   Left = 0
   Top = 0
-  Width = 600
-  Height = 448
-  DoubleBuffered = True
+  BorderIcons = []
+  BorderStyle = bsNone
+  ClientHeight = 448
+  ClientWidth = 600
   Color = 4210752
+  DoubleBuffered = True
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  KeyPreview = True
   Padding.Left = 1
   Padding.Top = 1
   Padding.Right = 1
   Padding.Bottom = 1
-  ParentBackground = False
-  ParentColor = False
-  ParentDoubleBuffered = False
-  TabOrder = 0
+  OldCreateOrder = True
+  OnCreate = FormCreate
+  OnKeyDown = FormKeyDown
   DesignSize = (
     600
     448)
+  PixelsPerInch = 96
+  TextHeight = 13
   object UTitleBar1: TUTitleBar
     Left = 1
     Top = 1
     Width = 598
     Align = alTop
-    Color = clBlack
+    Color = 4210752
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
     Font.Height = -11
@@ -37,8 +46,8 @@ object NEDDialogOpen: TNEDDialogOpen
     ExplicitWidth = 0
   end
   object btnClose: TUQuickButton
-    Left = 553
-    Top = 0
+    Left = 554
+    Top = 1
     Anchors = [akTop, akRight]
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
@@ -53,7 +62,6 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColors.DarkColor = 3947580
     ButtonStyle = qbsNone
     Caption = #59153
-    ExplicitLeft = 506
   end
   object SplitterEx1: TSplitterEx
     Left = 201
@@ -79,14 +87,11 @@ object NEDDialogOpen: TNEDDialogOpen
     Font.Style = []
     ParentFont = False
     ShowCaption = False
-    TabOrder = 0
+    TabOrder = 3
     BackColor.Enabled = False
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 0
-    ExplicitTop = 32
-    ExplicitWidth = 600
     object txtPath: TUText
       AlignWithMargins = True
       Left = 53
@@ -147,14 +152,11 @@ object NEDDialogOpen: TNEDDialogOpen
     Font.Style = []
     ParentFont = False
     ShowCaption = False
-    TabOrder = 1
+    TabOrder = 0
     BackColor.Enabled = False
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 0
-    ExplicitTop = 73
-    ExplicitHeight = 293
   end
   object UPanel3: TUPanel
     Left = 1
@@ -174,9 +176,6 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 0
-    ExplicitTop = 407
-    ExplicitWidth = 600
     object btnCancel: TUButton
       Left = 0
       Top = 0
@@ -220,7 +219,6 @@ object NEDDialogOpen: TNEDDialogOpen
       CustomColors.TextColors.DarkDisabled = clGray
       CustomColors.TextColors.DarkFocused = clWhite
       Caption = 'Cancel'
-      ExplicitWidth = 322
     end
     object btnOpen: TUButton
       Left = 320
@@ -265,7 +263,6 @@ object NEDDialogOpen: TNEDDialogOpen
       CustomColors.TextColors.DarkFocused = clWhite
       Highlight = True
       Caption = 'Open'
-      ExplicitLeft = 322
     end
   end
   object UPanel4: TUPanel
@@ -281,14 +278,11 @@ object NEDDialogOpen: TNEDDialogOpen
     Font.Style = []
     ParentFont = False
     ShowCaption = False
-    TabOrder = 3
+    TabOrder = 1
     BackColor.Enabled = False
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitLeft = 0
-    ExplicitTop = 366
-    ExplicitWidth = 600
     object edtPath: TUEdit
       AlignWithMargins = True
       Left = 8
@@ -316,7 +310,13 @@ object NEDDialogOpen: TNEDDialogOpen
       BorderColor.FocusedLightColor = 14120960
       BorderColor.FocusedDarkColor = 14120960
       Transparent = True
-      ExplicitWidth = 584
     end
+  end
+  object ImageList1: TImageList
+    ColorDepth = cd32Bit
+    DrawingStyle = dsTransparent
+    ShareImages = True
+    Left = 208
+    Top = 16
   end
 end
