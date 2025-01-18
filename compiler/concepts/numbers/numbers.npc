@@ -1,0 +1,48 @@
+﻿code 'numbers';
+
+var
+  // signed integers
+  signed_byte       : s8;  //                       -128 to 127
+  signed_word       : s16; //                    -32_768 to 32_767
+  signed_double_word: s32; //             -2_147_483_648 to 2_147_483_647
+  signed_quad_word  : s64; // -9_223_372_036_854_775_808 to 9_223_372_036_854_775_807
+  signed_integer    : int; // same as s32 on 32 bit system or s64 on 64 bit system
+
+  // unsigned integers
+  unsigned_byte       : u8;  // 0 to 255
+  unsigned_word       : u16; // 0 to 65_535
+  unsigned_double_word: u32; // 0 to 4_294_967_295
+  unsigned_quad_word  : u64; // 0 to 18_446_744_073_709_551_615
+  unsigned_integer    : uint; // same as u32 on 32 bit system or u64 on 64 bit system
+
+  // floats
+  float_32: f32;
+  float_64: f64;
+  //float_128: f128;
+  double_float: float; // same as f64 on 32/64 bit system
+
+  // we can declare numbers in a variety of ways
+  // here are the possible options:
+  //
+  // 1. simple declaration
+  // val: int = 1234567890;
+  //
+  // 2. declaration with "_" for better readability
+  // val: int = 1_234_567_890;
+  //
+  // 3. declaration with "B" (default), "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
+  // the resulting value is represented in 1024 bytes intervals
+  // val: int = 640KB; // 640 * 1024 bytes
+  //
+  // 4. declaration with "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"
+  // the resulting value is represented in 1000 bytes intervals
+  // val: int = 100MiB; // 100 * 1000 bytes
+  //
+  // 5. declaration 3 and 4 can use "_"
+  // val: int = 1_TB;
+
+const
+  val1: int = 8KB; // 8 * 1024 bytes, can be written as 8_KB
+  val2: int = 123KiB; // 123 * 1000 bytes
+  
+end.
