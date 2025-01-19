@@ -24,22 +24,31 @@ var
   // we can declare numbers in a variety of ways
   // here are the possible options:
   //
-  // 1. simple declaration
+  // 1. simple literal
   // val: int = 1234567890;
   //
-  // 2. declaration with "_" for better readability
+  // 2. literal with "_" for better readability
   // val: int = 1_234_567_890;
   //
-  // 3. declaration with "B" (default), "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
-  // the resulting value is represented in 1024 bytes intervals
-  // val: int = 640KB; // 640 * 1024 bytes
-  //
-  // 4. declaration with "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"
+  // 3. literal with "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
   // the resulting value is represented in 1000 bytes intervals
-  // val: int = 100MiB; // 100 * 1000 bytes
+  // val: int = 640KB; // 640 * 1000 bytes
   //
-  // 5. declaration 3 and 4 can use "_"
+  // 4. literal with "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"
+  // the resulting value is represented in 1024 bytes intervals
+  // val: int = 100MiB; // 100 * 1024 bytes
+  //
+  // 5. literal 3 and 4 can use "_"
   // val: int = 1_TB;
+  //
+  // 6. literal in binary "0b...", hexadecimal "0x...", octal "0o..." format
+  // val: int = 0b0101;
+  // val: int = 0xc0de;
+  // val: int = 0o755; // usefull in linux permisions
+  //
+  // 7. literal 6 can use "_"
+  // val: int = 0b0101_0101;
+  // val: int = 0xdead_c0de;
 
 const
   val1: int = 8KB; // 8 * 1024 bytes, can be written as 8_KB
