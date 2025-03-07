@@ -38,6 +38,7 @@ object NEDDialogOpen: TNEDDialogOpen
     Font.Style = []
     ParentColor = False
     ParentFont = False
+    DoubleClick = False
     DragMovement = False
     EnableSystemMenu = False
     Caption = 'Open...'

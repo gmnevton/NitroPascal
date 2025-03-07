@@ -58,19 +58,29 @@ type
     FolderView: TFolderView;
     FilesView: TFolderView;
     //
+    FPath: String;
+    FFileExtension: String;
+    //
     procedure MainFormResize(Sender: TObject);
     function GetInterfaceForObj(const IDL: pItemIDList): IUnknown;
     procedure GetDesktopIcons;
     procedure GetFolders;
+    procedure ListDirs(const FolderBar: TFolderBar);
+    procedure ListFiles(const FolderBar: TFolderBar);
+    procedure GetFilesList;
     procedure GetFolderIcon(const IDL: PItemIDList; FolderBar: TFolderBar);
     procedure GetItemIcon(const IDL: PItemIDList; FolderItem: TFolderItem);
     procedure GetChildren(ShellFolder: IShellFolder; const IDL: PItemIDList; FolderBar: TFolderBar);
     function GetPathFromPIDL(const IDL: PItemIDList): String;
+    function GetPIDLFromPath(const Path: String): PItemIDList;
+    function GetDirFromSpecialFolder(const Folder: Integer): String;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     //
     function Execute(const DefaultPath: String = ''; const DefaultFileExt: String = '.*'): Boolean;
+    //
+    property FileName: String read FPath;
   end;
 
 implementation
@@ -114,6 +124,93 @@ Begin
   PIDL := Nil;
   ppMalloc := Nil;
 End;
+{
+function IsSupportedExtension(const FileName: String): Boolean;
+var
+  ext: String;
+begin
+  Result:=False;
+  ext:=LowerCase(FileName);
+  if (ext <> 'hashgen.exe') and ((ext <> 'hashgenui.exe')) and (ext <> sHashesFileName) then begin
+    ext:='';
+    ext:=ExtractFileExt(FileName);
+    try
+      Result:=((ext = '.exe') or
+               (ext = '.manifest') or
+               (ext = '.bpl') or
+               (ext = '.dll') or
+               (ext = '.jar') or
+               // configs
+               (IniFiles and (ext = '.ini')) or
+               (ext = '.json') or
+               // program data
+               (ext = '.xml') or
+               (ext = '.xsd') or
+               (ext = '.xsl') or
+               (ext = '.otf') or
+               (ext = '.ttf') or
+               // apps
+               (ext = '.pdf') or
+               (ext = '.doc') or
+               (ext = '.docx') or
+               (ext = '.xls') or
+               (ext = '.xlsx') or
+               // certs
+               (ext = '.crt') or
+               (ext = '.pem'));
+    finally
+      ext:='';
+    end;
+  end;
+end;
+}
+procedure SearchForFiles(APath, AExt: String; List: TStringList);
+var
+  SearchRec: TSearchRec;
+  Result: Integer;
+begin
+  if APath[Length(APath)] <> '\' then
+    APath := APath + '\';
+  if SysUtils.FindFirst(APath + '*' + AExt, faAnyFile - faDirectory, SearchRec) = 0 then begin
+    repeat
+      if (SearchRec.Attr and faDirectory = 0){ and IsSupportedExtension(SearchRec.Name)} then begin
+        List.Add(SearchRec.Name);
+      end;
+      Result:=SysUtils.FindNext(SearchRec);
+    until Result <> 0;
+    SysUtils.FindClose(SearchRec);
+  end;
+end;
+
+procedure SearchForDirectories(APath: String; List: TStringList{; Level: Integer = 0});
+var
+  SearchRec: TSearchRec;
+  Result: Integer;
+begin
+//    if Level > 1 then
+//      Exit;
+  if APath[Length(APath)] <> '\' then
+    APath := APath + '\';
+{$IFDEF DEBUG}
+  OutputDebugString(PChar('Found dir: ''' + APath + ''''));
+//      Sleep(10);
+{$ENDIF}
+//  List.Add(APath);
+  if SysUtils.FindFirst(APath + '*.*', faDirectory, SearchRec) = 0 then begin
+    repeat
+      if SearchRec.Attr and faDirectory = faDirectory then begin
+        if (Length(SearchRec.Name) > 2) or
+           (((Length(SearchRec.Name) = 1) and (SearchRec.Name[1] <> '.')) and
+            ((Length(SearchRec.Name) = 2) and (Word(PChar(@SearchRec.Name[1])) <> $2E2E{'..'}))) then begin
+          List.Add(SearchRec.Name);
+          //ListDirs(APath + SearchRec.Name, List{, Level + 1});
+        end;
+      end;
+      Result:=SysUtils.FindNext(SearchRec);
+    until Result <> 0;
+    SysUtils.FindClose(SearchRec);
+  end;
+end;
 
 { TNEDDialogOpen }
 
@@ -145,10 +242,15 @@ begin
   FilesView.ItemImages := ImageList1;
   FilesView.TabStop := True;
 //  FilesView.Show;
+
+  FPath := '';
+  FFileExtension := '';
 end;
 
 destructor TNEDDialogOpen.Destroy;
 begin
+  FPath := '';
+  FFileExtension := '';
   FCanClose := False;
   FExecutionResult := mrNone;
   FilesView.Free;
@@ -239,11 +341,12 @@ begin
       else
         Desktop.BindToObject(IDL, Nil, IID_IShellFolder, Result);
     finally
-      if Assigned(DesktopIDL) then
-        DesktopIDL := Nil;
+      FreeItemIDList(DesktopIDL);
+//      if Assigned(DesktopIDL) then
+//        DesktopIDL := Nil;
     end;
   finally
-    Desktop := nil;
+    Desktop := Nil;
   end;
 end;
 
@@ -291,24 +394,92 @@ begin
 //          SHGetFileInfo(Pointer(AbsoluteIDL), 0, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_OPENICON);
 //        FolderBar
     end;
+    FreeItemIDList(IDL);
   end;
   FolderView.ActiveIndex := 0;
+end;
+
+procedure TNEDDialogOpen.ListDirs(const FolderBar: TFolderBar);
+var
+  List: TStringList;
+  FileItem: TFolderItem;
+  path: String;
+  IDL: PItemIDList;
+  i: Integer;
+begin
+  List := TStringList.Create;
+  try
+    SearchForDirectories(FPath, List);
+    for i := 0 to List.Count - 1 do begin
+      path := List.Strings[i];
+      FileItem := FolderBar.Items.Add;
+      FileItem.Caption := path;
+      IDL := GetPIDLFromPath(FPath + path);
+      GetItemIcon(IDL, FileItem);
+      FreeItemIDList(IDL);
+    end;
+  finally
+    List.Free;
+  end;
+end;
+
+procedure TNEDDialogOpen.ListFiles(const FolderBar: TFolderBar);
+var
+  List: TStringList;
+  FileItem: TFolderItem;
+  path: String;
+  IDL: PItemIDList;
+  i: Integer;
+begin
+  List := TStringList.Create;
+  try
+    SearchForFiles(FPath, FFileExtension, List);
+    for i := 0 to List.Count - 1 do begin
+      path := List.Strings[i];
+      FileItem := FolderBar.Items.Add;
+      FileItem.Caption := path;
+      IDL := GetPIDLFromPath(FPath + path);
+      GetItemIcon(IDL, FileItem);
+      FreeItemIDList(IDL);
+    end;
+  finally
+    List.Free;
+  end;
+end;
+
+procedure TNEDDialogOpen.GetFilesList;
+var
+  FolderBar: TFolderBar;
+begin
+  FilesView.Folders.Clear;
+  FolderBar := FilesView.Folders.Add;
+//  FolderBar.Visible := False;
+  ListDirs(FolderBar);
+  ListFiles(FolderBar);
 end;
 
 procedure TNEDDialogOpen.GetFolderIcon(const IDL: PItemIDList; FolderBar: TFolderBar);
 var
   FileInfo: TSHFileInfo;
 begin
-  SHGetFileInfo(Pointer(IDL), SFGAO_SHARE, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
-  FolderBar.ImageIndex := FileInfo.iIcon;
+  if Assigned(IDL) then begin
+    SHGetFileInfo(Pointer(IDL), SFGAO_SHARE, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+    FolderBar.ImageIndex := FileInfo.iIcon;
+  end
+  else
+    FolderBar.ImageIndex := -1;
 end;
 
 procedure TNEDDialogOpen.GetItemIcon(const IDL: PItemIDList; FolderItem: TFolderItem);
 var
   FileInfo: TSHFileInfo;
 begin
-  SHGetFileInfo(Pointer(IDL), 0{SFGAO_SHARE}, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_LARGEICON);
-  FolderItem.ImageIndex := FileInfo.iIcon;
+  if Assigned(IDL) then begin
+    SHGetFileInfo(Pointer(IDL), 0{SFGAO_SHARE}, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_LARGEICON);
+    FolderItem.ImageIndex := FileInfo.iIcon;
+  end
+  else
+    FolderItem.ImageIndex := -1;
 end;
 
 function TNEDDialogOpen.GetPathFromPIDL(const IDL: PItemIDList): String;
@@ -321,6 +492,24 @@ begin
   end
   else
     Result := '';
+end;
+
+function TNEDDialogOpen.GetPIDLFromPath(const Path: String): PItemIDList;
+begin
+  Result := ILCreateFromPath(PChar(Path));
+end;
+
+function TNEDDialogOpen.GetDirFromSpecialFolder(const Folder: Integer): String;
+var
+  SpecialDirIDL: pItemIDList;
+begin
+  Result := '';
+  SetLength(Result, MAX_PATH);
+  SHGetSpecialFolderLocation(0, Folder, SpecialDirIDL);
+  SHGetPathFromIDList(SpecialDirIDL, PChar(Result));
+  SetLength(Result, StrLen(PChar(Result)));
+  Result := IncludeTrailingPathDelimiter(Result);
+  FreeItemIDList(SpecialDirIDL);
 end;
 
 procedure TNEDDialogOpen.GetChildren(ShellFolder: IShellFolder; const IDL: PItemIDList; FolderBar: TFolderBar);
@@ -403,7 +592,7 @@ begin
   end;
 end;
 
-function TNEDDialogOpen.Execute(const DefaultPath, DefaultFileExt: String): Boolean;
+function TNEDDialogOpen.Execute(const DefaultPath: String = ''; const DefaultFileExt: String = '.*'): Boolean;
 //var
 //  ParentFormTabStop: Boolean;
 //  ParentFormKeyPreview: Boolean;
@@ -425,6 +614,18 @@ begin
     Self.AlignWithMargins := True;
     Self.Align := alClient;
     GetFolders;
+    //
+    if Length(DefaultPath) > 0 then
+      FPath := IncludeTrailingPathDelimiter(DefaultPath)
+    else
+      FPath := GetDirFromSpecialFolder(CSIDL_PERSONAL); // get "My Documents" as default
+    if Length(DefaultFileExt) > 0 then
+      FFileExtension := DefaultFileExt
+    else
+      FFileExtension := '.*'; // get all files as default if none was specified
+    //
+    txtPath.Caption := FPath;
+    GetFilesList;
     //
     FMainForm.OverlayType := otTransparent;
     //FMainForm.Enabled := False;
