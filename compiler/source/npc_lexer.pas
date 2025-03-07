@@ -455,12 +455,11 @@ begin
       Inc(cur, FEncoding.GetCharCount(FSource, cur - PSource, xadd));
     if CharInSet(x, [#13, #10]) then begin
       if x = #13 then begin // CR
-        if IsNotEmpty and (cur^ = 10) then begin
+        if IsNotEmpty and (cur^ = 10) then
           Inc(cur);
-          bol := cur;
-          Inc(FLines);
-          Inc(row);
-        end;
+        bol := cur;
+        Inc(FLines);
+        Inc(row);
       end
       else if x = #10 then begin // LF
         bol := cur;
