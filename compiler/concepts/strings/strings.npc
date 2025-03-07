@@ -1,0 +1,16 @@
+code 'strings';
+
+// compile-time & run-time format strings
+
+ExampleFormatString {
+  var FileName: String = 'test.txt';
+  var temp: String = 'File \'%\' not found !' + {Filename};
+  
+  // above string definition results in concatenation of string literal with variable FileName, where FileName replaces first
+  // occurence of symbol '%'.
+  // after that, variable temp contains this string:
+  
+  // File 'test.txt' not found !
+}
+
+end.

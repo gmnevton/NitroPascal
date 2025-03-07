@@ -1,0 +1,97 @@
+﻿code 'error handling';
+
+{.
+  >>> trying to make error reporting better <<<
+  
+  programmers know two types of errors:
+  1. simple error
+  2. exception
+  
+  what if our error handling would be as simple as simple error
+  and had some of benefits of exceptions without slow processing and tons of bloat
+  and what if our procedures/functions - lambdas - could decide of what to do with error(s)
+  that been invoked inside of them ?
+  
+  first of all we need to understand that error is some state that our code is or is not in,
+  second is that some states of code we are expecting and others are unexpected, 
+  but we have to be able to handle them in some way.
+  
+  errors happen usually inside some blocks of instructions and this blocks are associated with lambdas, so -
+  any block of code should be able to decide what to do with errors when it needs to.
+  
+  lambdas should be able to decide if any error that happen inside them is processed and satisfied or
+  if that error and possibly other errors, that happened before, is not handled inside that lambda, which automatically
+  push that list of errors up in parent scope.
+  
+  our error handling can have methods that can discard some of selected types of errors or all or only that which was raised
+  insede lambda.
+  
+  if in our chain of lambdas none of them handled our errors, that errors should be reported to the OS
+  and halt execution of our project.
+  
+  lambdas should be able to call any amount of custom error handling routines inside our project.
+
+  example of such error handling inside lambda is bellow:
+  
+  %error-level%:
+  - comment (before/after)
+  - hint (before/after)
+  - warning (immediate)
+  - error (immediate)
+  - panic
+
+  %error-processing%:
+  - before
+  - after
+  - immediate
+  
+  %error-type%:
+  - user
+  - os
+  
+  %error-subtype%:
+  - expected
+  - unexpected
+  
+  %error-scope% - scope of error:
+  - local
+  - alien
+  
+  %error-code% - integer code associated with error
+  
+  %error-message% - message associated with error
+
+.}
+
+SomeTestProc(some_params: [] Any): (OK: bool, Status: int)
+{@comment before 'some comment that will be fired at the beginning of the lambda'}
+{@comment after 'some comment that will be fired at the end of the lambda'}
+{@hint 'this is crazy'}
+{@warning 'this is warning'}
+{@error type:OS code:2}
+{@error type:OS code:10060..10080}
+{@error:
+  if %error-level% in (.error_level_Error, .error_level_Warning) and 
+     %error-type% = .error_type_OS and 
+     %error-subtype% = .error_subtype_Expected and 
+     %error-scope% = .error_scope_Local and
+     %error-code% = 2 then {
+    @error-solved
+  }
+  
+  // @error-discard;
+  @error-discard-all;
+  // @error-push-up-out-of-scope;
+
+  // default behavior is to push this error to the list of errors of the upper scope.
+}
+{
+  var FileName: String = 'test.txt';
+  var fh: int = OpenFile(File = 'test.txt', Mode = .rwt);
+  if fh = 0 then {
+    @error push 'File \'%\' not found !' + {Filename}; // format - @error (push/immediate) 'error message'/error_code;
+  }
+  
+};
+
+end.
