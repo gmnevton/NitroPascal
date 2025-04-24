@@ -1,0 +1,42 @@
+﻿code 'unions';
+
+{.
+  types can be declared with zero memory alocation, 
+  it means that two or more identifiers share the same addres space
+.}  
+
+type
+  Enum = record
+    @share mem {
+      field1: u8;
+      field2: u32;
+    }
+  end;
+  
+{.
+  the directive declaration: @share (mem | storage)
+  
+  @share mem - this directive tels the compiler to allocate fields as one shared memory space
+  it means, that field1 has offset 0 and field2 also has offset 0, but total space allocated in memory consists of 32 bits,
+  where field1 is left padded by zeros.
+  
+  take this emeory layout:
+  
+  |---------------------------------------------------------------|
+  | |3| | | | | | | | | |2| | | | | | | | | |1| | | | | | | | | |0|
+  |1|0|9|8|7|6|5|4|3|2|1|0|9|8|7|6|5|4|3|2|1|0|9|8|7|6|5|4|3|2|1|0|
+  |---------------------------------------------------------------|
+  |0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|         field1|
+  |---------------------------------------------------------------|
+  |                                                         field2|
+  |---------------------------------------------------------------|
+  
+  @share storage - this directive tels the compiler to allocate fields as one shared storage space in according to files
+  it means, that field1 has offset 0 and field2 also has offset 0, but total space allocated in memory consists of 32 bits,
+  where field1 is left padded by zeros.
+  
+  as you can see, you can easly read and write different field values, and field value will have only the exact bites used by
+  the field.
+.}  
+
+end.
