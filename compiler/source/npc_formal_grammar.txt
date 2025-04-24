@@ -127,15 +127,16 @@ Selector = '^' |
            '(' ActualParams ')' .
 
 Statement = [ Label ':' ] [ ( Designator | Ident ) ':=' Expression |
-                          ( Designator | Ident ) [ ActualParams ] { Selector } |
-                          CompoundStatement |
-                          IfStatement |
-                          CaseStatement |
-                          WhileStatement |
-                          RepeatStatement |
-                          ForStatement |
-                          GotoStatement |
-                          WithStatement ] .
+                            ( Designator | Ident ) [ ActualParams ] { Selector } |
+                            CompoundStatement |
+                            IfStatement |
+                            CaseStatement |
+                            ForStatement |
+                            GotoStatement |
+                            WithStatement ] .
+                          
+--                            WhileStatement |
+--                            RepeatStatement ] .
 
 Label = Ident .
 
