@@ -1,0 +1,50 @@
+﻿code 'records';
+
+{.
+  records can have custom IO rutines, that can describe,
+  how to read and write record fields to memory / files
+.}  
+
+type
+  FileHeader = record {
+    file_id: u32, // [4] ascii char
+    field_1: u8,
+    field_2: u32
+  } @io {
+    @override read(const handle: THandle): boolean {
+      try {
+        file(handle).offset(0);
+        file_id := file(handle).read_u32;
+        field_1 := file(handle).read_u8;
+        field_2 := file(handle).read_u32;
+        result := true;
+      } except {
+        result := false;
+      };
+    },
+    @override write(const handle: THandle): boolean {
+      try {
+        file(handle).reset;
+        file(handle).write_u32(file_id);
+        file(handle).write_u8 (field_1);
+        file(handle).write_u32(field_2);
+        result := true;
+      } except {
+        result := false;
+      };
+    }
+  };
+  
+{.
+  our language has ability to define how it can read/write data from/to memory/file
+
+  lets see some examples:
+.}
+
+ReadFile(const FileName: String): (ok: boolean, data: FileHeader, file_handle: THandle, bytes_read: u64) {
+  ok, file_handle := IO.FileOpen(FileName, [file_Read]);
+  ok, bytes_read := IO.FileReadBuffer(file_handle, data{@io {$handle: file_handle}});
+  ok := IO.FileClose(file_handle);
+}
+
+end.

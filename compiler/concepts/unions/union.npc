@@ -6,35 +6,38 @@
 .}  
 
 type
-  Enum = record
-    @share mem {
+  Enum = record {
+    union {
       field1: u8,
       field2: u32
-      @io {
-        @override read(): u8 {
-          result := field2.d;
-        },
-        @override read(): u32 {
-          result := field2;
-        },
-        @override write(const value: u8) {
-          field2 = value;
-        }
-        @override write(const value: u32) {
-          field2 = value;
-        }
-      }
     }
-  end;
+  } @io {
+    @override read(): u8 {
+      field2 := read_u32(field2.offset);
+      result := field2.d;
+    },
+    @override read(): u32 {
+      field2 := read_u32(field2.offset);
+      result := field2;
+    },
+    @override write(const value: u8) {
+      field2 = value;
+      write_u32(field2, field2.offset);
+    },
+    @override write(const value: u32) {
+      field2 = value;
+      write_u32(field2, field2.offset);
+    }
+};
   
 {.
-  the directive declaration: @share (mem | storage)
+  the declaration: 
   
-  @share mem - this directive tels the compiler to allocate fields as one shared memory space
+  union - this directive tels the compiler to allocate fields as one shared memory space
   it means, that field1 has offset 0 and field2 also has offset 0, but total space allocated in memory consists of 32 bits,
   where field1 is left padded by zeros.
   
-  take this emeory layout:
+  take this memeory layout:
   
   |---------------------------------------------------------------|
   | |3| | | | | | | | | |2| | | | | | | | | |1| | | | | | | | | |0|
@@ -46,10 +49,6 @@ type
   |---------------------------------------------------------------|
   |                                                         field2|
   |---------------------------------------------------------------|
-  
-  @share storage - this directive tels the compiler to allocate fields as one shared storage space in according to files
-  it means, that field1 has offset 0 and field2 also has offset 0, but total space allocated in memory consists of 32 bits,
-  where field1 is left padded by zeros.
   
   as you can see, you can easly read and write different field values, and field value will have only the exact bites used by
   the field.
