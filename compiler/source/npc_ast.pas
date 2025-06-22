@@ -38,6 +38,8 @@ type
     AST_PROCEDURE,
     AST_PROCEDURE_CALL,
 
+    AST_LABEL,
+    AST_ASSIGN,
 //    AST_WHILE,
     AST_IF,
     AST_BREAK,
@@ -253,6 +255,21 @@ type
     PROCEDURE_HasImplicitResultValue = 2
   );
 
+  TNPC_ASTLabel = class(TNPC_ASTStatement)
+  public
+    // &Type = AST_LABEL
+    Ident: UTF8String;
+    Statement: TNPC_ASTStatement;
+//    TryBody: TNPC_ASTStatement; // set to TryCatchStatement or TryFinallyStatement if in _body portion
+//    TryFinally: TNPC_ASTTryFinallyStatement;
+//    ScopeGuard: TNPC_ASTScopeGuardStatement;
+//    LastVar: TNPC_ASTVarDeclaration;
+//    GotoTarget: TNPC_ASTStatement; // interpret
+    //
+    constructor Create; override;
+    destructor Destroy; override;
+  end;
+
   TNPC_ASTProcedure = class(TNPC_ASTExpression)
   public
     // &Type = AST_PROCEDURE
@@ -284,6 +301,16 @@ type
     Name: UTF8String;
     Scope: TNPC_ASTBlock;
     DeclarationsThatOwnMemeory: Array of TNPC_ASTDeclaration;
+    //
+    constructor Create; override;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTAssign = class(TNPC_ASTExpression)
+  public
+    // &Type = AST_ASSIGN
+    Ident: UTF8String;
+    Expression: TNPC_ASTExpression; // = null
     //
     constructor Create; override;
     destructor Destroy; override;
@@ -336,6 +363,18 @@ type
     TYPE_DefinitionOwnsMemory = $1
   );
 
+  TNPC_TypeDefinitionType = (
+    DEF_Unknown,
+    DEF_Record,
+    DEF_Enum,
+    DEF_Array,
+    DEF_Pointer,
+    DEF_Literal,
+    DEF_ProcedureArguments,
+    DEF_ProcedureResult,
+    DEF_ForeignFunction
+  );
+
   TNPC_ASTTypeDefinition = class(TNPC_ASTExpression)
   public
     // &Type = AST_TYPE_DEFINITION
@@ -359,6 +398,8 @@ type
     //
     constructor Create; override;
     destructor Destroy; override;
+    //
+    function DefinitionOfType: TNPC_TypeDefinitionType;
   end;
 
   TNPC_ASTDirectiveIF = class(TNPC_ASTExpression)
@@ -639,6 +680,24 @@ begin
   inherited;
 end;
 
+{ TNPC_ASTLabel }
+
+constructor TNPC_ASTLabel.Create;
+begin
+  inherited;
+  &Type := AST_LABEL;
+  //
+  Ident := '';
+  Statement := Nil;
+end;
+
+destructor TNPC_ASTLabel.Destroy;
+begin
+  Ident := '';
+  Statement := Nil;
+  inherited;
+end;
+
 { TNPC_ASTProcedure }
 
 constructor TNPC_ASTProcedure.Create;
@@ -686,6 +745,24 @@ begin
   Name := '';
   Scope := Nil;
   SetLength(DeclarationsThatOwnMemeory, 0);
+  inherited;
+end;
+
+{ TNPC_ASTAssign }
+
+constructor TNPC_ASTAssign.Create;
+begin
+  inherited;
+  &Type := AST_ASSIGN;
+  //
+  Ident := '';
+  Expression := Nil;
+end;
+
+destructor TNPC_ASTAssign.Destroy;
+begin
+  Ident := '';
+  Expression := Nil;
   inherited;
 end;
 
@@ -809,6 +886,11 @@ begin
   ProcedureIsVARArgs := False;
   ByteSize := -1; // size in bytes of storage for this type; set and used in bytecode-builder
   inherited;
+end;
+
+function TNPC_ASTTypeDefinition.DefinitionOfType: TNPC_TypeDefinitionType;
+begin
+  Result := DEF_Unknown;
 end;
 
 { TNPC_ASTDirectiveIF }

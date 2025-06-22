@@ -48,6 +48,14 @@ type
   end;
   TNPCImportArray = Array of TNPCImport;
 
+  TNPCParseStatementFlag = (
+    stafStartNewScope,                   // start new scope
+    stafStatementIsRequired,             // { } statement is required
+    stafStatementIsRequiredWithNewScope, // { } statement is required and start new scope
+    stafEmptyStatementIsAcceptable       // empty statement ';' is really ok
+  );
+  TNPCParseStatementFlags = set of TNPCParseStatementFlag;
+
   TNPCSourceParser = class
   private
     ParentParser: TNPCSourceParser;
@@ -64,21 +72,26 @@ type
   protected
     ParsingType: TNPCParsingType;
     //
-    function Unescape(const Value: String): String;
+    function Unescape(const Value: String): String; inline;
     procedure IncLevel; inline;
     procedure DecLevel; inline;
     procedure Clear;
     //
     procedure AddImport(const AImportType: TNPCImportType; const AImportName: String; const AImportPath: String);
-    function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean; overload;
-    function TokenIsReservedIdent(const AToken: TNPCToken): Boolean; overload;
-    function TokenIsLiteral(const AToken: TNPCToken): Boolean;
-    function TokenIsBiLiteral(const AToken: TNPCToken): Boolean;
-    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: TNPCReservedSymbols): Boolean; overload;
-    function TokenIsReservedSymbol(const AToken: TNPCToken): Boolean; overload;
-    procedure SkipComments;
-    function SkipComment(const AToken: TNPCToken; const ConsumeToken: Boolean = False): Boolean;
+    function TokenIsIdent(const AToken: TNPCToken): Boolean; inline;
+    function TokenIsReserved(const AToken: TNPCToken): Boolean; inline;
+    function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean; overload; inline;
+    function TokenIsReservedIdent(const AToken: TNPCToken): Boolean; overload; inline;
+    function TokenIsLiteral(const AToken: TNPCToken): Boolean; inline;
+    function TokenIsBiLiteral(const AToken: TNPCToken): Boolean; inline;
+    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: TNPCReservedSymbols): Boolean; overload;// inline;
+    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbols: Array of TNPCReservedSymbols): Boolean; overload;
+    function TokenIsReservedSymbol(const AToken: TNPCToken): Boolean; overload;// inline;
+    procedure SkipComments; inline;
+    function SkipComment(const AToken: TNPCToken; const ConsumeToken: Boolean = False): Boolean; inline;
     function IsCodeFileNamedAs(const FileName: String; const CodeName: String): Boolean;
+    function LookupTypeDefinition(const AToken: TNPCToken): TNPC_ASTTypeDefinition;
+    function IsDeclaration(var AToken: TNPCToken): Boolean;
     //
     function Parse(const ASource: TStringStream; const ASourceFile: String; const ParsingImport: Boolean = False): Boolean;
     //
@@ -96,8 +109,11 @@ type
     procedure ParseDirectives(const ABlock: TNPC_ASTBlock);
     procedure ParseComment;
 
-    procedure ParseAssignment(const AToken: TNPCToken);
-    procedure ParseExpression;
+    function  ParseStatement(const AFlags: TNPCParseStatementFlags; const ABlock: TNPC_ASTBlock): TNPC_ASTStatement; // ; var AStatement: TNPC_ASTStatement): Boolean;
+
+    function  ParseAssignment(const Ident: String): TNPC_ASTAssign;
+
+    function  ParseExpression: TNPC_ASTExpression;
     procedure ParseExpressionSimpleExpression;
     procedure ParseExpressionTerm;
     procedure ParseExpressionFactor;
@@ -353,6 +369,11 @@ begin
   Result := (AToken.&Type = tokIdent) and AToken.ReservedWord and SameText(AToken.Value, NPCReservedIdentifiers[AReservedIdent].Ident);
 end;
 
+function TNPCSourceParser.TokenIsReserved(const AToken: TNPCToken): Boolean;
+begin
+
+end;
+
 function TNPCSourceParser.TokenIsReservedIdent(const AToken: TNPCToken): Boolean;
 begin
   Result := (AToken.&Type = tokIdent) and AToken.ReservedWord;
@@ -368,11 +389,29 @@ begin
   Result := (AToken.&Type in [tokAssign..tokNotEqual]) and AToken.ReservedSymbol;
 end;
 
+function TNPCSourceParser.TokenIsIdent(const AToken: TNPCToken): Boolean;
+begin
+
+end;
+
 function TNPCSourceParser.TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: TNPCReservedSymbols): Boolean;
 begin
   Result := (AToken.&Type in [tokOParen..tokDiv]) and AToken.ReservedSymbol and (AToken.Value = NPCReservedSymbolToString(AReservedSymbol));
   if not Result then
     Result := (AToken.&Type in [tokCommentSL..tokAssign]) and AToken.ReservedSymbol and StartsStr(NPCReservedSymbolToString(AReservedSymbol), AToken.Value);
+end;
+
+function TNPCSourceParser.TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbols: Array of TNPCReservedSymbols): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  //
+  for i:=0 to Length(AReservedSymbols) - 1 do begin
+    Result := (AToken.&Type in [tokOParen..tokDiv, tokDoubleDot..tokModEqual]) and AToken.ReservedSymbol and (AToken.Value = NPCReservedSymbolToString(AReservedSymbols[i]));
+    if Result then
+      Break;
+  end;
 end;
 
 function TNPCSourceParser.TokenIsReservedSymbol(const AToken: TNPCToken): Boolean;
@@ -858,14 +897,212 @@ begin
   end;
 end;
 
+//ActualParams = '(' [ ( Expression | Designator ) | { ',' ( Expression | Designator ) } ] ')' .
+//
+//Designator = BasicDesignator { Selector } .
+//
+//BasicDesignator = Ident |
+//                  Ident [ ActualParams ] |
+//                  Ident '(' Expression ')' .
+//
+//Selector = '^' |
+//           '[' Expression { ',' Expression } ']' |
+//           '.' Ident |
+//           '(' ActualParams ')' .
+//
+//Statement = [ Label ':' ] [ ( Designator | Ident ) ':=' Expression |
+//                            ( Designator | Ident ) [ ActualParams ] { Selector } |
+//                            CompoundStatement |
+//                            IfStatement |
+//                            CaseStatement |
+//                            ForStatement |
+//                            GotoStatement |
+//                            WithStatement ] .
+//
+//Label = Ident .
+//
+//StatementList = Statement ';' { Statement ';' } .
+//
+//CompoundStatement = ( 'begin' | '{' )
+//                    StatementList
+//                    ( 'end' | '}' ) .
+
+function TNPCSourceParser.ParseStatement(const AFlags: TNPCParseStatementFlags; const ABlock: TNPC_ASTBlock): TNPC_ASTStatement; // ; var AStatement: TNPC_ASTStatement): Boolean;
+var
+  token, next_token, next_next_token: TNPCToken;
+  loc: TNPCLocation;
+  ident: String;
+  statement: TNPC_ASTStatement;
+  expression: TNPC_ASTExpression;
+  idx: Integer;
+  type_cast: TNPC_ASTTypeDefinition;
+label
+  _Declaration,
+  _Expression;
+begin
+  Result := Nil;
+//  Result := False;
+//  AStatement := Nil;
+  if Texer.IsNotEmpty then begin
+    token := Texer.GetToken;
+    loc := token.Location;
+    if (token.&Type = tokIdent) and not token.ReservedWord then begin
+      next_token := Texer.PeekToken;
+
+      // ident:
+      if TokenIsReservedSymbol(next_token, rs_Colon) then begin // it's a label
+        ident := token.Value;
+        Texer.SkipToken; // skip after ':'
+        next_next_token := Texer.PeekToken;
+        if next_next_token.&Type = tokCCurly then // '}' block close
+          statement := Nil
+        else if next_next_token.&Type = tokOCurly then // '{' new block open
+          statement := ParseStatement([stafStartNewScope, stafStatementIsRequired], ABlock) //, statement)
+        else if stafStatementIsRequiredWithNewScope in AFlags then
+          statement := ParseStatement([stafStatementIsRequired, stafEmptyStatementIsAcceptable], ABlock) //, statement)
+        else
+          statement := ParseStatement([stafEmptyStatementIsAcceptable], ABlock); //, statement);
+        //
+        Result{AStatement} := TNPC_ASTLabel.Create; // LabelStatement(Texer. loc, ident, s);
+        idx := Length(ABlock.Statements);
+        SetLength(ABlock.Statements, idx + 1);
+        ABlock.Statements[idx] := Result{AStatement};
+//        AStatement.
+//        AStatement.Block := ABlock;
+//        AStatement.Location := loc.Copy;
+//        AStatement.Expression := // never TNPC_ASTExpression.Create;, must be somthing derived from it
+//        AStatement.Expression.
+        TNPC_ASTLabel(Result).Ident := ident;
+        TNPC_ASTLabel(Result).Block := ABlock;
+        TNPC_ASTLabel(Result).Location := loc.Copy;
+        TNPC_ASTLabel(Result).Statement := statement; // never TNPC_ASTExpression.Create;, must be somthing derived from it
+//        Result := True;
+        Exit;
+      end;
+
+// case
+// TOK.question:
+// TOK.andAssign:/
+// TOK.orAssign:
+// TOK.xorAssign:
+// TOK.leftShiftAssign:
+// TOK.rightShiftAssign:
+
+      // ident.
+      // ident[
+      // ident++
+      // ident--
+      // ident:=
+      // ident+=
+      // ident-=
+      // ident*=
+      // ident/=
+      // ident%=
+      // eveluate as expression
+      if TokenIsReservedSymbol(next_token, [rs_Dot,
+                                            rs_OBracket,
+                                            rs_DoublePlus,
+                                            rs_DoubleMinus,
+                                            rs_Assign,
+                                            rs_PlusEqual,
+                                            rs_MinusEqual,
+                                            rs_MulEqual,
+                                            rs_DivEqual,
+                                            rs_ModEqual]) then
+        goto _Expression;
+
+      // ident(
+      if TokenIsReservedSymbol(next_token, rs_OParen) then begin // it may be a type_cast for variable declaration or function call
+        type_cast := LookupTypeDefinition(token);
+        if (type_cast <> Nil) and (type_cast.DefinitionOfType <> DEF_Unknown) then
+            goto _Declaration;
+        goto _Expression;  // function call
+      end;
+
+      // ;
+      if TokenIsReservedSymbol(next_token, rs_Semicolon) then // it may be a type_cast for variable declaration or function call
+        goto _Expression;
+
+      // else it must be declaration
+      if IsDeclaration(token) then
+        goto _Declaration;
+
+      goto _Expression;
+    end
+
+// case
+// TOK.charLiteral:
+// TOK.wcharLiteral:
+// TOK.dcharLiteral:
+// TOK.int32Literal:
+// TOK.uns32Literal:
+// TOK.int64Literal:
+// TOK.uns64Literal:
+// TOK.int128Literal:
+// TOK.uns128Literal:
+// TOK.float32Literal:
+// TOK.float64Literal:
+// TOK.float80Literal:
+// TOK.imaginary32Literal:
+// TOK.imaginary64Literal:
+// TOK.imaginary80Literal:
+// TOK.leftParenthesis:
+// TOK.and:
+// TOK.mul:
+// TOK.min:
+// TOK.add:
+// TOK.tilde:
+// TOK.not:
+// TOK.plusPlus:
+// TOK.minusMinus:
+// TOK.sizeof_:
+// TOK._Generic:
+// TOK._assert:
+
+    //
+    else if TokenIsReservedSymbol(token, []) then begin
+      _Declaration:
+      _Expression:
+//      expression := ParseExpression();
+//      if (token.value == TOK.identifier && exp.op == EXP.identifier) then begin
+//        error(token.loc, "found `%s` when expecting `;` or `=`, did you mean `%s %s = %s`?", peek(&token).toChars(), exp.toChars(), token.toChars(), peek(peek(&token)).toChars());
+//        nextToken();
+//      end
+//      else
+//        check(TOK.semicolon, "statement");
+//      Result := tnpc_ast // ExpStatement(loc, exp);
+      Exit;
+    end
+
+
+
+
+
+//    if TokenIsReservedSymbol(token, rs_Dollar) then begin
+//    end
+//    else if TokenIsReservedSymbol(token, rs_At) then begin
+//    end
+//    else if TokenIsReservedSymbol(token, rs_CCurly) then begin
+//      Break;
+//    end
+////    else if TokenIsReservedIdent(token, ri_imports) then begin
+////      ParseImports(token);
+////    end
+    else
+      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
+  end;
+end;
+
 // assignment = ident [param_list] ":=" expr
 //
 // param_list = ('(' | '[') ident { ',' ident } (')' | ']')
 
-procedure TNPCSourceParser.ParseAssignment(const AToken: TNPCToken);
+function TNPCSourceParser.ParseAssignment(const Ident: String): TNPC_ASTAssign;
 begin
   Texer.SkipToken; // ':='
-  {Result := }ParseExpression; // get everything until ';'
+  Result := TNPC_ASTAssign.Create;
+  Result.Ident := Ident; // ident to assign to; @TODO: check if it exists in declared variables
+  Result.Expression := ParseExpression; // get everything until ';'
   Texer.ExpectToken([tokSemicolon]);
 end;
 
@@ -891,7 +1128,7 @@ end;
 //
 // call_params = ('(' expr { ',' expr } ')') | ('[' expr { '.' expr } ']') | '^' | 'as' ident .
 
-procedure TNPCSourceParser.ParseExpression;
+function TNPCSourceParser.ParseExpression: TNPC_ASTExpression;
 var
   token: TNPCToken;
 begin
@@ -2000,35 +2237,56 @@ end;
 procedure TNPCSourceParser.ParseForParams;
 var
   token: TNPCToken;
-  sect_cnt: Byte;
-  sect_init: Boolean;
-  sect_cond: Boolean;
-  sect_post: Boolean;
+  sect_init: TNPC_ASTStatement;
+  sect_cond: TNPC_ASTExpression;
+  sect_post: TNPC_ASTExpression;
 begin
   SkipComments;
   // determine if there is 3 sections of parameters
-  sect_cnt := 0;
-  sect_init := False;
-  sect_cond := False;
-  sect_post := False;
+  sect_init := Nil;
+  sect_cond := Nil;
+  sect_post := Nil;
   //
-  while Texer.IsNotEmpty do begin
+  if Texer.IsNotEmpty then begin
     token := Texer.PeekToken;
-    if TokenIsReservedIdent(token, ri_var) or
-       (not token.ReservedWord and not token.ReservedSymbol and (token.&Type in [tokIdent..tokChar])) or
-       (token.ReservedSymbol and (token.&Type in [tokMinus..tokDiv, tokDoubleDot..tokModEqual])) then begin
-//      AddToken(token);
+    // check if semicolon was first
+    if not TokenIsReservedSymbol(token, rs_Semicolon) then begin
+      sect_init := ParseStatement([], AST);
+      SkipComments;
+      token := Texer.PeekToken;
     end
-    else if TokenIsReservedSymbol(token, rs_Semicolon) then begin
-//      AddToken(token);
-      Inc(sect_cnt);
+    else begin
+      Texer.SkipToken;
+      SkipComments;
+      token := Texer.PeekToken;
+    end;
+    // check if semicolon was second
+    if not TokenIsReservedSymbol(token, rs_Semicolon) then begin
+      sect_cond := ParseExpression;
+      SkipComments;
+      token := Texer.PeekToken;
     end
-    else if TokenIsReservedIdent(token, ri_do) or TokenIsReservedSymbol(token, rs_OCurly) then
+    else begin
+      Texer.SkipToken;
+      SkipComments;
+      token := Texer.PeekToken;
+    end;
+    sect_post := ParseExpression;
+    SkipComments;
+    token := Texer.PeekToken;
+//    if TokenIsReservedIdent(token, ri_var) or
+//       (not token.ReservedWord and not token.ReservedSymbol and (token.&Type in [tokIdent..tokChar])) or
+//       (token.ReservedSymbol and (token.&Type in [tokMinus..tokDiv, tokDoubleDot..tokModEqual])) then begin
+////      AddToken(token);
+//    end
+//    else if TokenIsReservedSymbol(token, rs_Semicolon) then begin
+////      AddToken(token);
+//      Inc(sect_cnt);
+//    end
+    if TokenIsReservedIdent(token, ri_do) or TokenIsReservedSymbol(token, rs_OCurly) then
       Exit
     else
       raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'for ', sStatement]));
-    //
-    Texer.SkipToken;
   end;
 end;
 
@@ -2121,6 +2379,63 @@ begin
   end;
 end;
 
+function TNPCSourceParser.IsDeclaration(var AToken: TNPCToken): Boolean;
+begin
+//        auto t = pt;
+//        //printf("isCDeclaration() %s\n", t.toChars());
+//        if (!isDeclarationSpecifiers(t))
+//            return false;
+//
+//        while (1)
+//        {
+//            if (t.value == TOK.semicolon)
+//            {
+//                t = peek(t);
+//                pt = t;
+//                return true;
+//            }
+//            if (!isCDeclarator(t, DTR.xdirect))
+//                return false;
+//            if (t.value == TOK.asm_)
+//            {
+//                t = peek(t);
+//                if (t.value != TOK.leftParenthesis || !skipParens(t, &t))
+//                    return false;
+//            }
+//            if (t.value == TOK.__attribute__)
+//            {
+//                t = peek(t);
+//                if (t.value != TOK.leftParenthesis || !skipParens(t, &t))
+//                    return false;
+//            }
+//            if (t.value == TOK.assign)
+//            {
+//                t = peek(t);
+//                if (!isInitializer(t))
+//                    return false;
+//            }
+//            switch (t.value)
+//            {
+//                case TOK.comma:
+//                    t = peek(t);
+//                    break;
+//
+//                case TOK.semicolon:
+//                    t = peek(t);
+//                    pt = t;
+//                    return true;
+//
+//                default:
+//                    return false;
+//            }
+//        }
+end;
+
+function TNPCSourceParser.LookupTypeDefinition(const AToken: TNPCToken): TNPC_ASTTypeDefinition;
+begin
+
+end;
+
 function SearchInFiles(const Parser: TNPCSourceParser; Path: String; const FileName: String; const Settings: TNPCProjectSettings; var FoundInPath: String; const SearchForText: String): Boolean;
 var
   SearchRec: TSearchRec;
@@ -2179,7 +2494,7 @@ end;
 function SearchSubDirectoriesForCodeName(const Parser: TNPCSourceParser; Path: String; const CodeName: String; var FoundInPath: String): Boolean;
 var
   SearchRec: TSearchRec;
-  checked_path, checked_file, found_path: String;
+  checked_path{, checked_file}, found_path: String;
   iResult: Integer;
 begin
   Result := False;
@@ -2403,7 +2718,7 @@ begin
         decl.Identifier.Location := decl.Location;
         //decl.Identifier.ResolvedDeclaration
         decl.Identifier.ParentDeclaration := TNPC_ASTDeclaration(ABlock);
-        decl.Identifier.Name := token.Value;
+        decl.Identifier.Name := UTF8String(token.Value);
         //
         if token.&Type = tokString then // @TODO: search all .npc files for code name specified in token.Value
           //raise NPCSyntaxError.NotSupportedError(token.Location, Format(sParserImportNotFound, [token.Value]));
@@ -2790,7 +3105,7 @@ begin
     else if TokenIsLiteral(token) or TokenIsBiLiteral(token) then begin
       Result := True;
       if TokenIsReservedSymbol(token, rs_Assign) then begin
-        ParseAssignment(token);
+        ParseAssignment(''{token});
         Continue;
       end
       else if TokenIsReservedSymbol(token, rs_OParen) then begin // parse function call params
@@ -2868,6 +3183,7 @@ begin
         TNPC_ASTBlock(ASTree).Flags := LongWord(BLOCK_ConsistsOfOrderedStatements);
 
         token := Texer.ExpectToken([tokIdent, tokString]);
+        // handle project name of idents with dots, like: test1.project.nitropascal
         TNPCProjectSettings(SettingsPtr^).ProjectName := token.Value;
         ConsoleWriteln('Compiling project____: ' + token.Value);
 //        AddToken(token);
