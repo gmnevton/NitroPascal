@@ -14,11 +14,13 @@ uses
   Classes,
   npc_lexer,
   npc_parser,
-  npc_project_settings;
+  npc_project_settings,
+  npc_compiler;
 
 type
   TNPCProject = class
   private
+    FCompiler: TNPCCompiler;
   protected
     procedure ReportErrors;
   public
@@ -254,6 +256,8 @@ begin
   if AFormatSettings = Nil then
     AFormatSettings := @FormatSettings;
   //
+  FCompiler := TNPCCompiler.Create;
+  //
   GetSettings.InputPath := AInputPath; // main project path
   GetSettings.ProjectName := '';
   GetSettings.ProjectEncoding := AEncoding;
@@ -286,6 +290,8 @@ begin
       AFormatSettings := @gFormatSettings
     else
       AFormatSettings := @FormatSettings;
+  //
+  FCompiler := TNPCCompiler.Create;
   //
   GetSettings.InputPath := '';
   GetSettings.ProjectName := '';
@@ -352,6 +358,8 @@ begin
     //Settings.Defines[i]. := '';
   end;
   SetLength(GetSettings.Defines, 0);
+  //
+  FCompiler.Free;
   inherited;
 end;
 
@@ -361,7 +369,8 @@ var
 begin
   Result := True;
   try
-    Parser := TNPCProjectParser.Create(Nil);
+    FCompiler.Clear;
+    Parser := TNPCProjectParser.Create(FCompiler, Nil);
     try
       Parser.ParseProject;
     finally

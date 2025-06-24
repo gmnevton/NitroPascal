@@ -29,6 +29,7 @@ type
     rs_Quote,       // '
     rs_DQuote,      // "
 
+    rs_Tilda,       // ~
     rs_Exclamation, // !
     rs_At,          // @
     rs_Hash,        // #
@@ -55,9 +56,9 @@ type
     rs_Assign,       // :=
     rs_LessEqual,    // <=
     rs_GreaterEqual, // >=
-    rs_NotEqual,     // != - alias for '<>': same as not (A = B) used like in C++: A != B
-    rs_NotEqual1,    // != - alias for '<>': same as not (A = B) used like in C++: A != B
-    rs_NotEqual2,    // != - alias for '<>': same as not (A = B) used like in C++: A != B
+    rs_NotEqual,     // <> or != - alias for '<>' or '!=': same as not (A = B) used like in C++: A != B
+    rs_NotEqual1,    // <> see rs_NotEqual
+    rs_NotEqual2,    // != see rs_NotEqual
     rs_DoublePlus,   // ++
     rs_DoubleMinus,  // --
     rs_PlusEqual,    // +=
@@ -114,6 +115,7 @@ begin
     rs_Quote       : Result := '''';
     rs_DQuote      : Result := '"';
 
+    rs_Tilda       : Result := '~';
     rs_Exclamation : Result := '!';
     rs_At          : Result := '@';
     rs_Hash        : Result := '#';
@@ -140,7 +142,7 @@ begin
     rs_Assign      : Result := ':=';
     rs_LessEqual   : Result := '<=';
     rs_GreaterEqual: Result := '>=';
-    rs_NotEqual    : Result := '<>';
+    rs_NotEqual    : Result := '<> or !=';
     rs_NotEqual1   : Result := '<>';
     rs_NotEqual2   : Result := '!=';
     rs_DoublePlus  : Result := '++';
@@ -171,6 +173,7 @@ begin
     tokQuote        : Result := rs_Quote;        // '
     tokDQuote       : Result := rs_DQuote;       // "
 
+    tokTilda        : Result := rs_Tilda;        // !
     tokExclamation  : Result := rs_Exclamation;  // !
     tokAt           : Result := rs_At;           // @
     tokHash         : Result := rs_Hash;         // #
@@ -197,8 +200,8 @@ begin
     tokAssign       : Result := rs_Assign;       // :=
     tokLessEqual    : Result := rs_LessEqual;    // <=
     tokGreaterEqual : Result := rs_GreaterEqual; // >=
-    tokNotEqual1    : Result := rs_NotEqual1;    // != - alias for '<>': same as not (A = B) used like in C++: A != B
-    tokNotEqual2    : Result := rs_NotEqual2;    // != - alias for '<>': same as not (A = B) used like in C++: A != B
+    tokNotEqual1    : Result := rs_NotEqual1;    // <>
+    tokNotEqual2    : Result := rs_NotEqual2;    // !=
     tokDoublePlus   : Result := rs_DoublePlus;   // ++
     tokDoubleMinus  : Result := rs_DoubleMinus;  // --
     tokPlusEqual    : Result := rs_PlusEqual;    // +=

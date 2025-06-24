@@ -16,6 +16,8 @@ uses
   npc_reserved_words,
   npc_reserved_symbols,
   npc_tokenizer,
+  npc_tokens,
+  npc_compiler,
   npc_utils,
   npc_error,
   npc_ast;
@@ -58,6 +60,7 @@ type
 
   TNPCSourceParser = class
   private
+    Compiler: TNPCCompiler;
     ParentParser: TNPCSourceParser;
     Tokenizer: TNPCTokenizer;
     Texer: TNPCTokensParser;
@@ -78,15 +81,17 @@ type
     procedure Clear;
     //
     procedure AddImport(const AImportType: TNPCImportType; const AImportName: String; const AImportPath: String);
+    function TokenIsOfType(const AToken: TNPCToken; const ATokenTypes: Array of TNPCTokenType): Boolean;
     function TokenIsIdent(const AToken: TNPCToken): Boolean; inline;
     function TokenIsReserved(const AToken: TNPCToken): Boolean; inline;
-    function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean; overload; inline;
     function TokenIsReservedIdent(const AToken: TNPCToken): Boolean; overload; inline;
+    function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean; overload; inline;
+    function TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdents: Array of TNPCReservedIdents): Boolean; overload;
     function TokenIsLiteral(const AToken: TNPCToken): Boolean; inline;
     function TokenIsBiLiteral(const AToken: TNPCToken): Boolean; inline;
-    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: TNPCReservedSymbols): Boolean; overload;// inline;
+    function TokenIsReservedSymbol(const AToken: TNPCToken): Boolean; overload; inline;
+    function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: TNPCReservedSymbols): Boolean; overload; inline;
     function TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbols: Array of TNPCReservedSymbols): Boolean; overload;
-    function TokenIsReservedSymbol(const AToken: TNPCToken): Boolean; overload;// inline;
     procedure SkipComments; inline;
     function SkipComment(const AToken: TNPCToken; const ConsumeToken: Boolean = False): Boolean; inline;
     function IsCodeFileNamedAs(const FileName: String; const CodeName: String): Boolean;
@@ -162,7 +167,7 @@ type
     function  ParseStatements(var AToken: TNPCToken; const AExitOnReservedIdents: Array of TNPCReservedIdents; const ALevel: Integer): Boolean;
     procedure ParseLambdaParams(const AToken: TNPCToken);
   public
-    constructor Create(const AParentParser: TNPCSourceParser);
+    constructor Create(const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser);
     destructor Destroy; override;
     //
     function ParseImportFile(const ASourceFile: String): Boolean; overload;
@@ -173,11 +178,11 @@ type
     property AST: TNPC_ASTBlock read ASTree;
   end;
 
-function NPC_CompileImport(const ASourceFileName: PChar; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
-function NPC_CompileImport(const ASourceStream: TStringStream; const ASourceFileName: PChar; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
+function NPC_CompileImport(const ASourceFileName: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
+function NPC_CompileImport(const ASourceStream: TStringStream; const ASourceFileName: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
 
-function NPC_CompileSource(const ASourceCode: PChar; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
-function NPC_CompileSource(const ASourceStream: TStringStream; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
+function NPC_CompileSource(const ASourceCode: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
+function NPC_CompileSource(const ASourceStream: TStringStream; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean; stdcall; overload;
 
 implementation
 
@@ -188,22 +193,21 @@ uses
   npc_project,
   npc_project_settings,
   npc_md5,
-  npc_tokens,
   npc_location,
   npc_types;
 
-function NPC_CompileImport(const ASourceFileName: PChar; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
+function NPC_CompileImport(const ASourceFileName: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
 var
   Source: TNPCSourceParser;
   idx: Integer;
 begin
-  Source := TNPCSourceParser.Create(ParentParser);
+  Source := TNPCSourceParser.Create(ACompiler, AParentParser);
   try
     Result := Source.ParseImportFile(ASourceFileName);
     if Result then begin
       Block := Source.AST;
-      if ParentParser <> Nil then begin
-        ParentParser.Imports[High(ParentParser.Imports)].Resolved := True;
+      if AParentParser <> Nil then begin
+        AParentParser.Imports[High(AParentParser.Imports)].Resolved := True;
       end;
     end;
   finally
@@ -211,16 +215,16 @@ begin
   end;
 end;
 
-function NPC_CompileImport(const ASourceStream: TStringStream; const ASourceFileName: PChar; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
+function NPC_CompileImport(const ASourceStream: TStringStream; const ASourceFileName: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
 begin
 
 end;
 
-function NPC_CompileSource(const ASourceCode: PChar; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
+function NPC_CompileSource(const ASourceCode: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
 var
   Source: TNPCSourceParser;
 begin
-  Source := TNPCSourceParser.Create(ParentParser);
+  Source := TNPCSourceParser.Create(ACompiler, AParentParser);
   try
     Result := Source.ParseSourceCode(ASourceCode);
   finally
@@ -228,11 +232,11 @@ begin
   end;
 end;
 
-function NPC_CompileSource(const ASourceStream: TStringStream; const ParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
+function NPC_CompileSource(const ASourceStream: TStringStream; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; var Block: TNPC_ASTBlock): Boolean;
 var
   Source: TNPCSourceParser;
 begin
-  Source := TNPCSourceParser.Create(ParentParser);
+  Source := TNPCSourceParser.Create(ACompiler, AParentParser);
   try
     Result := Source.ParseSourceCode(ASourceStream, '');
   finally
@@ -242,8 +246,9 @@ end;
 
 { TNPCSourceParser }
 
-constructor TNPCSourceParser.Create(const AParentParser: TNPCSourceParser);
+constructor TNPCSourceParser.Create(const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser);
 begin
+  Compiler := ACompiler;
   ParentParser := AParentParser;
   SettingsPtr := GetSettings;
   ParsingType := SOURCE;
@@ -364,19 +369,52 @@ begin
   Imports[idx].Resolved := False;
 end;
 
-function TNPCSourceParser.TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean;
+function TNPCSourceParser.TokenIsOfType(const AToken: TNPCToken; const ATokenTypes: Array of TNPCTokenType): Boolean;
+var
+  i: Integer;
 begin
-  Result := (AToken.&Type = tokIdent) and AToken.ReservedWord and SameText(AToken.Value, NPCReservedIdentifiers[AReservedIdent].Ident);
+  Result := False;
+  //
+  for i:=0 to Length(ATokenTypes) - 1 do begin
+    Result := AToken.&Type = ATokenTypes[i];
+    if Result then
+      Break;
+  end;
+end;
+
+function TNPCSourceParser.TokenIsIdent(const AToken: TNPCToken): Boolean;
+begin
+  Result := (AToken.&Type = tokIdent) and not AToken.ReservedWord;
 end;
 
 function TNPCSourceParser.TokenIsReserved(const AToken: TNPCToken): Boolean;
 begin
-
+  Result := AToken.ReservedWord or AToken.ReservedSymbol;
 end;
 
 function TNPCSourceParser.TokenIsReservedIdent(const AToken: TNPCToken): Boolean;
 begin
   Result := (AToken.&Type = tokIdent) and AToken.ReservedWord;
+end;
+
+function TNPCSourceParser.TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdent: TNPCReservedIdents): Boolean;
+begin
+  Result := TokenIsReservedIdent(AToken) and SameText(AToken.Value, NPCReservedIdentifiers[AReservedIdent].Ident);
+end;
+
+function TNPCSourceParser.TokenIsReservedIdent(const AToken: TNPCToken; const AReservedIdents: Array of TNPCReservedIdents): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  if not TokenIsReservedIdent(AToken) then
+    Exit;
+  //
+  for i:=0 to Length(AReservedIdents) - 1 do begin
+    Result := SameText(AToken.Value, NPCReservedIdentifiers[AReservedIdents[i]].Ident);
+    if Result then
+      Break;
+  end;
 end;
 
 function TNPCSourceParser.TokenIsLiteral(const AToken: TNPCToken): Boolean;
@@ -386,19 +424,19 @@ end;
 
 function TNPCSourceParser.TokenIsBiLiteral(const AToken: TNPCToken): Boolean;
 begin
-  Result := (AToken.&Type in [tokAssign..tokNotEqual]) and AToken.ReservedSymbol;
+  Result := (AToken.&Type in [tokAssign..tokModEqual]) and AToken.ReservedSymbol;
 end;
 
-function TNPCSourceParser.TokenIsIdent(const AToken: TNPCToken): Boolean;
+function TNPCSourceParser.TokenIsReservedSymbol(const AToken: TNPCToken): Boolean;
 begin
-
+  Result := (AToken.&Type = tokIdent) and AToken.ReservedSymbol;
 end;
 
 function TNPCSourceParser.TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbol: TNPCReservedSymbols): Boolean;
 begin
-  Result := (AToken.&Type in [tokOParen..tokDiv]) and AToken.ReservedSymbol and (AToken.Value = NPCReservedSymbolToString(AReservedSymbol));
+  Result := TokenIsLiteral(AToken) and (AToken.Value = NPCReservedSymbolToString(AReservedSymbol));
   if not Result then
-    Result := (AToken.&Type in [tokCommentSL..tokAssign]) and AToken.ReservedSymbol and StartsStr(NPCReservedSymbolToString(AReservedSymbol), AToken.Value);
+    Result := TokenIsBiLiteral(AToken) and StartsStr(NPCReservedSymbolToString(AReservedSymbol), AToken.Value);
 end;
 
 function TNPCSourceParser.TokenIsReservedSymbol(const AToken: TNPCToken; const AReservedSymbols: Array of TNPCReservedSymbols): Boolean;
@@ -412,11 +450,6 @@ begin
     if Result then
       Break;
   end;
-end;
-
-function TNPCSourceParser.TokenIsReservedSymbol(const AToken: TNPCToken): Boolean;
-begin
-  Result := (AToken.&Type = tokIdent) and AToken.ReservedSymbol;
 end;
 
 procedure TNPCSourceParser.SkipComments;
@@ -946,7 +979,7 @@ begin
   if Texer.IsNotEmpty then begin
     token := Texer.GetToken;
     loc := token.Location;
-    if (token.&Type = tokIdent) and not token.ReservedWord then begin
+    if TokenIsIdent(token) then begin
       next_token := Texer.PeekToken;
 
       // ident:
@@ -1031,21 +1064,7 @@ begin
     end
 
 // case
-// TOK.charLiteral:
-// TOK.wcharLiteral:
-// TOK.dcharLiteral:
-// TOK.int32Literal:
-// TOK.uns32Literal:
-// TOK.int64Literal:
-// TOK.uns64Literal:
-// TOK.int128Literal:
-// TOK.uns128Literal:
-// TOK.float32Literal:
-// TOK.float64Literal:
-// TOK.float80Literal:
-// TOK.imaginary32Literal:
-// TOK.imaginary64Literal:
-// TOK.imaginary80Literal:
+// TOK.Literal:
 // TOK.leftParenthesis:
 // TOK.and:
 // TOK.mul:
@@ -1060,17 +1079,21 @@ begin
 // TOK._assert:
 
     //
-    else if TokenIsReservedSymbol(token, []) then begin
-      _Declaration:
+    else if TokenIsIdent(token) or // not reserved ident
+            TokenIsReservedSymbol(token, [rs_OParen, rs_Asterisk, rs_Minus, rs_Plus,{ rs_Tilda,} rs_DoublePlus, rs_DoubleMinus]) or
+            TokenIsReservedIdent(token, [ri_and, ri_not]) then begin
+//      _Declaration:
       _Expression:
-//      expression := ParseExpression();
-//      if (token.value == TOK.identifier && exp.op == EXP.identifier) then begin
-//        error(token.loc, "found `%s` when expecting `;` or `=`, did you mean `%s %s = %s`?", peek(&token).toChars(), exp.toChars(), token.toChars(), peek(peek(&token)).toChars());
-//        nextToken();
-//      end
-//      else
+      expression := ParseExpression;
+      if TokenIsIdent(token) and (expression is TNPC_ASTIdentifier) then begin
+        //error(token.loc, "found `%s` when expecting `;` or `=`, did you mean `%s %s = %s`?", peek(&token).toChars(), exp.toChars(), token.toChars(), peek(peek(&token)).toChars());
+        Texer.SkipToken;
+      end
+      else
 //        check(TOK.semicolon, "statement");
-//      Result := tnpc_ast // ExpStatement(loc, exp);
+        Texer.ExpectToken([tokSemicolon]);
+
+      Result := expression; // ExpStatement(loc, exp);
       Exit;
     end
 
@@ -1089,6 +1112,7 @@ begin
 ////      ParseImports(token);
 ////    end
     else
+      _Declaration:
       raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, '', sProjectFile]));
   end;
 end;
@@ -2571,7 +2595,7 @@ begin
     //
     // @TODO: make it parallel
     // @TODO: create new source parser class, because we now have critical error in file processing, we clear self properties with newly loaded file, which is wrong
-    if NPC_CompileImport(PChar(checked_file), Self, ADecl.Identifier.Block) then begin
+    if NPC_CompileImport(PChar(checked_file), Compiler, Self, ADecl.Identifier.Block) then begin
 
     end
     else begin // errors
@@ -2609,7 +2633,7 @@ begin
       AddImport(itCode, AToken.Value, checked_file);
       ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
       // @TODO: make it parallel
-      if NPC_CompileImport(PChar(checked_file), Self, ADecl.Identifier.Block) then begin
+      if NPC_CompileImport(PChar(checked_file), Compiler, Self, ADecl.Identifier.Block) then begin
 
       end
       else begin // errors
@@ -2637,7 +2661,7 @@ begin
     AddImport(itCode, AToken.Value, checked_file);
     ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
     // @TODO: make it parallel
-    if NPC_CompileImport(PChar(checked_file), Self, ADecl.Identifier.Block) then begin
+    if NPC_CompileImport(PChar(checked_file), Compiler, Self, ADecl.Identifier.Block) then begin
 
     end
     else begin // errors
@@ -2676,7 +2700,7 @@ begin
       AddImport(itCode, AToken.Value, checked_file);
       ConsoleWriteln('Import found_________: "' + AToken.Value + '" at: "' + checked_file  + '"');
       // @TODO: make it parallel
-      if NPC_CompileImport(PChar(checked_file), Self, ADecl.Identifier.Block) then begin
+      if NPC_CompileImport(PChar(checked_file), Compiler, Self, ADecl.Identifier.Block) then begin
 
       end
       else begin // errors
