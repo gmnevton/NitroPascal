@@ -1,0 +1,19 @@
+﻿code 'type boolean';
+
+var
+  SomeVariable: Boolean;
+
+SomeTestFunc(): Boolean {
+  Result := True; // or False or Error
+};
+
+{.
+  we have Boolean type that is compatible with other languages
+  where value 0 means False, value 1 means True,
+  but our Boolean has special meaning for value -1 which means Error
+  
+  for compatibility reasons when calling third party libraries which might return -1 as Boolean value
+  in that case the value is absoluted (ABS) to positive number
+.}
+
+end.
