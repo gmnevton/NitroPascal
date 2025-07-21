@@ -9,9 +9,13 @@ SomeTestProc() {
 //  init-loop statement
 //  for ; [loop condition]; { statements; post-loop statement; };
 
+//  declare post-loop temporary statemet override
+//  @post-loop-override: ( statement ';' | { '{' statement ';' '}' ) ';'. // it overrides post-loop statement with new temporary statement(s);
+
 
   for i := 0; i < 100; i += 1 {
-  
+
+    @post-loop-override: i += 2; // it overrides post-loop statement with new temporary increment of +2;
   }
 };
 
