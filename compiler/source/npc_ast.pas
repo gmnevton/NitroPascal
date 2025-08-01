@@ -21,6 +21,7 @@ type
     AST_BLOCK,
     AST_EXPRESSION,
     AST_STATEMENT,
+    AST_EXPRESSION_STATEMENT,
 
     AST_IDENTIFIER,
     AST_LITERAL,
@@ -88,7 +89,10 @@ type
     BLOCK_BelongsToLoop = $4,
     BLOCK_BelongsToRecord = $8,
     BLOCK_HasBeenInferred = $10,
-    BLOCK_HasBeenByteCoded = $20
+    BLOCK_HasBeenByteCoded = $20,
+    BLOCK_IsMainProcedure = $40,
+    BLOCK_IsInitProcedure = $80,
+    BLOCK_IsDeinitProcedure = $100
   );
 
   TNPC_ASTBlock = class(TNPC_AST)
@@ -110,6 +114,9 @@ type
     //
     constructor Create; override;
     destructor Destroy; override;
+    //
+    procedure AddBlock(const Block: TNPC_ASTBlock);
+    procedure AddStatement(const Statement: TNPC_ASTStatement);
   end;
 
   TNPC_ASTExpression = class(TNPC_AST)
@@ -254,6 +261,14 @@ type
     PROCEDURE_BelongsToRunDirective = 1,
     PROCEDURE_HasImplicitResultValue = 2
   );
+
+  TNPC_ASTExpressionStatement = class(TNPC_ASTStatement)
+  public
+    // &Type = AST_EXPRESSION_STATEMENT
+    //
+    constructor Create; override;
+    destructor Destroy; override;
+  end;
 
   TNPC_ASTLabel = class(TNPC_ASTStatement)
   public
@@ -475,6 +490,26 @@ begin
   inherited;
 end;
 
+procedure TNPC_ASTBlock.AddBlock(const Block: TNPC_ASTBlock);
+var
+  idx: Integer;
+begin
+  idx := Length(ChildScopes);
+  SetLength(ChildScopes, idx + 1);
+  ChildScopes[idx] := Block;
+  Block.Parent := Self;
+end;
+
+procedure TNPC_ASTBlock.AddStatement(const Statement: TNPC_ASTStatement);
+var
+  idx: Integer;
+begin
+  idx := Length(Statements);
+  SetLength(Statements, idx + 1);
+  Statements[idx] := Statement;
+  Statement.Block := Self;
+end;
+
 { TNPC_ASTExpression }
 
 constructor TNPC_ASTExpression.Create;
@@ -677,6 +712,19 @@ begin
   Block := Nil;
   TypeDefinition := Nil;
   Expression := Nil;
+  inherited;
+end;
+
+{ TNPC_ASTExpressionStatement }
+
+constructor TNPC_ASTExpressionStatement.Create;
+begin
+  inherited;
+  &Type := AST_EXPRESSION_STATEMENT;
+end;
+
+destructor TNPC_ASTExpressionStatement.Destroy;
+begin
   inherited;
 end;
 

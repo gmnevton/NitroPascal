@@ -1,0 +1,12 @@
+﻿project 'Test_Project';
+
+{$program-type Windows32 GUI}
+
+begin
+  // program initialization code
+  SomeString := 'this is a text';
+  if ConsoleAvailable then {
+    Writeln(SomeString);
+    ConsolePause;
+  };
+end.

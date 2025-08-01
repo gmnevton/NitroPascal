@@ -138,6 +138,7 @@ begin
     rs_CommentMLE1 : Result := '.}';
     rs_CommentMLB2 : Result := '(*';
     rs_CommentMLE2 : Result := '*)';
+    //
     rs_DoubleDot   : Result := '..';
     rs_Assign      : Result := ':=';
     rs_LessEqual   : Result := '<=';

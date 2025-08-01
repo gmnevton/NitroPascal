@@ -346,18 +346,18 @@ begin
     try
       list.LoadFromFile(ALocation.FilePath + ALocation.FileName);
 
-      line_start := ALocation.StartRow - 1 - ALines;
-      if line_start < 0 then
-        line_start := 0;
+      line_start := ALocation.StartRow - ALines;
+      if line_start < 1 then
+        line_start := 1;
 
-      line_end := ALocation.EndRow - 1 + ALines;
-      if line_end > list.Count - 1 then
-        line_end := list.Count - 1;
+      line_end := ALocation.EndRow + ALines;
+      if line_end > list.Count then
+        line_end := list.Count;
 
-      while (line_start < ALocation.StartRow - 1) and (Length(list.Strings[line_start]) = 0) do
+      while (line_start < ALocation.StartRow) and (Length(list.Strings[line_start - 1]) = 0) do
         Inc(line_start);
 
-      while (line_end > ALocation.EndRow - 1) and (Length(list.Strings[line_end]) = 0) do
+      while (line_end > ALocation.EndRow) and (Length(list.Strings[line_end - 1]) = 0) do
         Dec(line_end);
 
       num_len := 1;
@@ -369,14 +369,14 @@ begin
 
       for i:=line_start to line_end do begin
         if i = line_start then
-          Result := Result + PrintGutter(num_len, i + 1)
+          Result := Result + PrintGutter(num_len, i)
         else
-          Result := Result + #13#10 + PrintGutter(num_len, i + 1);
+          Result := Result + #13#10 + PrintGutter(num_len, i);
 
         if ansi then begin
-          if i = ALocation.StartRow - 1 then begin
+          if i = ALocation.StartRow then begin
 //            Result := Result + Copy(list.Strings[i], 1, ALocation.StartCol - 1);
-            line := list.Strings[i];
+            line := list.Strings[i - 1];
             line_len := Length(line);
             ident_start := ALocation.StartCol;
             ident_end := IfThen(ALocation.EndCol > 0, ALocation.EndCol, ALocation.StartCol);
@@ -392,18 +392,18 @@ begin
               end;
             end
             else begin
-              Result := Result + syntax_highlight(list.Strings[i]) + DupeString(' ', ALocation.StartCol - line_len - 1);
+              Result := Result + syntax_highlight(list.Strings[i - 1]) + DupeString(' ', ALocation.StartCol - line_len - 1);
               Result := Result + BG_LIGHT_RED + WHITE;
               Result := Result + ' ';
               Result := Result + RESET + NORMAL;
             end;
           end
           else
-            Result := Result + syntax_highlight(list.Strings[i]);
+            Result := Result + syntax_highlight(list.Strings[i - 1]);
         end
         else begin
-          Result := Result + list.Strings[i];
-          if i = ALocation.StartRow - 1 then
+          Result := Result + list.Strings[i - 1];
+          if i = ALocation.StartRow then
             Result := Result + #13#10 + DupeString(' ', j + 1) + '| ' + DupeString(' ', ALocation.StartCol - 1) + DupeString('~', ALocation.EndCol - ALocation.StartCol);
         end;
       end;
