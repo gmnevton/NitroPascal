@@ -1,0 +1,22 @@
+﻿code 'skip directive';
+
+SkipDirective() {
+  DoThis();
+  DoThat();
+  
+  // in this example we have block of statements that will be skipped while running through this procedure,
+  // but in some cases we need to be able to execute the skippable part, so we just jump to it forward or backward
+
+  @skip: {
+    EntranceLabel:
+    
+    DoSomething();
+    DoSomethingMore();
+  };
+
+  DoLast();
+  
+  if we_need_to_do_the_skipped_part_now then goto EntranceLabel;
+}
+
+end.
