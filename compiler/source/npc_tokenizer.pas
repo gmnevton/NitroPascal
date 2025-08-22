@@ -71,7 +71,7 @@ type
     function NextToken: TNPCToken; inline; // grabs next token and preserves actual index
     procedure SkipToken; inline; // increase index to next position
     //
-    function ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
+    function ExpectToken(const ATokens: Array of TNPCTokenType; const APeekToken: Boolean = False; const AIdentWithMinus: Boolean = False): TNPCToken;
     function ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken; inline;
     function ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken; inline;
   end;
@@ -363,14 +363,18 @@ begin
   Inc(FIndex);
 end;
 
-function TNPCTokensParser.ExpectToken(const ATokens: Array of TNPCTokenType; const IdentWithMinus: Boolean = False): TNPCToken;
+function TNPCTokensParser.ExpectToken(const ATokens: Array of TNPCTokenType; const APeekToken: Boolean = False; const AIdentWithMinus: Boolean = False): TNPCToken;
 var
   token: TNPCTokenType;
 begin
-  if IdentWithMinus then
+  if AIdentWithMinus then
     Result := GetTokenWithMinus
-  else
-    Result := GetToken;
+  else begin
+    if APeekToken then
+      Result := PeekToken
+    else
+      Result := GetToken;
+  end;
   if Result = Nil then begin
     raise NPCSyntaxError.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
   end;
