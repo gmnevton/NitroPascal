@@ -65,6 +65,11 @@ begin
       Writeln('              S - for SourcesOnly or');
       Writeln('              A - for All');
       Writeln('            ]');
+      Writeln('          - output_ast[');
+      Writeln('              P - for ProjectOnly or');
+      Writeln('              S - for SourcesOnly or');
+      Writeln('              A - for All');
+      Writeln('            ]');
       Writeln;
       Writeln('Try:    npc.exe ''.\tests\simple_project\first.npe''');
       Writeln;

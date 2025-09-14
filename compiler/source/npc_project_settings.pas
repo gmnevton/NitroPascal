@@ -56,6 +56,8 @@ type
     //
     OutputTokens: TNPCProjectOutputTokensType;
     SetOutputTokens: Boolean;
+    OutputAST: TNPCProjectOutputTokensType;
+    SetOutputAST: Boolean;
   end;
 
   TNPCImportInfo = packed record
@@ -86,6 +88,7 @@ type
     //
     OutputTypes: Array of TNPCProjectOutputType;
     OutputTokens: TNPCProjectOutputTokensType;
+    OutputAST: TNPCProjectOutputTokensType;
   end;
 
   PNPCProjectSettings = ^TNPCProjectSettings;
@@ -113,6 +116,7 @@ begin
   SetLength(Settings.Defines, 0);
   SetLength(Settings.OutputTypes, 0);
   Settings.OutputTokens := otNone;
+  Settings.OutputAST := otNone;
   Settings.Errors := TStringList.Create;
 end;
 
@@ -127,6 +131,7 @@ begin
   SetLength(Settings.Defines, 0);
   SetLength(Settings.OutputTypes, 0);
   Settings.OutputTokens := otNone;
+  Settings.OutputAST := otNone;
   Settings.Errors.Free;
 end;
 

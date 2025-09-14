@@ -186,6 +186,7 @@ begin
         if Length(Param) > 1 then begin
           //format_settings{}
           //output_tokens[]
+          //output_ast[]
           if StartsText('format_settings', Param) then begin
 
           end
@@ -207,6 +208,32 @@ begin
                 if SameText(Value, 'A') then begin // All
                   commandLineSettings.OutputTokens := otProjectAndSources;
                   commandLineSettings.SetOutputTokens := True;
+                end;
+              end
+              else
+                Continue;
+            end
+            else
+              Continue;
+          end
+          else if StartsText('output_ast', Param) then begin
+            i := Pos('[', Param);
+            if i > 0 then begin
+              j := Pos(']', Param);
+              if j > 0 then begin
+                Value := Copy(Param, i + 1, j - i - 1);
+                if SameText(Value, 'P') then begin // ProjectOnly
+                  commandLineSettings.OutputAST := otProjectOnly;
+                  commandLineSettings.SetOutputAST := True;
+                end
+                else if SameText(Value, 'S') then begin // SourcesOnly
+                  commandLineSettings.OutputAST := otSourcesOnly;
+                  commandLineSettings.SetOutputAST := True;
+                end
+                else
+                if SameText(Value, 'A') then begin // All
+                  commandLineSettings.OutputAST := otProjectAndSources;
+                  commandLineSettings.SetOutputAST := True;
                 end;
               end
               else
@@ -267,12 +294,16 @@ begin
   SetLength(GetSettings.Defines, 0);
   SetLength(GetSettings.OutputTypes, 0);
   GetSettings.OutputTokens := otNone;
+  GetSettings.OutputAST := otNone;
   //
   if ASettings.SetFormatSettings then begin
     GetSettings.ProjectFormatSettings := @ASettings.FormatSettings;
   end;
   if ASettings.SetOutputTokens then begin
     GetSettings.OutputTokens := ASettings.OutputTokens;
+  end;
+  if ASettings.SetOutputAST then begin
+    GetSettings.OutputAST := ASettings.OutputAST;
   end;
   //
   GetSettings.Errors.Clear;
@@ -302,12 +333,16 @@ begin
   SetLength(GetSettings.Defines, 0);
   SetLength(GetSettings.OutputTypes, 1);
   GetSettings.OutputTokens := otNone;
+  GetSettings.OutputAST := otNone;
   //
   if ASettings.SetFormatSettings then begin
     GetSettings.ProjectFormatSettings := @ASettings.FormatSettings;
   end;
   if ASettings.SetOutputTokens then begin
     GetSettings.OutputTokens := ASettings.OutputTokens;
+  end;
+  if ASettings.SetOutputAST then begin
+    GetSettings.OutputAST := ASettings.OutputAST;
   end;
   //
   GetSettings.OutputTypes[0].OutputPath := '';
