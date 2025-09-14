@@ -38,6 +38,7 @@ type
     value_f32,
     value_f64,
     value_f80,
+    value_f128,
 
     // string
     value_string,

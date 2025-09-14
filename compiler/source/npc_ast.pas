@@ -21,6 +21,9 @@ type
     AST_BLOCK,
     AST_EXPRESSION,
     AST_STATEMENT,
+    AST_STATEMENTS,
+    AST_COMPOUND_STATEMENT,
+    AST_SCOPE_STATEMENT,
     AST_EXPRESSION_STATEMENT,
 
     AST_IDENTIFIER,
@@ -29,7 +32,7 @@ type
 
     AST_UNARY,
     AST_BINARY,
-//    AST_TERNARY,
+    AST_TERNARY,
 
     AST_ENUM,
     AST_TYPE_DEFINITION,
@@ -41,13 +44,14 @@ type
 
     AST_LABEL,
     AST_ASSIGN,
-//    AST_WHILE,
     AST_IF,
+    AST_CASE,
     AST_BREAK,
     AST_CONTINUE,
 
     AST_FOR,
-    AST_CASE,
+    AST_WHILE,
+    AST_REPEAT_UNTIL,
 
     AST_ARRAY,
     AST_ARRAY_SLICE,
@@ -171,8 +175,39 @@ type
     LITERAL_True,
     LITERAL_False,
     LITERAL_Number,
+    LITERAL_Char,
     LITERAL_String,
+    LITERAL_Identifier,
     LITERAL_Array
+  );
+
+  TNPC_NumberValueType = (
+    NUMBER_Unknown       = $0,
+    NUMBER_Uninitialized = $1,
+
+    NUMBER_bool      = $2,
+    NUMBER_int       = $4,
+    NUMBER_float     = $8,
+    NUMBER_null      = $10,
+    NUMBER_pointer   = $20,
+    NUMBER_procedure = $40,
+
+    NUMBER_s8   = $80,
+    NUMBER_s16  = $100,
+    NUMBER_s32  = $200,
+    NUMBER_s64  = $400,
+    NUMBER_s128 = $800,
+
+    NUMBER_u8   = $1000,
+    NUMBER_u16  = $2000,
+    NUMBER_u32  = $4000,
+    NUMBER_u64  = $8000,
+    NUMBER_u128 = $10000,
+
+    NUMBER_f32  = $20000,
+    NUMBER_f64  = $40000,
+    NUMBER_f80  = $80000,
+    NUMBER_f128 = $100000
   );
 
   TNPC_ASTLiteral = class(TNPC_ASTExpression)
@@ -257,6 +292,36 @@ type
     destructor Destroy; override;
   end;
 
+  TNPC_ASTStatements = class(TNPC_ASTStatement)
+  public
+    // &Type = AST_STATEMENTS
+    Statements: Array of TNPC_ASTStatement;
+    //
+    constructor Create; override;
+    destructor Destroy; override;
+    //
+    procedure AddStatement(const Statement: TNPC_ASTStatement);
+  end;
+
+  TNPC_ASTCompoundStatement = class(TNPC_ASTStatement)
+  public
+    // &Type = AST_COMPOUND_STATEMENT
+    Statements: TNPC_ASTStatements;
+    //
+    constructor Create; override;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTScopeStatement = class(TNPC_ASTStatement)
+  public
+    // &Type = AST_SCOPE_STATEMENT
+    Scope: TNPC_ASTBlock;
+    Statement: TNPC_ASTStatement;
+    //
+    constructor Create; override;
+    destructor Destroy; override;
+  end;
+
   TNPC_ProcedureFlags = (
     PROCEDURE_BelongsToRunDirective = 1,
     PROCEDURE_HasImplicitResultValue = 2
@@ -331,12 +396,12 @@ type
     destructor Destroy; override;
   end;
 
-  TNPC_ASTIf = class(TNPC_ASTExpression)
+  TNPC_ASTIfStatement = class(TNPC_ASTStatement)
   public
     // &Type = AST_IF
     Condition: TNPC_ASTExpression; // = null
-    ThenBlock: TNPC_ASTBlock; // = null
-    ElseBlock: TNPC_ASTBlock; // = null
+    ThenBlock: TNPC_ASTStatement; // = null
+    ElseBlock: TNPC_ASTStatement; // = null
     //
     constructor Create; override;
     destructor Destroy; override;
@@ -380,11 +445,15 @@ type
 
   TNPC_TypeDefinitionType = (
     DEF_Unknown,
-    DEF_Record,
+    DEF_Type,
     DEF_Enum,
+    DEF_Set,
+    DEF_BitSet,
+    DEF_Record,
     DEF_Array,
     DEF_Pointer,
     DEF_Literal,
+    DEF_Procedure,
     DEF_ProcedureArguments,
     DEF_ProcedureResult,
     DEF_ForeignFunction
@@ -715,6 +784,63 @@ begin
   inherited;
 end;
 
+{ TNPC_ASTStatements }
+
+constructor TNPC_ASTStatements.Create;
+begin
+  inherited;
+  &Type := AST_STATEMENTS;
+  //
+  Flags := 0;
+  SetLength(Statements, 0);
+end;
+
+destructor TNPC_ASTStatements.Destroy;
+begin
+  SetLength(Statements, 0);
+  inherited;
+end;
+
+procedure TNPC_ASTStatements.AddStatement(const Statement: TNPC_ASTStatement);
+var
+  idx: Integer;
+begin
+  idx := Length(Statements);
+  SetLength(Statements, idx + 1);
+  Statements[idx] := Statement;
+  Statement.Block := Block;
+end;
+
+{ TNPC_ASTCompoundStatement }
+
+constructor TNPC_ASTCompoundStatement.Create;
+begin
+  inherited;
+  Statements := Nil;
+end;
+
+destructor TNPC_ASTCompoundStatement.Destroy;
+begin
+  Statements := Nil;
+  inherited;
+end;
+
+{ TNPC_ASTScopeStatement }
+
+constructor TNPC_ASTScopeStatement.Create;
+begin
+  inherited;
+  Scope := Nil;
+  Statement := Nil;
+end;
+
+destructor TNPC_ASTScopeStatement.Destroy;
+begin
+  Statement := Nil;
+  Scope := Nil;
+  inherited;
+end;
+
 { TNPC_ASTExpressionStatement }
 
 constructor TNPC_ASTExpressionStatement.Create;
@@ -814,9 +940,9 @@ begin
   inherited;
 end;
 
-{ TNPC_ASTIf }
+{ TNPC_ASTIfStatement }
 
-constructor TNPC_ASTIf.Create;
+constructor TNPC_ASTIfStatement.Create;
 begin
   inherited;
   &Type := AST_IF;
@@ -826,7 +952,7 @@ begin
   ElseBlock := Nil;
 end;
 
-destructor TNPC_ASTIf.Destroy;
+destructor TNPC_ASTIfStatement.Destroy;
 begin
   Condition := Nil;
   ThenBlock := Nil;
