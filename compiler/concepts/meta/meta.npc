@@ -1,0 +1,43 @@
+code 'compile-time meta programming';
+
+// A meta-type function (compile-time helper)
+@meta-def: ExpandEnumRange(const Prefix: string; FromN, ToN: int32; const Extra: []string): string {
+  resultList := TStringList.Create;
+  @defer: resultList.Free;
+
+  for i := FromN to ToN do
+    resultList.Add(Prefix + IntToStr(i));
+
+  for i := 0 to Extra.High do
+    resultList.Add(Extra[i]);
+
+  Result := resultList.CommaText; // returns something like "E1,E2,E3,E4,...,E10,Extra1,Extra2"
+};
+
+type
+  TMyEnum = (@meta: ExpandEnumRange('E', 1, 10, ['Extra1', 'Extra2']));
+
+type
+  TLetters = (@meta: ExpandCharRange('A', 'Z'), Underscore);
+  TDays    = (@meta: ExpandEnumRange('Day', 1, 31, []));
+  TFlags   = (@meta: ExpandPowerOfTwo('Flag', 8)); // generates Flag1=1, Flag2=2, Flag3=4, ... , Flag8=128
+
+
+/.
+  this is a prototype of compile-time metaprogramming functionality that will be supported in the NitroPascal compiler.
+
+  there are two directives:
+
+    @meta-def:
+    @meta:
+
+  directive @meta-def: is used to define function that will be executed during compilation to 
+  modify or extend some of the source code. it will be possible to define function that is inlined.
+  directive can define a single function or block of functions.
+  
+  directive @meta: is responsible for running compile-time evaluation of defined or inlined function,
+  output of that function is inlined into source code, in place from where it was called.
+  
+./
+
+end.
