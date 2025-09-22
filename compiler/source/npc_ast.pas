@@ -59,6 +59,8 @@ type
 //    procedure Add(const AName: UTF8String; const ASymbol: TNPCSymbol);
 //    function TryGetValue(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
     //
+    procedure AddOrSetValue(const AName: UTF8String; ASymbol: TNPCSymbol);
+    function TryGetValue(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
     function Resolve(const AName: UTF8String): TNPCSymbol;
     //
     procedure DefineType(const AName: UTF8String; AType: TNPC_ASTTypeExpression; ADecl: TObject);
@@ -404,7 +406,7 @@ type
     // &Type = AST_BLOCK
     Flags: TNPC_BlockFlags;
     ParentBlock: TNPC_ASTStatementBlock;
-    Stmts: TObjectList<TNPC_ASTStatement>;
+    Statements: TObjectList<TNPC_ASTStatement>;
     //
     constructor Create(const ALocation: TNPCLocation; AParent: TNPC_ASTStatementBlock; const AFlags: TNPC_BlockFlags = []); reintroduce;
     destructor Destroy; override;
@@ -415,7 +417,7 @@ type
   TNPC_ASTStatementExpression = class(TNPC_ASTStatement)
   public
     // &Type = AST_EXPRESSION_STATEMENT
-    Expr: TNPC_ASTExpression;
+    Expression: TNPC_ASTExpression;
     //
     constructor Create(const ALocation: TNPCLocation; AExpr: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
@@ -544,6 +546,16 @@ begin
     Symbol.Free;
   Table.Free;
   inherited;
+end;
+
+procedure TNPCScope.AddOrSetValue(const AName: UTF8String; ASymbol: TNPCSymbol);
+begin
+  Table.AddOrSetValue(AName, ASymbol);
+end;
+
+function TNPCScope.TryGetValue(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
+begin
+  Result := Table.TryGetValue(AName, ASymbol);
 end;
 
 function TNPCScope.Resolve(const AName: UTF8String): TNPCSymbol;
@@ -998,12 +1010,12 @@ begin
   inherited Create(ALocation);
   &Type := AST_BLOCK;
   ParentBlock := AParent;
-  Stmts := TObjectList<TNPC_ASTStatement>.Create(True);
+  Statements := TObjectList<TNPC_ASTStatement>.Create(True);
 end;
 
 destructor TNPC_ASTStatementBlock.Destroy;
 begin
-  Stmts.Free;
+  Statements.Free;
   inherited;
 end;
 
@@ -1011,7 +1023,7 @@ procedure TNPC_ASTStatementBlock.AddStatement(const AStatement: TNPC_ASTStatemen
 begin
   if AStatement is TNPC_ASTStatementBlock then
     TNPC_ASTStatementBlock(AStatement).ParentBlock := Self;
-  Stmts.Add(AStatement);
+  Statements.Add(AStatement);
 end;
 
 { TNPC_ASTStatementExpression }
@@ -1020,13 +1032,13 @@ constructor TNPC_ASTStatementExpression.Create(const ALocation: TNPCLocation; AE
 begin
   inherited Create(ALocation);
   &Type := AST_EXPRESSION_STATEMENT;
-  Expr := AExpr;
+  Expression := AExpr;
 end;
 
 destructor TNPC_ASTStatementExpression.Destroy;
 begin
-  if Expr <> Nil then
-    Expr.Free;
+  if Expression <> Nil then
+    Expression.Free;
   inherited;
 end;
 

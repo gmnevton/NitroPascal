@@ -65,7 +65,7 @@ type
   TNPCParseDeclarationFlags = set of TNPCParseDeclarationFlag;
 
   TNPCSourceParser = class
-  private
+  strict private
     Compiler: TNPCCompiler;
     ParentParser: TNPCSourceParser;
     Tokenizer: TNPCTokenizer;
@@ -75,12 +75,14 @@ type
     ASTree: TNPC_AST;
     ScopeStack: TObjectList<TNPCScope>;
     CurrentScope: TNPCScope;
-    Imports: TNPCImportArray;
+    CurrentBlock: TNPC_ASTStatementBlock;
   private
-    FLevel: Integer;
+    Imports: TNPCImportArray;
     Builtin_IntegerType: TNPC_ASTTypeDefinition;
     Builtin_RealType: TNPC_ASTTypeDefinition;
     Builtin_BooleanType: TNPC_ASTTypeDefinition;
+  private
+    FLevel: Integer;
     //
     procedure AddProjectImport(const ASourceFile, ACodeName: String);
     function  TypeToString(const Sym: TNPCSymbol): String;
@@ -141,19 +143,19 @@ type
     function  ParsePrimaryExpression(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseSimpleExpression(const AToken: TNPCToken; const Left: TNPC_ASTExpression): TNPC_ASTExpression;
 
-    function  ParseType: TNPC_ASTTypeExpression;
-    function  ParseTypeDeclaration(const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatementTypeDecl;
-    function  ParseVariableDeclaration: TNPC_ASTStatementVarDecl;
+    function  ParseType(const AToken: TNPCToken): TNPC_ASTTypeExpression;
+    function  ParseTypeDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatementTypeDecl;
+    function  ParseVariableDeclaration(const AToken: TNPCToken): TNPC_ASTStatementVarDecl;
 
-    function  ParseBlock: TNPC_ASTStatementBlock;
-    function  ParseAssignment(const AToken: TNPCToken): TNPC_ASTExpression;
-    function  ParseIdentifier: TNPC_ASTExpression;
-    function  ParseLiteral: TNPC_ASTExpression;
-    function  ParseIf: TNPC_ASTStatementIf;
-    function  ParseCase: TNPC_ASTStatementCase;
-    function  ParseFor: TNPC_ASTStatement;
+    function  ParseBlock(const AToken: TNPCToken): TNPC_ASTStatementBlock;
+    function  ParseAssignment(const AToken: TNPCToken): TNPC_ASTStatement;
+    function  ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
+    function  ParseLiteral(const AToken: TNPCToken): TNPC_ASTExpression;
+    function  ParseIf(const AToken: TNPCToken): TNPC_ASTStatementIf;
+    function  ParseCase(const AToken: TNPCToken): TNPC_ASTStatementCase;
+    function  ParseFor(const AToken: TNPCToken): TNPC_ASTStatement;
     procedure ParseForParams;
-    function  ParseWhile: TNPC_ASTStatementWhile;
+    function  ParseWhile(const AToken: TNPCToken): TNPC_ASTStatementWhile;
     procedure ParseCall(const AToken: TNPCToken);
     procedure ParseCallParams(const AToken: TNPCToken);
 
@@ -743,33 +745,33 @@ end;
 procedure TNPCSourceParser.AddStatement(const AStmt: TNPC_ASTStatement);
 begin
   if Assigned(CurrentBlock) then
-    CurrentBlock.Statements.Add(S)
+    CurrentBlock.AddStatement(AStmt)
   else
     raise Exception.Create('No current block to add statement to');
 end;
 
 procedure TNPCSourceParser.DeclareSymbol(const AName: String; const ASym: TNPCSymbol);
 var
-  scope: TScope;
+  scope: TNPCScope;
 begin
-  if FScopeStack.Count = 0 then
+  if ScopeStack.Count = 0 then
     Exit;
   //
-  scope := FScopeStack.Last;
+  scope := ScopeStack.Last;
   // allow shadowing: put symbol in current scope
-  scope.AddOrSetValue(Name, Sym);
+  scope.AddOrSetValue(AName, ASym);
 end;
 
 function TNPCSourceParser.LookupSymbol(const AName: String): TNPCSymbol;
 var
   i: Integer;
-  scope: TScope;
-  sym: TSymbol;
+  scope: TNPCScope;
+  sym: TNPCSymbol;
 begin
   Result := Nil;
-  for i := FScopeStack.Count - 1 downto 0 do begin
-    scope := FScopeStack[i];
-    if scope.TryGetValue(Name, sym) then
+  for i := ScopeStack.Count - 1 downto 0 do begin
+    scope := ScopeStack[i];
+    if scope.TryGetValue(AName, sym) then
       Exit(sym);
   end;
 end;
@@ -1330,64 +1332,55 @@ end;
 
 function TNPCSourceParser.ParseStatement(const AFlags: TNPCParseStatementFlags): TNPC_ASTStatement;
 var
-  name: string;
-  target: TExpr;
-  rhs: TExpr;
-  expr: TExpr;
-  block: TBlockStmt;
+  token: TNPCToken;
+  name: String;
+  target: TNPC_ASTExpression;
+  rhs: TNPC_ASTExpression;
+  expr: TNPC_ASTExpression;
+  block: TNPC_ASTStatementBlock;
 begin
-  case FToken.Kind of
-    tkIdentifier: begin
-      // might be assignment
-      Result := ParseAssignment;
+  token := Texer.PeekToken;
+  //
+  if TokenIsIdent(token) then begin // might be assignment
+    Result := ParseAssignment(token);
+  end
+  else if TokenIsReservedIdent(token, ri_type) then begin
+    Result := ParseTypeDeclaration(token, []);
+  end
+  else if TokenIsReservedIdent(token, ri_var) then begin
+    Result := ParseVariableDeclaration(token);
+  end
+  else if TokenIsReservedIdent(token, ri_begin) or TokenIsReservedSymbol(token, rs_OCurly) then begin
+    Result := ParseBlock(token);
+  end
+  else if TokenIsReservedIdent(token, ri_if) then begin
+    Result := ParseIf(token);
+  end
+  else if TokenIsReservedIdent(token, ri_for) then begin
+    Result := ParseFor(token);
+  end
+  else if TokenIsReservedIdent(token, ri_while) then begin
+    Result := ParseWhile(token);
+  end
+  else begin
+    // expression or assignment statement
+    expr := ParseExpression(token, 0);
+    // if next token is assign ':=' -> assignment
+    token := Texer.PeekToken;
+    if TokenIsReservedSymbol(token, rs_Assign) then begin
+      // left must be an lvalue; we keep it as expression for now
+      target := expr;
+      Texer.SkipToken; // consume :=
+      token := Texer.PeekToken;
+      rhs := ParseExpression(token, 0);
+      Texer.ExpectToken([tokSemicolon]);
+      Result := TNPC_ASTStatementAssign.Create(target.Location, target, rhs);
+    end
+    else begin
+      // expression statement
+      Texer.ExpectToken([tokSemicolon]);
+      Result := TNPC_ASTStatementExpression.Create(expr.Location, expr);
     end;
-    tkType: begin
-      Result := ParseTypeDecl;
-      Exit;
-    end;
-    tkVar: begin
-      Result := ParseVarDecl;
-      Exit;
-    end;
-    tkBegin: begin
-      Result := ParseBlock;
-      Exit;
-    end;
-    tkIf: begin
-      Result := ParseIf;
-      Exit;
-    end;
-    tkWhile: begin
-      Result := ParseWhile;
-      Exit;
-    end;
-    tkFor: begin
-      Result := ParseFor;
-      Exit;
-    end;
-    else
-      begin
-        // expression or assignment statement
-        expr := ParseExpression(0);
-        // if next token is assign ':=' -> assignment
-        if (FToken.Kind = tkAssign) then
-        begin
-          // left must be an lvalue; we keep it as expression for now
-          target := expr;
-          Advance; // consume :=
-          rhs := ParseExpression(0);
-          Eat(tkSemicolon);
-          Result := TAssignStmt.Create(target, rhs);
-          Exit;
-        end
-        else
-        begin
-          // expression statement
-          Eat(tkSemicolon);
-          Result := TExprStmt.Create(expr);
-          Exit;
-        end;
-      end;
   end;
 end;
 
@@ -1705,7 +1698,7 @@ begin
   end;
 end;
 
-function TNPCSourceParser.ParseType: TNPC_ASTTypeExpression;
+function TNPCSourceParser.ParseType(const AToken: TNPCToken): TNPC_ASTTypeExpression;
 begin
   if Current.Kind = tkIdentifier then
   begin
@@ -1807,7 +1800,7 @@ begin
     raise Exception.Create('Unexpected type syntax');
 end;
 
-function TNPCSourceParser.ParseTypeDeclaration(const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatementTypeDecl;
+function TNPCSourceParser.ParseTypeDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatementTypeDecl;
 //begin
 //  Result := Nil;
 //  if Texer.IsEmpty then
@@ -1918,28 +1911,35 @@ begin
 end;
 
 function TNPCSourceParser.ParseBlock: TNPC_ASTStatementBlock;
+var
+  oldBlock: TBlockStmt;
 begin
   ExpectKind(tkBegin);
   EnterScope; // new lexical scope for this block
-  Result := TBlockStmt.Create;
-  while not TokenIs(tkEnd) do
-  begin
-    if TokenIs(tkEOF) then
-      raise Exception.Create('Unexpected EOF inside block');
-//    var Stmt := ParseStatement;
-//    if Assigned(Stmt) then
-//      AddStatement(Stmt);
-    Result.Stmts.Add(ParseStatement);
+  Result := TNPC_ASTStatementBlock.Create;
+  try
+    oldBlock := CurrentBlock;
+    CurrentBlock := Result;
+    while not TokenIs(tkEnd) do begin
+      if TokenIs(tkEOF) then
+        raise Exception.Create('Unexpected EOF inside block');
+      //Result.Stmts.Add(ParseStatement);
+      var Stmt := ParseStatement;
+      if Assigned(Stmt) then
+        AddStatement(Stmt);
+    end;
+    ExpectKind(tkEnd);
+  finally
+    LeaveScope;
+    CurrentBlock := oldBlock;
   end;
-  ExpectKind(tkEnd);
-  LeaveScope;
 end;
 
 // assignment = ident [param_list] ":=" expr
 //
 // param_list = ('(' | '[') ident { ',' ident } (')' | ']')
 
-function TNPCSourceParser.ParseAssignment(const AToken: TNPCToken): TNPC_ASTExpression;
+function TNPCSourceParser.ParseAssignment(const AToken: TNPCToken): TNPC_ASTStatement;
 //var
 //  assign_type: TNPCToken;
 //  exp: TNPC_ASTExpression;
