@@ -153,19 +153,21 @@ type
 
   // Types
 
-  TNPC_ASTTypeDefinition = class(TNPC_ASTExpression)
-  public
-    // &Type = AST_TYPE_DEFINITION
-    //
-    constructor Create(const ALocation: TNPCLocation); override;
-    destructor Destroy; override;
-  end;
-
   TNPC_ASTTypeExpression = class(TNPC_ASTExpression)
   public
     // &Type = AST_TYPE_DECLARATION
     //
     constructor Create(const ALocation: TNPCLocation); override;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTTypeDefinition = class(TNPC_ASTTypeExpression)
+  public
+    // &Type = AST_TYPE_DEFINITION
+    Name: UTF8String;
+    SizeInBytes: Byte;
+    //
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Byte); reintroduce;
     destructor Destroy; override;
   end;
 
@@ -605,14 +607,17 @@ end;
 
 { TNPC_ASTTypeDefinition }
 
-constructor TNPC_ASTTypeDefinition.Create;
+constructor TNPC_ASTTypeDefinition.Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Byte);
 begin
-  inherited;
+  inherited Create(ALocation);
   &Type := AST_TYPE_DEFINITION;
+  Name := AName;
+  SizeInBytes := ASizeInBytes;
 end;
 
 destructor TNPC_ASTTypeDefinition.Destroy;
 begin
+  Name := '';
   inherited;
 end;
 

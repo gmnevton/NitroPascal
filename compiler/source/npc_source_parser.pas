@@ -74,9 +74,13 @@ type
     SettingsPtr: Pointer;
     ASTree: TNPC_AST;
     ScopeStack: TObjectList<TNPCScope>;
+    CurrentScope: TNPCScope;
     Imports: TNPCImportArray;
   private
     FLevel: Integer;
+    Builtin_IntegerType: TNPC_ASTTypeDefinition;
+    Builtin_RealType: TNPC_ASTTypeDefinition;
+    Builtin_BooleanType: TNPC_ASTTypeDefinition;
     //
     procedure AddProjectImport(const ASourceFile, ACodeName: String);
     function  TypeToString(const Sym: TNPCSymbol): String;
@@ -86,7 +90,7 @@ type
     //
     function Unescape(const Value: String): String; inline;
     function  GetPrecedence(const AToken: TNPCToken): Integer;
-    procedure EnterScope; //inline;
+    procedure EnterScope(const AParentScope: TNPCScope); //inline;
     procedure LeaveScope; //inline;
     procedure InitBuiltins(const AScope: TNPCScope);
     procedure Clear;
@@ -264,11 +268,15 @@ begin
   Texer := Nil;
   ASTree := Nil;
   FLevel := 0;
+  ScopeStack := TObjectList<TNPCScope>.Create(False);
+  CurrentScope := Nil;
 end;
 
 destructor TNPCSourceParser.Destroy;
 begin
   Clear;
+  // clear scopes
+  ScopeStack.Free;
   inherited;
 end;
 
@@ -371,67 +379,76 @@ end;
 
 function TNPCSourceParser.GetPrecedence(const AToken: TNPCToken): Integer;
 begin
-  case AToken.&Type of
-    tokOr: Result := 1;
-    tkXor: Result := 2;
-    tkAnd: Result := 3;
-    tkEq,
-    tkNeq,
-    tkLT,
-    tkLTE,
-    tkGT,
-    tkGTE: Result := 4;
-    tkPlus,
-    tkMinus: Result := 5;
-    tkStar,
-    tkSlash,
-    tkPercent,
-    tkMod,
-    tkShl,
-    tkShr: Result := 6;
-    tkAssign: Result := 0; // assignment handled as statement-level
-    tkDot: Result := 9; // member access very high
-    tkLBracket: Result := 9; // indexing high
+  if TokenIsReservedSymbol(AToken, rs_Assign) then // ':=' // assignment handled as statement-level
+    Exit(0)
+  else if TokenIsReservedIdent(AToken, ri_or) then // 'or'
+    Exit(1)
+  else if TokenIsReservedIdent(AToken, ri_xor) then // 'xor'
+    Exit(2)
+  else if TokenIsReservedIdent(AToken, ri_and) then // 'and'
+    Exit(3)
+  else if TokenIsReservedSymbol(AToken, [rs_Exclamation, // '!'
+                                         rs_Equal,       // '='
+                                         rs_LessThan,    // '<'
+                                         rs_LessEqual,   // '<='
+                                         rs_GreaterThan, // '>'
+                                         rs_GreaterEqual // '>='
+                                        ]) then
+    Exit(4)
+  else if TokenIsReservedSymbol(AToken, [rs_Plus, rs_Minus]) then // '+', '-'
+    Exit(5)
+  else if TokenIsReservedSymbol(AToken, [rs_Asterisk, // '*'
+                                         rs_Div,      // '/'
+                                         rs_Percent,  // '%'
+                                         rs_ModEqual  // '%='
+                                        ]) then
+    Exit(6)
+  else if TokenIsReservedIdent(AToken, ri_mod) then // 'mod'
+    Exit(6)
+  else if TokenIsReservedIdent(AToken, [ri_shl, ri_shr]) then // 'shl', 'shr'
+    Exit(6)
+  else if TokenIsReservedSymbol(AToken, [rs_Dot, rs_OBracket]) then // '.', '[' // member access very high / indexing high
+    Exit(9)
   else
     Result := 0;
-  end;
 end;
 
-procedure TNPCSourceParser.EnterScope;
+procedure TNPCSourceParser.EnterScope(const AParentScope: TNPCScope);
 begin
-  FScopeStack.Add(TScope.Create(16));
+  ScopeStack.Add(TNPCScope.Create(AParentScope));
+  CurrentScope := ScopeStack.Last;
+  if AParentScope = Nil then
+    InitBuiltins(CurrentScope);
 end;
 
 procedure TNPCSourceParser.LeaveScope;
 var
-  s: TScope;
+  s: TNPCScope;
 begin
-  if FScopeStack.Count = 0 then
+  if ScopeStack.Count = 0 then
     Exit;
   //
-  s := FScopeStack.Last;
-  FScopeStack.Delete(FScopeStack.Count - 1);
+  s := ScopeStack.Last;
+  ScopeStack.Delete(ScopeStack.Count - 1);
   s.Free;
+  //
+  if ScopeStack.Count > 0 then
+    CurrentScope := ScopeStack.Last
+  else
+    CurrentScope := Nil;
 end;
 
 procedure TNPCSourceParser.InitBuiltins(const AScope: TNPCScope);
 begin
   // register built-in types
-  BuiltinIntegerType := TTypeName.Create;
-  TTypeName(BuiltinIntegerType).Name := 'Integer';
-  CurrentScope.DefineType('Integer', BuiltinIntegerType);
+  Builtin_IntegerType := TNPC_ASTTypeDefinition.Create(Nil, 'Integer', 4);
+  AScope.DefineType('Integer', Builtin_IntegerType, Nil);
 
-  BuiltinRealType := TTypeName.Create;
-  TTypeName(BuiltinRealType).Name := 'Real';
-  CurrentScope.DefineType('Real', BuiltinRealType);
+  Builtin_IntegerType := TNPC_ASTTypeDefinition.Create(Nil, 'Real', 8);
+  AScope.DefineType('Real', Builtin_RealType, Nil);
 
-  BuiltinBooleanType := TTypeName.Create;
-  TTypeName(BuiltinBooleanType).Name := 'Boolean';
-  CurrentScope.DefineType('Boolean', BuiltinBooleanType);
-
-//  Scope.DefineType('Integer', TTypeName.Create('Integer'));
-//  Scope.DefineType('Real', TTypeName.Create('Real'));
-//  Scope.DefineType('Boolean', TTypeName.Create('Boolean'));
+  Builtin_BooleanType := TNPC_ASTTypeDefinition.Create(Nil, 'Boolean', 1);
+  AScope.DefineType('Boolean', Builtin_BooleanType, Nil);
 
 //var
 //  intSym, boolSym, strSym: TSymbol;
@@ -467,9 +484,12 @@ begin
 //  for i:=0 to High(TokensArray) do
 //    FreeAndNil(TokensArray[i]);
 //  SetLength(TokensArray, 0);
-//  FIndex := 0;
-//  if ASTree <> Nil then
-//    FreeAndNil(ASTree);
+  FLevel := 0;
+  // clear scopes
+  while ScopeStack.Count > 0 do
+    LeaveScope;
+  if ASTree <> Nil then
+    FreeAndNil(ASTree);
 end;
 
 procedure TNPCSourceParser.AddImport(const AImportType: TNPCImportType; const AImportName, AImportPath: String);
@@ -717,54 +737,7 @@ end;
 
 function TNPCSourceParser.IsDeclaration(var AToken: TNPCToken): Boolean;
 begin
-//        auto t = pt;
-//        //printf("isCDeclaration() %s\n", t.toChars());
-//        if (!isDeclarationSpecifiers(t))
-//            return false;
-//
-//        while (1)
-//        {
-//            if (t.value == TOK.semicolon)
-//            {
-//                t = peek(t);
-//                pt = t;
-//                return true;
-//            }
-//            if (!isCDeclarator(t, DTR.xdirect))
-//                return false;
-//            if (t.value == TOK.asm_)
-//            {
-//                t = peek(t);
-//                if (t.value != TOK.leftParenthesis || !skipParens(t, &t))
-//                    return false;
-//            }
-//            if (t.value == TOK.__attribute__)
-//            {
-//                t = peek(t);
-//                if (t.value != TOK.leftParenthesis || !skipParens(t, &t))
-//                    return false;
-//            }
-//            if (t.value == TOK.assign)
-//            {
-//                t = peek(t);
-//                if (!isInitializer(t))
-//                    return false;
-//            }
-//            switch (t.value)
-//            {
-//                case TOK.comma:
-//                    t = peek(t);
-//                    break;
-//
-//                case TOK.semicolon:
-//                    t = peek(t);
-//                    pt = t;
-//                    return true;
-//
-//                default:
-//                    return false;
-//            }
-//        }
+
 end;
 
 procedure TNPCSourceParser.AddStatement(const AStmt: TNPC_ASTStatement);
@@ -807,6 +780,9 @@ var
 //  idx: Integer;
 begin
   Result := False;
+
+  EnterScope(CurrentScope);
+
   Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(SettingsPtr^).ProjectFormatSettings^);
   try
     if ASource <> Nil then

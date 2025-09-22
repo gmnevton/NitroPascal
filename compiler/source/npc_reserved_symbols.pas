@@ -174,7 +174,7 @@ begin
     tokQuote        : Result := rs_Quote;        // '
     tokDQuote       : Result := rs_DQuote;       // "
 
-    tokTilda        : Result := rs_Tilda;        // !
+    tokTilda        : Result := rs_Tilda;        // ~
     tokExclamation  : Result := rs_Exclamation;  // !
     tokAt           : Result := rs_At;           // @
     tokHash         : Result := rs_Hash;         // #
