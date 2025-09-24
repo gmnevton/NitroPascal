@@ -141,7 +141,7 @@ type
     function  ParseStatement(const AFlags: TNPCParseStatementFlags): TNPC_ASTStatement;
     function  ParseExpression(const AToken: TNPCToken; Prec: Integer = 0): TNPC_ASTExpression;
     function  ParsePrimaryExpression(const AToken: TNPCToken): TNPC_ASTExpression;
-    function  ParseSimpleExpression(const AToken: TNPCToken; const Left: TNPC_ASTExpression): TNPC_ASTExpression;
+    function  ParseSimpleExpression(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
 
     function  ParseType(const AToken: TNPCToken): TNPC_ASTTypeExpression;
     function  ParseTypeDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatementTypeDecl;
@@ -151,12 +151,15 @@ type
     function  ParseAssignment(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseLiteral(const AToken: TNPCToken): TNPC_ASTExpression;
+    function  ParseSet(const AToken: TNPCToken): TNPC_ASTExpression;
+    function  ParseIndex(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
+    function  ParseRecordMember(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseIf(const AToken: TNPCToken): TNPC_ASTStatementIf;
     function  ParseCase(const AToken: TNPCToken): TNPC_ASTStatementCase;
     function  ParseFor(const AToken: TNPCToken): TNPC_ASTStatement;
     procedure ParseForParams;
     function  ParseWhile(const AToken: TNPCToken): TNPC_ASTStatementWhile;
-    procedure ParseCall(const AToken: TNPCToken);
+    function  ParseCall(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpressionCall;
     procedure ParseCallParams(const AToken: TNPCToken);
 
     procedure SearchImportByCodeName(const AToken: TNPCToken; const SearchPath: String; const SearchFileName: String);
@@ -1430,19 +1433,24 @@ function TNPCSourceParser.ParseExpression(const AToken: TNPCToken; Prec: Integer
 //  Result := exp;
 //end;
 var
-  left: TExpr;
+  token: TNPCToken;
+  left: TNPC_ASTExpression;
   curPrec: Integer;
-  opTok: TToken;
+//  opTok: TNPCToken;
 begin
-  left := ParsePrimaryExpression; // nud
+  token := Texer.PeekToken;
+  left := ParsePrimaryExpression(token); // nud
   try
     while True do begin
-      curPrec := GetPrecedence(FToken);
+      token := Texer.PeekToken;
+      if token.&Type = tokEOF then
+        Break;
+      curPrec := GetPrecedence(token);
       if (curPrec = 0) or (curPrec <= Prec) then
         Break;
-      opTok := FToken;
-      Advance;
-      left := ParseSimpleExpression(left, opTok); // led
+//      opTok := token;
+//      Texer.SkipToken;
+      left := ParseSimpleExpression(token, left); // led
     end;
     Result := left;
   except
@@ -1478,277 +1486,203 @@ function TNPCSourceParser.ParsePrimaryExpression(const AToken: TNPCToken): TNPC_
 //  end;
 //end;
 var
-  t: TToken;
-  inner: TExpr;
+  token: TNPCToken;
+  op: UTF8String;
+  inner: TNPC_ASTExpression;
 begin
-  t := FToken;
-  case t.Kind of
-    tkInteger: begin
-      Result := ParseLiteral;
-    end;
-    tkIdentifier: begin
-      Advance;
-      // an identifier may be followed by '(' (call) or '[' (index) and will be handled in infix
-      Result := TIdentExpr.Create(t.Text);
-    end;
-    tkNumber: begin
-      Advance;
-      Result := TNumberExpr.Create(t.Text);
-    end;
-    tkString: begin
-      Advance;
-      Result := TStringExpr.Create(t.Text);
-    end;
-    tkMinus: begin
-      Advance;
-      inner := ParseExpression(GetPrecedence(t)); // unary - bind tighter than additive
-      Result := TUnaryExpr.Create('-', inner);
-    end;
-    tkPlus: begin
-      Advance;
-      expr := ParseExpression(GetPrecedence(t));
-      Result := TUnaryExpr.Create('+', expr);
-    end;
-    tkNot: begin
-      Advance;
-      expr := ParseExpression(7);
-      Result := TUnaryExpr.Create('not', expr);
-    end;
-    tkLParen: begin
-      Advance;
-      inner := ParseExpression(0);
-      ExpectKind(tkRParen);
-      Result := inner;
-    end
-    tkLBracket: begin
-      Advance;
-      var Elements := TList<TExpr>.Create;
-      try
-        if Current.Kind <> tkRBracket then
-        repeat
-          Elements.Add(ParseExpression);
-        until not Match(tkComma);
-        Expect(tkRBracket);
-
-        var SetType: TTypeSet := nil;
-        var ElemType: TTypeExpr := nil;
-
-        if Elements.Count > 0 then
-        begin
-          // infer element type from first element
-          for var E in Elements do
-          begin
-            var ThisType: TTypeExpr := nil;
-
-            if E is TExprEnumConst then
-              ThisType := TExprEnumConst(E).EnumType
-            else if E is TExprLiteral then
-              ThisType := TExprLiteral(E).LiteralType
-            else if E is TExprVariable then
-            begin
-              var Sym := CurrentScope.Resolve(TExprVariable(E).Name);
-              if not Assigned(Sym) then
-                raise Exception.Create('Unknown identifier: ' + TExprVariable(E).Name);
-              ThisType := Sym.TypeRef;
-            end;
-
-            if not Assigned(ThisType) then
-              raise Exception.Create('Unsupported element in set literal');
-
-            if not Assigned(ElemType) then
-              ElemType := ThisType
-            else if ElemType <> ThisType then
-              raise Exception.CreateFmt('Type mismatch in set literal: expected %s, found %s',
-                [ElemType.Name, ThisType.Name]);
-          end;
-
-          SetType := TTypeSet.Create;
-          SetType.ElementType := ElemType;
-        end;
-
-        // For empty set, SetType stays nil (to be filled later from context)
-        var SetLit := TExprSetLiteral.Create(SetType);
-        for var E in Elements do
-          SetLit.Elements.Add(E);
-        Result := SetLit;
-      finally
-        Elements.Free;
-      end;
-    end;
+  if TokenIsIdent(AToken) or TokenIsNumber(AToken) or TokenIsString(AToken) or TokenIsChar(AToken) then begin
+    Result := ParseLiteral(AToken);
+  end
+  else if TokenIsReservedSymbol(AToken, [rs_Minus, rs_Plus]) then begin
+    Texer.SkipToken;
+    token := Texer.PeekToken;
+    op := AToken.Value;
+    inner := ParseExpression(token, GetPrecedence(token)); // unary - bind tighter than additive
+    Result := TNPC_ASTExpressionUnary.Create(AToken.Location, op, inner);
+  end
+  else if TokenIsReservedIdent(token, ri_not) or TokenIsReservedSymbol(token, rs_Exclamation) then begin // 'not' / '!'
+    Texer.SkipToken;
+    token := Texer.PeekToken;
+    op := token.Value;
+    inner := ParseExpression(token, 7);
+    Result := TNPC_ASTExpressionUnary.Create(AToken.Location, op, inner);
+  end
+  else if TokenIsReservedSymbol(token, rs_OParen) then begin // '('
+    Texer.SkipToken;
+    token := Texer.PeekToken;
+    inner := ParseExpression(token, 0);
+    Texer.ExpectReservedSymbol(rs_CParen); // ')'
+    Result := inner;
+  end
+  else if TokenIsReservedSymbol(token, rs_OBracket) then begin // '['
+    Texer.SkipToken;
+    inner := ParseSet(AToken);
+    Texer.ExpectReservedSymbol(rs_CBracket); // ']'
+    Result := inner;
+  end
   else
-    raise Exception.CreateFmt('Unexpected token in prefix: %s', [t.Text]);
-  end;
+    raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnexpectedTokenIn, [AToken.TokenToString, '', sStatement]));
 end;
 
-function TNPCSourceParser.ParseSimpleExpression(const AToken: TNPCToken; const Left: TNPC_ASTExpression): TNPC_ASTExpression;
+function TNPCSourceParser.ParseSimpleExpression(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
 var
-  opTxt: string;
-  right: TExpr;
-  callNode: TCallExpr;
-  idx: TIndexExpr;
+  token: TNPCToken;
+  op: UTF8String;
+  right: TNPC_ASTExpression;
+  idx: TNPC_ASTExpressionIndex;
 begin
-  opTxt := OpTok.Text;
-  case OpTok.Kind of
-    tkPlus, tkMinus, tkStar, tkSlash, tkPercent, tkAnd, tkOr, tkXor, tkShl, tkShr, tkEq, tkNeq, tkLT, tkLTE, tkGT, tkGTE, tkMod: begin
-      right := ParseExpression(GetPrecedence(OpTok));
-      Result := TBinaryExpr.Create(Left, opText, right);
-    end;
-    tkDot: begin
-//        // member access: expect identifier
-//        if FToken.Kind <> tkIdentifier then
-//          raise Exception.Create('Expected member identifier after .');
-//        memberName := FToken.Text;
-//        Advance;
-//        Result := TMemberExpr.Create(Left, memberName);
+  if TokenIsReservedSymbol(AToken, [rs_Plus,       // '+'
+                                    rs_Minus,      // '-'
+                                    rs_Asterisk,   // '*'
+                                    rs_Div,        // '/'
+                                    rs_Percent,    // '%'
+                                    rs_Equal,      // '='
+                                    rs_Exclamation // '!'
+//                                    rs_NotEqual,
+//                                    rs_NotEqual1,
+//                                    rs_NotEqual2
 
-      Advance;
-      var Field := ExpectIdentifier;
-
-      if not (Left is TExprVariable) then
-        raise Exception.Create('Field access must be on a variable');
-
-      var VarSym := CurrentScope.Resolve(TExprVariable(Left).Name);
-      if not Assigned(VarSym) or not (VarSym.TypeRef is TTypeRecord) then
-        raise Exception.Create('Variable is not a record: ' + TExprVariable(Left).Name);
-
-      var RecType := TTypeRecord(VarSym.TypeRef);
-      if not RecType.Fields.ContainsKey(Field) then
-        raise Exception.CreateFmt('Unknown field "%s" in record "%s"', [Field, TExprVariable(Left).Name]);
-
-      var FieldType := RecType.Fields[Field];
-      Left := TExprRecordField.Create(Left, Field, FieldType);
-      Result := Left;
-    end;
-    tkLParen: begin
-      // call: Left is callee
-      callNode := TCallExpr.Create(Left);
-      if not TokenIs(tkRParen) then
-      begin
-        while not TokenIs(tkRParen) do
-        begin
-          callNode.Args.Add(ParseExpression(0));
-          if TokenIs(tkComma) then Advance else Break;
-        end;
-      end;
-      ExpectKind(tkRParen);
-      Result := callNode;
-    end;
-    tkLBracket: begin
-//        // indexing: [expr]
-//        Advance;
-//        idx := TIndexExpr.Create(Left, ParseExpression(0));
-//        ExpectKind(tkRBracket);
-//        Result := idx;
-
-      Advance;
-      var IndexExpr := ParseExpression;
-      Expect(tkRBracket);
-
-      if not (Left is TExprVariable) then
-        raise Exception.Create('Array access must be on a variable');
-
-      var VarSym := CurrentScope.Resolve(TExprVariable(Left).Name);
-      if not Assigned(VarSym) or not (VarSym.TypeRef is TTypeArray) then
-        raise Exception.Create('Variable is not an array: ' + TExprVariable(Left).Name);
-
-      var ArrType := TTypeArray(VarSym.TypeRef);
-      Left := TExprArrayAccess.Create(Left, IndexExpr, ArrType.ElementType);
-      Result := Left;
-    end;
-    tkIn: begin
-      var RightExpr := ParseExpression;
-
-      if not (RightExpr is TExprSetLiteral) then
-        raise Exception.Create('Right side of "in" must be a set');
-
-      var SetLit := TExprSetLiteral(RightExpr);
-      var SetType := SetLit.SetType;
-
-      // Determine type of left operand
-      var LeftType: TTypeExpr := nil;
-      if Left is TExprVariable then begin
-        var Sym := CurrentScope.Resolve(TExprVariable(Left).Name);
-        if Assigned(Sym) then
-          LeftType := Sym.TypeRef;
-      end
-      else if Left is TExprEnumConst then
-        LeftType := TExprEnumConst(Left).EnumType
-      else if Left is TExprLiteral then
-        LeftType := TExprLiteral(Left).LiteralType;
-
-      if not Assigned(LeftType) then
-        raise Exception.Create('Cannot determine type of left operand in "in" expression');
-
-      // If RHS is empty set -> infer type from LHS
-      if (not Assigned(SetType)) then begin
-        SetType := TTypeSet.Create;
-        SetType.ElementType := LeftType;
-        SetLit.SetType := SetType;
-      end
-      else if SetType.ElementType <> LeftType then
-        raise Exception.CreateFmt(
-          'Type mismatch in "in": left operand is %s, but set element type is %s',
-          [LeftType.Name, SetType.ElementType.Name]);
-
-      Left := TExprInOp.Create(Left, RightExpr);
-      Result := Left;
-    end;
+                                   ]) or
+     TokenIsReservedIdent(AToken, [ri_and, // 'and'
+                                   ri_or,  // 'or'
+                                   ri_xor, // 'xor'
+                                   ri_not, // 'not'
+                                   ri_shl, // 'shl'
+                                   ri_shr, // 'shr'
+                                   ri_mod  // 'mod'
+                                  ]) then begin
+    //Texer.SkipToken;
+    op := AToken.Value;
+    right := ParseExpression(AToken, GetPrecedence(AToken));
+    Result := TNPC_ASTExpressionBinary.Create(AToken.Location, ALeft, op, right);
+  end
+  else if TokenIsReservedSymbol(AToken, rs_Dot) then begin // member access: ident '.' expr
+    Result := ParseRecordMember(AToken);
+  end
+  else if TokenIsReservedSymbol(AToken, rs_OParen) then begin // call: ident '(' expr (, expr) ')'
+    Result := ParseCall(AToken, ALeft);
+  end
+  else if TokenIsReservedSymbol(AToken, rs_OBracket) then begin // indexing: '[' expr ']'
+    Result := ParseIndex(AToken, ALeft);
+  end
   else
-    raise Exception.CreateFmt('Unknown infix %s', [OpTok.Text]);
-  end;
+    raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnexpectedTokenIn, [AToken.TokenToString, '', sStatement]));
+
+
+
+
+
+
+
+//  case OpTok.Kind of
+//    tkIn: begin
+//      var RightExpr := ParseExpression;
+//
+//      if not (RightExpr is TExprSetLiteral) then
+//        raise Exception.Create('Right side of "in" must be a set');
+//
+//      var SetLit := TExprSetLiteral(RightExpr);
+//      var SetType := SetLit.SetType;
+//
+//      // Determine type of left operand
+//      var LeftType: TTypeExpr := nil;
+//      if Left is TExprVariable then begin
+//        var Sym := CurrentScope.Resolve(TExprVariable(Left).Name);
+//        if Assigned(Sym) then
+//          LeftType := Sym.TypeRef;
+//      end
+//      else if Left is TExprEnumConst then
+//        LeftType := TExprEnumConst(Left).EnumType
+//      else if Left is TExprLiteral then
+//        LeftType := TExprLiteral(Left).LiteralType;
+//
+//      if not Assigned(LeftType) then
+//        raise Exception.Create('Cannot determine type of left operand in "in" expression');
+//
+//      // If RHS is empty set -> infer type from LHS
+//      if (not Assigned(SetType)) then begin
+//        SetType := TTypeSet.Create;
+//        SetType.ElementType := LeftType;
+//        SetLit.SetType := SetType;
+//      end
+//      else if SetType.ElementType <> LeftType then
+//        raise Exception.CreateFmt(
+//          'Type mismatch in "in": left operand is %s, but set element type is %s',
+//          [LeftType.Name, SetType.ElementType.Name]);
+//
+//      Left := TExprInOp.Create(Left, RightExpr);
+//      Result := Left;
+//    end;
+//  else
+//    raise Exception.CreateFmt('Unknown infix %s', [OpTok.Text]);
+//  end;
 end;
 
 function TNPCSourceParser.ParseType(const AToken: TNPCToken): TNPC_ASTTypeExpression;
+var
+  token: TNPCToken;
+  Enum: TNPC_ASTTypeEnum;
+  Value: Integer;
+  Ident: TNPCToken;
+  Lit: TNPC_ASTExpression;
+  IndexType: TNPC_ASTTypeExpression;
+  ElemType: TNPC_ASTTypeExpression;
 begin
-  if Current.Kind = tkIdentifier then
-  begin
+  if TokenIsIdent(AToken) then begin // 'type' ident (and then '=' expr)
     // Simple type name
-    Result := TTypeName.Create(Current.Lexeme);
-    Advance;
+    Result := TNPC_ASTTypeName.Create(AToken.Location, AToken.Value);
+    Texer.SkipToken;
   end
-  else if Match(tkLParen) then
-  begin
-    var Enum := TTypeEnum.Create;
-    var Value := 0;
+  else if TokenIsReservedSymbol(AToken, rs_OParen) then begin // '('
+    Enum := TNPC_ASTTypeEnum.Create(AToken.Location);
+    Value := 0;
     repeat
-      var Ident := ExpectIdentifier;
+      Ident := Texer.ExpectToken([tokIdent]);
 
       // support explicit values: (Red=10, Green, Blue=30)
-      if Match(tkAssign) then
-      begin
+      token := Texer.PeekToken;
+      if TokenIsReservedSymbol(token, rs_Assign) then begin
         // reuse expression parser for assigned value, but expect integer literal only
-        var Lit := ParseExpression;
-        if not (Lit is TExprLiteral) then
-          raise Exception.Create('Enum value must be integer literal');
-        Value := StrToInt(TExprLiteral(Lit).Value);
+        Texer.SkipToken;
+        token := Texer.PeekToken;
+        Lit := ParseExpression(token, 0);
+        if not (Lit is TNPC_ASTExpressionLiteral) then
+          raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedButGot, ['literal', Lit.ToString]));
+//        if not (Lit is TNPC_ASTExpressionLiteral) then
+//          raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedButGot, ['literal', Lit.ToString]));
+        Value := StrToInt(TNPC_ASTExpressionLiteral(Lit).Value);
       end;
 
-      Enum.Members.Add(Ident, Value);
+      Enum.Members.Add(Ident.Value, Value);
 
       // add enum member to current scope as constant
-      CurrentScope.DefineConst(Ident, Value, Enum);
+      CurrentScope.DefineConst(Ident.Value, Builtin_IntegerType, Enum, Value);
 
       Inc(Value);
-    until not Match(tkComma);
-    Expect(tkRParen);
+    until not TokenIsReservedSymbol(token, rs_Comma);
+    Texer.ExpectReservedSymbol(rs_CParen); // ')'
     Result := Enum;
   end
-  else if Match(tkArray) then
-  begin
-//    Expect(tkOf);
+  else if TokenIsReservedIdent(AToken, ri_array) then begin // 'array'
+//    Texer.ExpectReservedToken(ri_of); // 'of'
 //    Result := TTypeArray.Create(ParseType);
-    Expect(tkLBracket);
-    var IndexType := ParseType;
-    Expect(tkRBracket);
-    Expect(tkOf);
-    var ElemType := ParseType;
-    var Arr := TTypeArray.Create;
-    Arr.IndexType := IndexType;
-    Arr.ElementType := ElemType;
-    Result := Arr;
+//    Texer.ExpectReservedSymbol(rs_OBracket); // '['
+    IndexType := Nil;
+    token := Texer.PeekToken;
+    if TokenIsReservedSymbol(token, rs_OBracket) then begin // '[' expr ']'
+      Texer.SkipToken;
+      token := Texer.PeekToken;
+      IndexType := ParseType(token);
+      Texer.ExpectReservedSymbol(rs_CBracket);
+    end;
+
+    Texer.SkipToken;
+    Texer.ExpectReservedToken(ri_of); // 'of'
+    token := Texer.PeekToken;
+    ElemType := ParseType(token);
+    Result := TNPC_ASTTypeArray.Create(token.Location, ElemType, IndexType);
   end
-  else if Match(tkRecord) then
-  begin
+  else if Match(tkRecord) then begin
 //    var Rec := TTypeRecord.Create;
 //    while not Match(tkEnd) do
 //    begin
@@ -1771,8 +1705,7 @@ begin
 //    Result := Rec;
 
     recDecl := TRecordTypeDecl.Create(typeName);
-    while not Check(tkEnd) do
-    begin
+    while not Check(tkEnd) do begin
       fieldName := Consume(tkIdentifier, 'Expected field name').Lexeme;
       Consume(tkColon, 'Expected ":" after field name');
       fieldTyp := ResolveType(Consume(tkIdentifier, 'Expected type').Lexeme);
@@ -1788,8 +1721,7 @@ begin
     //Exit(recDecl);
     Result := Rec;
   end
-  else if Match(tkSet) then
-  begin
+  else if Match(tkSet) then begin
     Expect(tkOf);
     var ElemType := ParseType;
     var S := TTypeSet.Create;
@@ -2066,6 +1998,139 @@ begin
   // assume integer literals for now
   Result := TExprLiteral.Create(Current.Lexeme, BuiltinIntegerType);
   Advance;
+
+//    tkIdentifier: begin
+//      Advance;
+//      // an identifier may be followed by '(' (call) or '[' (index) and will be handled in infix
+//      Result := TIdentExpr.Create(t.Text);
+//    end;
+//    tkString: begin
+//      Advance;
+//      Result := TStringExpr.Create(t.Text);
+//    end;
+//    tkNumber: begin
+//      Advance;
+//      Result := TNumberExpr.Create(t.Text);
+//    end;
+
+end;
+
+function TNPCSourceParser.ParseSet(const AToken: TNPCToken): TNPC_ASTExpression;
+var
+  Elements: TList<TNPC_ASTExpression>;
+begin
+  Texer.SkipToken;
+  Elements := TList<TExpr>.Create;
+  try
+    if Current.Kind <> tkRBracket then
+      repeat
+        Elements.Add(ParseExpression);
+      until not Match(tkComma);
+    Expect(tkRBracket);
+
+    var SetType: TTypeSet := nil;
+    var ElemType: TTypeExpr := nil;
+
+    if Elements.Count > 0 then begin
+      // infer element type from first element
+      for var E in Elements do begin
+        var ThisType: TTypeExpr := nil;
+
+        if E is TExprEnumConst then
+          ThisType := TExprEnumConst(E).EnumType
+        else if E is TExprLiteral then
+          ThisType := TExprLiteral(E).LiteralType
+        else if E is TExprVariable then begin
+          var Sym := CurrentScope.Resolve(TExprVariable(E).Name);
+          if not Assigned(Sym) then
+            raise Exception.Create('Unknown identifier: ' + TExprVariable(E).Name);
+          ThisType := Sym.TypeRef;
+        end;
+
+        if not Assigned(ThisType) then
+          raise Exception.Create('Unsupported element in set literal');
+
+        if not Assigned(ElemType) then
+          ElemType := ThisType
+        else if ElemType <> ThisType then
+          raise Exception.CreateFmt('Type mismatch in set literal: expected %s, found %s',
+            [ElemType.Name, ThisType.Name]);
+      end;
+
+      SetType := TTypeSet.Create;
+      SetType.ElementType := ElemType;
+    end;
+
+    // For empty set, SetType stays nil (to be filled later from context)
+    var SetLit := TExprSetLiteral.Create(SetType);
+    for var E in Elements do
+      SetLit.Elements.Add(E);
+    Result := SetLit;
+  finally
+    Elements.Free;
+  end;
+end;
+
+function TNPCSourceParser.ParseIndex(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
+var
+  IndexExpr: TNPC_ASTExpression;
+  VarSym: TNPCSymbol;
+  ArrType: TNPC_ASTTypeArray;
+  array_ident:  UTF8String;
+begin
+//        // indexing: [expr]
+//        Advance;
+//        idx := TIndexExpr.Create(Left, ParseExpression(0));
+//        ExpectKind(tkRBracket);
+//        Result := idx;
+
+  Texer.SkipToken;
+
+  if not (ALeft is TNPC_ASTExpressionVariable) then
+    raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserCantAccessFieldOnNonVar, [Field, ALeft.ToString]));
+
+  array_ident := TNPC_ASTExpressionVariable(ALeft).Name;
+
+  VarSym := CurrentScope.Resolve(array_ident);
+  if not Assigned(VarSym) or not (VarSym.TypeRef is TNPC_ASTTypeArray) then
+    raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserTypeRequiredForIdent, ['array', array_ident, TNPC_ASTExpressionVariable(ALeft).ToString]));
+
+  IndexExpr := ParseExpression(AToken, 0);
+  Texer.Expect(tkRBracket);
+
+  ArrType := TNPC_ASTTypeArray(VarSym.TypeRef);
+  Result := TNPC_ASTExpressionArray.Create(ALeft.Location, Left, IndexExpr, ArrType.ElementType);
+end;
+
+function TNPCSourceParser.ParseRecordMember(const AToken: TNPCToken): TNPC_ASTExpression;
+var
+  VarSym: TNPCSymbol;
+  RecType: TNPC_ASTTypeRecord;
+  record_ident:  UTF8String;
+  Field: UTF8String;
+  FieldType: TNPC_ASTTypeExpression;
+begin
+  Texer.SkipToken;
+  token := Texer.ExpectToken([tokIdent]); // expect identifier
+  Field := token.Value;
+
+  if not (ALeft is TNPC_ASTExpressionVariable) then
+    raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserCantAccessFieldOnNonVar, [Field, ALeft.ToString]));
+
+  record_ident := TNPC_ASTExpressionVariable(ALeft).Name;
+
+  VarSym := CurrentScope.Resolve(record_ident);
+  if not Assigned(VarSym) or not (VarSym.TypeRef is TNPC_ASTTypeRecord) then
+    raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserTypeRequiredForIdent, ['record', record_ident, TNPC_ASTExpressionVariable(ALeft).ToString]));
+
+  AToken.Location.SetEndRowCol(token.Location.EndRow, token.Location.EndCol);
+
+  RecType := TNPC_ASTTypeRecord(VarSym.TypeRef);
+  if not RecType.Fields.ContainsKey(Field) then
+    raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserFieldNotFoundInRecord, [Field, record_ident]));
+
+  FieldType := RecType.Fields[Field];
+  Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Field, FieldType);
 end;
 
 // if_stmt    = 'if' expr 'then' stmt ['else' stmt] ';' .
@@ -2369,9 +2434,30 @@ begin
   Result := TWhileStmt.Create(cond, body);
 end;
 
-procedure TNPCSourceParser.ParseCall(const AToken: TNPCToken);
+function TNPCSourceParser.ParseCall(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpressionCall;
+var
+  token: TNPCToken;
+  right: TNPC_ASTExpression;
 begin
-
+  // call: Left is callee
+  Result := TNPC_ASTExpressionCall.Create(ALeft.Location, ALeft);
+  token := Texer.PeekToken;
+  if Texer.IsNotEmpty and not TokenIsReservedSymbol(token, rs_CParen) then begin // ')'
+    while not TokenIsReservedSymbol(token, rs_CParen) do begin
+      right := ParseExpression(0);
+      if Assigned(right) then
+        callNode.Args.Add(right);
+      token := Texer.PeekToken;
+      if TokenIsReservedSymbol(token, rs_Comma) then begin
+        Texer.SkipToken
+        token := Texer.PeekToken;
+      end
+      else
+        Break;
+    end;
+  end;
+  Texer.ExpectReservedSymbol(rs_CParen); // ')'
+  Result := callNode;
 end;
 
 procedure TNPCSourceParser.ParseCallParams(const AToken: TNPCToken);
@@ -2889,7 +2975,6 @@ begin
     Texer.SkipToken;
   end;
 end;
-
 
 procedure TNPCSourceParser.ParseInitialization(const AToken: TNPCToken);
 var

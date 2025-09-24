@@ -13,10 +13,10 @@ uses
   Types;
 
 const
-  sErrorBase = '%s: %s';
+  sErrorBase   = '%s: %s';
   sErrorBaseEx = '%s - %s: %s';
 
-  sLexerStreamNotSpecified = 'Stream not specified while trying to read from file "%s".';
+  sLexerStreamNotSpecified       = 'Stream not specified while trying to read from file "%s".';
   sLexerStreamNotSpecifiedStream = 'Stream not specified while trying to read from stream.';
 
   sProjectFile    = 'project file';
@@ -27,13 +27,16 @@ const
   sStatement      = 'statement';
   sExpression     = 'expression';
 
-  sParserUnexpectedTokenIn      = 'unexpected token "%s" in %s%s';
-  sParserUnexpectedType         = 'unexpected type "%s", expected "%s"';
-  sParserSectionHasNoBody       = '"%s" section has no body';
-  sParserUnknownIdentIn         = 'unknown identifier "%s" in %s%s';
-  sParserUnknownDirectiveNameIn = 'unknown setting or define directive name "%s" in %s%s';
-  sParserExpectedButGot         = 'expected "%s", but got "%s"';
-  sParserImportNotFound         = 'import not found "%s"';
+  sParserUnexpectedTokenIn       = 'unexpected token "%s" in %s%s';
+  sParserUnexpectedType          = 'unexpected type "%s", expected "%s"';
+  sParserSectionHasNoBody        = '"%s" section has no body';
+  sParserUnknownIdentIn          = 'unknown identifier "%s" in %s%s';
+  sParserUnknownDirectiveNameIn  = 'unknown setting or define directive name "%s" in %s%s';
+  sParserExpectedButGot          = 'expected "%s", but got "%s"';
+  sParserImportNotFound          = 'import not found "%s"';
+  sParserCantAccessFieldOnNonVar = 'can''t access field "%s" on non-variable expression "%s"';
+  sParserTypeRequiredForIdent    = '"<%s>" type required for identifier "%s", but got "%s"';
+  sParserFieldNotFoundInRecord   = 'field "%s" not found in record "%s"';
 
   sProjectError = '%s - ProjectError(%s): %s';
 
