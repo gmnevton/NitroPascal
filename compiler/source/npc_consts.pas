@@ -27,16 +27,28 @@ const
   sStatement      = 'statement';
   sExpression     = 'expression';
 
-  sParserUnexpectedTokenIn       = 'unexpected token "%s" in %s%s';
-  sParserUnexpectedType          = 'unexpected type "%s", expected "%s"';
-  sParserSectionHasNoBody        = '"%s" section has no body';
-  sParserUnknownIdentIn          = 'unknown identifier "%s" in %s%s';
-  sParserUnknownDirectiveNameIn  = 'unknown setting or define directive name "%s" in %s%s';
-  sParserExpectedButGot          = 'expected "%s", but got "%s"';
-  sParserImportNotFound          = 'import not found "%s"';
-  sParserCantAccessFieldOnNonVar = 'can''t access field "%s" on non-variable expression "%s"';
-  sParserTypeRequiredForIdent    = '"<%s>" type required for identifier "%s", but got "%s"';
-  sParserFieldNotFoundInRecord   = 'field "%s" not found in record "%s"';
+  sParserUnexpectedTokenIn         = 'unexpected token "%s" in %s%s';
+  sParserUnexpectedType            = 'unexpected type "%s", expected "%s"';
+  sPareserUnexpectedSyntax         = 'unexpected %s syntax, expected %s';
+  sParserSectionHasNoBody          = '"%s" section has no body';
+  sParserUnknownIdentIn            = 'unknown identifier "%s" in %s%s';
+  sParserUnknownDirectiveNameIn    = 'unknown setting or define directive name "%s" in %s%s';
+  sParserExpectedButGot            = 'expected "%s", but got "%s"';
+  sParserExpectedElementsButGot    = 'expected %s, but got "%s" in %s%s';
+  sParserImportNotFound            = 'import not found "%s"';
+  sParserCantAccessFieldOnNonVar   = 'can''t access field "%s" on non-variable expression "%s"';
+  sParserTypeRequiredForIdent      = '"<%s>" type required for identifier "%s", but got "%s"';
+  sParserFieldNotFoundInRecord     = 'field "%s" not found in record "%s"';
+  sParserTypeDefNotFound           = 'type definition for "%s" not found';
+  sParserExpectedNameAfter         = 'expected %s name after %s%s';
+  sParserExpectedNameAfterKeyword  = 'expected %s name after "%s" keyword';
+  sParserTypeMismatchInLiteral     = 'type mismatch in %s: expected %s, found %s';
+  sParserUnknownTypeFor            = 'unknown type "%s" for %s%s';
+  sParserUnknown                   = 'unknown %s: %s';
+  sParserLeftSideOfMustBe          = 'left side of %s must be a %s';
+//  sParserEmptySetAssignRequiresSet = 'can''t assign empty set to variable "%s"';
+  sParserIntrinsicFuncExpects      = 'intrinsic function %s expects %s as %s';
+  sParserIdentifierNotValidInExpr  = 'identifier not valid in expression: %s';
 
   sProjectError = '%s - ProjectError(%s): %s';
 

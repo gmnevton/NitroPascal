@@ -19,21 +19,39 @@ type
   TNPC_ASTTypeExpression = class;
 
   TNPCSymbolKind = (
+    skBuiltinType,
     skType,
-    skDecl, // const, var
-    skProc  // procedure, function
+    skVar // const
+  );
+
+  TNPCSymbolType = (
+    stUnresolved,
+    stEnum, // ( e1, e2, ... )
+    stEnumConst, // e1, e2, ...
+    stSet, // [ s1, s2, s3..s4, ... ]
+    stSetConst, // s1, s2, ...
+    stBitSet, // 64 bit int
+    stArray, // array[] of ...
+    stRecord, // record ... end
+    stRecordField, // ident: ident;
+    stPointer, // 32 / 64 bit value
+    stLiteral, // ident / number / string / char
+    stProcedure, // pointer
+    stForeignFunction // pointer
   );
 
   TNPCSymbol = class
   public
     Name: UTF8String;
     Kind: TNPCSymbolKind;
-    IsConst: Boolean;
+    &Type: TNPCSymbolType;
     TypeRef: TNPC_ASTTypeExpression;
     DeclNode: TObject; // pointer/reference to the declaration AST node (optional)
+    Size: Integer;
+    IsConst: Boolean;
     ConstValue: Integer; // used if Kind=skDecl and IsConst=True
     //
-    constructor Create(const AName: UTF8String; AKind: TNPCSymbolKind; AConst: Boolean; AType: TNPC_ASTTypeExpression; ADecl: TObject; AValue: Integer = 0);
+    constructor Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject; ASize: Integer = -1; AValue: Integer = 0);
   end;
 
 //  TNPCListEntry = packed record
@@ -63,14 +81,16 @@ type
     function TryGetValue(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
     function Resolve(const AName: UTF8String): TNPCSymbol;
     //
-    procedure DefineType(const AName: UTF8String; AType: TNPC_ASTTypeExpression; ADecl: TObject);
-    procedure DefineConst(const AName: UTF8String; AType: TNPC_ASTTypeExpression; ADecl: TObject; AValue: Integer);
-    procedure DefineVar(const AName: UTF8String; AType: TNPC_ASTTypeExpression; ADecl: TObject);
+    function DefineBuiltinType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression): TNPCSymbol;
+    function DefineType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject): TNPCSymbol;
+    function DefineConst(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject; AValue: Integer): TNPCSymbol;
+    function DefineVar(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject): TNPCSymbol;
   end;
 
   TNPC_ASTType = (
     AST_UNKNOWN,
 
+    // nodes
     AST_BLOCK,
     AST_EXPRESSION,
     AST_STATEMENT,
@@ -79,50 +99,65 @@ type
     AST_SCOPE_STATEMENT,
     AST_EXPRESSION_STATEMENT,
 
+    // subnodes
     AST_IDENTIFIER,
     AST_LITERAL,
     AST_DECLARATION,
 
+    // ops
     AST_UNARY,
     AST_BINARY,
     AST_TERNARY,
 
+    // types
     AST_TYPE_DEFINITION,
     AST_TYPE_NAME,
     AST_TYPE_DECLARATION,
-    AST_RECORD_DESCRIPTION,
-    AST_ENUM,
-    AST_SET,
-    AST_BITSET,
-    AST_ARRAY,
-    AST_ARRAY_SLICE,
-    AST_RECORD,
+    AST_TYPE_RECORD_DESCRIPTION,
+    AST_TYPE_ENUM,
+    AST_TYPE_SET,
+    AST_TYPE_BITSET,
+    AST_TYPE_ARRAY,
+    AST_TYPE_ARRAY_SLICE,
+    AST_TYPE_RECORD,
+
+    // expressions
     AST_EXPRESSION_LITERAL, // AST_LITERAL ???
-    AST_ENUM_CONST,
-    AST_SET_LITERAL, // AST_LITERAL ???
 //    AST_IDENT, // AST_LITERAL ???
 //    AST_NUMBER, // AST_LITERAL ???
-    AST_STRING, // AST_LITERAL ???
-    AST_IN_OP,
-    AST_STRUCT_MEMBER,
-    AST_ARRAY_INDEX,
-    AST_STATEMENT_TYPE_DECL, // same as AST_TYPE_DECLARATION ???
-    AST_STATEMENT_VAR_DECL, // same as AST_TYPE_DECLARATION ??
+    AST_EXPRESSION_STRING, // AST_LITERAL ???
+    AST_EXPRESSION_ENUM,
+    AST_EXPRESSION_ENUM_CONST,
+    AST_EXPRESSION_SET,
+    AST_EXPRESSION_SET_LITERAL, // AST_LITERAL ???
+    AST_EXPRESSION_ARRAY,
+    AST_EXPRESSION_ARRAY_SLICE,
+    AST_EXPRESSION_RECORD,
+    AST_EXPRESSION_IF, // ternary, eg: x := if cond then true_expr else false_expr;
+    AST_EXPRESSION_CASE, // ternary, eg: x := case selector of branches_expr else default_expr end;
+    AST_EXPRESSION_IN_OP,
+    AST_EXPRESSION_STRUCT_MEMBER,
+    AST_EXPRESSION_ARRAY_INDEX,
 
     AST_PROCEDURE,
     AST_CALL,
     AST_EXTERNAL_CALL,
 
-    AST_LABEL,
-    AST_ASSIGN,
-    AST_IF,
-    AST_CASE,
-    AST_BREAK,
-    AST_CONTINUE,
-    AST_FOR,
-    AST_WHILE,
-    AST_REPEAT_UNTIL,
+    // statements
+    AST_STATEMENT_LABEL,
+    AST_STATEMENT_BITSET,
+    AST_STATEMENT_ASSIGN,
+    AST_STATEMENT_IF,
+    AST_STATEMENT_CASE,
+    AST_STATEMENT_BREAK,
+    AST_STATEMENT_CONTINUE,
+    AST_STATEMENT_FOR,
+    AST_STATEMENT_WHILE,
+    AST_STATEMENT_REPEAT_UNTIL,
+    AST_STATEMENT_TYPE_DECL, // same as AST_TYPE_DECLARATION ???
+    AST_STATEMENT_VAR_DECL, // same as AST_TYPE_DECLARATION ??
 
+    // directives
     AST_DIRECTIVE_IF,
     AST_DIRECTIVE_ENSURE
   );
@@ -148,7 +183,7 @@ type
   public
     // &Type = AST_EXPRESSION
     Flags: LongWord;
-    InferredType: TNPC_ASTTypeExpression; //TNPC_ASTTypeDefinition;
+//    InferredType: TNPC_ASTTypeExpression; //TNPC_ASTTypeDefinition;
     //
     constructor Create(const ALocation: TNPCLocation); override;
     destructor Destroy; override;
@@ -168,13 +203,44 @@ type
     function ToString: String; override;
   end;
 
+  TNPC_ASTTypeExpressionClassType = class of TNPC_ASTTypeExpression;
+
+  TNPC_ASTTypeEnum = class;
+  TNPC_ASTTypeSet = class;
+  TNPC_ASTTypeArray = class;
+  TNPC_ASTTypeRecord = class;
+
+  TNPC_ASTExpressionSetLiteral = class;
+
+  TNPC_TypeDefinitionType = (
+    DEF_Unknown,
+    DEF_Type,
+    DEF_Enum,
+    DEF_Set,
+    DEF_BitSet,
+    DEF_Array,
+    DEF_Record,
+    DEF_Pointer,
+    DEF_Literal,
+    DEF_Procedure,
+    DEF_ProcedureArguments,
+    DEF_ProcedureResult,
+    DEF_ForeignFunction
+  );
+
   TNPC_ASTTypeDefinition = class(TNPC_ASTTypeExpression)
   public
     // &Type = AST_TYPE_DEFINITION
+    Flags: LongWord;
+    DefinitionType: TNPC_TypeDefinitionType;
     Name: UTF8String;
-    SizeInBytes: Byte;
+    SizeInBytes: Integer;
+    EnumDescription: TNPC_ASTTypeEnum;
+    SetDescription: TNPC_ASTTypeSet; // TNPC_ASTExpressionSetLiteral; // TNPC_ASTTypeSet;
+    ArrayDescription: TNPC_ASTTypeArray;
+    RecordDescription: TNPC_ASTTypeRecord;
     //
-    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Byte); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Integer); reintroduce;
     destructor Destroy; override;
     //
     function ToString: String; override;
@@ -193,7 +259,7 @@ type
 
   TNPC_ASTTypeEnum = class(TNPC_ASTTypeExpression)
   public
-    // &Type = AST_ENUM
+    // &Type = AST_TYPE_ENUM
     Members: TDictionary<UTF8String, Integer>;
     //
     constructor Create(const ALocation: TNPCLocation); override;
@@ -204,10 +270,11 @@ type
 
   TNPC_ASTTypeSet = class(TNPC_ASTTypeExpression)
   public
-    // &Type = AST_SET
+    // &Type = AST_TYPE_SET
     ElementType: TNPC_ASTTypeExpression;
+    Elements: TObjectList<TNPC_ASTExpression>;
     //
-    constructor Create(const ALocation: TNPCLocation); override;
+    constructor Create(const ALocation: TNPCLocation; const AElementType: TNPC_ASTTypeExpression); reintroduce;
     destructor Destroy; override;
     //
     function ToString: String; override;
@@ -215,7 +282,7 @@ type
 
   TNPC_ASTTypeArray = class(TNPC_ASTTypeExpression)
   public
-    // &Type = AST_ARRAY
+    // &Type = AST_TYPE_ARRAY
     ElementType: TNPC_ASTTypeExpression;
     IndexType: TNPC_ASTTypeExpression;
     //
@@ -227,7 +294,7 @@ type
 
   TNPC_ASTTypeRecord = class(TNPC_ASTTypeExpression)
   public
-    // &Type = AST_RECORD_DESCRIPTION
+    // &Type = AST_TYPE_RECORD_DESCRIPTION
     Fields: TDictionary<UTF8String, TNPC_ASTTypeExpression>;
     //
     constructor Create(const ALocation: TNPCLocation); override;
@@ -250,6 +317,18 @@ type
     function ToString: String; override;
   end;
 
+//  TNPC_ASTStatementEnum = class(TNPC_ASTStatement)
+//  public
+//    // &Type = AST_ENUM
+//    ElementType: TNPC_ASTTypeExpression;
+//    Elements: TObjectList<TNPC_ASTExpression>;
+//    //
+//    constructor Create(const ALocation: TNPCLocation; const AElementType: TNPC_ASTTypeExpression); reintroduce;
+//    destructor Destroy; override;
+//    //
+//    function ToString: String; override;
+//  end;
+
   TNPC_ASTExpressionEnumConst = class(TNPC_ASTExpression)
   public
     // &Type = AST_ENUM_CONST
@@ -263,12 +342,24 @@ type
     function ToString: String; override;
   end;
 
+  TNPC_ASTExpressionSet = class(TNPC_ASTExpression)
+  public
+    // &Type = AST_EXPRESSION_SET
+    ElementType: TNPC_ASTTypeExpression;
+    Elements: TObjectList<TNPC_ASTExpression>;
+    //
+    constructor Create(const ALocation: TNPCLocation; const AElementType: TNPC_ASTTypeExpression); reintroduce;
+    destructor Destroy; override;
+    //
+    //function ToString: String; override;
+  end;
+
   // set literal: [Red, Green, Blue]
   TNPC_ASTExpressionSetLiteral = class(TNPC_ASTExpression)
   public
     // &Type = AST_SET_LITERAL
-    Elements: TObjectList<TNPC_ASTExpression>;
     SetType: TNPC_ASTTypeSet;
+    Elements: TObjectList<TNPC_ASTExpression>;
     //
     constructor Create(const ALocation: TNPCLocation; AType: TNPC_ASTTypeSet); reintroduce;
     destructor Destroy; override;
@@ -348,14 +439,36 @@ type
     function ToString: String; override;
   end;
 
+  TNPC_ASTCaseBranch = class
+  public
+    IfValues: TObjectList<TNPC_ASTExpression>; // constants like 1, 2, 3
+    ResultExpr: TNPC_ASTExpression; // expression for this branch
+  end;
+
+  TNPC_ASTCaseBranches = TObjectList<TNPC_ASTCaseBranch>;
+
+  TNPC_ASTExpressionCase = class(TNPC_ASTExpression)
+  public
+    // &Type = AST_EXPRESSION_CASE
+    Selector: TNPC_ASTExpression;
+    Branches: TNPC_ASTCaseBranches;
+    DefaultExpr: TNPC_ASTExpression;
+    //
+    constructor Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+    //
+    function ToString: String; override;
+  end;
+
   // membership test: X in [..]
   TNPC_ASTExpressionInOp = class(TNPC_ASTExpressionBinary)
   public
     // &Type = AST_IN_OP
-    //Left: TNPC_ASTExpression;
-    //Right: TNPC_ASTExpression; // must be set
+    Left: TNPC_ASTExpression;
+    Right: TNPC_ASTExpression; // must be set
     //
     constructor Create(const ALocation: TNPCLocation; ALeft, ARight: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
     //
     function ToString: String; override;
   end;
@@ -474,7 +587,9 @@ type
     destructor Destroy; override;
   end;
 
-  TNPC_ASTStatementTypeDecl = class(TNPC_ASTStatement)
+  // type
+  //   ident = type_definition
+  TNPC_ASTStatementTypeDeclaration = class(TNPC_ASTStatement)
   public
     // &Type = AST_STATEMENT_TYPE_DECL
     Name: UTF8String;
@@ -484,7 +599,7 @@ type
     destructor Destroy; override;
   end;
 
-  TNPC_ASTStatementVarDecl = class(TNPC_ASTStatement)
+  TNPC_ASTStatementVariableDeclaration = class(TNPC_ASTStatement)
   public
     // &Type = AST_STATEMENT_VAR_DECL
     Name: UTF8String;
@@ -535,11 +650,11 @@ type
   TNPC_ASTStatementCase = class(TNPC_ASTStatement)
   public
     // &Type = AST_CASE
-//    Cond: TNPC_ASTExpression;
-//    ThenStmt,
-//    ElseStmt: TNPC_ASTStatement;
+    Selector: TNPC_ASTExpression;
+    Branches: TNPC_ASTCaseBranches;
+    DefaultExpr: TNPC_ASTExpression;
     //
-    //constructor Create(const ALocation: TNPCLocation; ACond: TNPC_ASTExpression; AThen, AElse: TNPC_ASTStatement); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
   end;
 
@@ -570,14 +685,16 @@ implementation
 
 { TNPCSymbol }
 
-constructor TNPCSymbol.Create(const AName: UTF8String; AKind: TNPCSymbolKind; AConst: Boolean; AType: TNPC_ASTTypeExpression; ADecl: TObject; AValue: Integer = 0);
+constructor TNPCSymbol.Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject; ASize: Integer = -1; AValue: Integer = 0);
 begin
   inherited Create;
   Name := AName;
   Kind := AKind;
-  IsConst := AConst;
-  TypeRef := AType;
+  &Type := AType;
+  TypeRef := ATypeRef;
   DeclNode := ADecl;
+  Size := ASize;
+  IsConst := AConst;
   ConstValue := AValue;
 end;
 
@@ -618,19 +735,28 @@ begin
   Result := Nil;
 end;
 
-procedure TNPCScope.DefineType(const AName: UTF8String; AType: TNPC_ASTTypeExpression; ADecl: TObject);
+function TNPCScope.DefineBuiltinType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression): TNPCSymbol;
 begin
-  Table.Add(AName, TNPCSymbol.Create(AName, skType, True, AType, ADecl));
+  Result := TNPCSymbol.Create(AName, skBuiltinType, AType, False, ATypeRef, Nil, Asize);
+  Table.Add(AName, Result);
 end;
 
-procedure TNPCScope.DefineConst(const AName: UTF8String; AType: TNPC_ASTTypeExpression; ADecl: TObject; AValue: Integer);
+function TNPCScope.DefineType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject): TNPCSymbol;
 begin
-  Table.Add(AName, TNPCSymbol.Create(AName, skDecl, True, AType, ADecl, AValue));
+  Result := TNPCSymbol.Create(AName, skType, AType, False, ATypeRef, ADecl, ASize);
+  Table.Add(AName, Result);
 end;
 
-procedure TNPCScope.DefineVar(const AName: UTF8String; AType: TNPC_ASTTypeExpression; ADecl: TObject);
+function TNPCScope.DefineConst(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject; AValue: Integer): TNPCSymbol;
 begin
-  Table.Add(AName, TNPCSymbol.Create(AName, skDecl, False, AType, ADecl));
+  Result := TNPCSymbol.Create(AName, skVar, AType, True, ATypeRef, ADecl, ASize, AValue);
+  Table.Add(AName, Result);
+end;
+
+function TNPCScope.DefineVar(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject): TNPCSymbol;
+begin
+  Result := TNPCSymbol.Create(AName, skVar, AType, False, ATypeRef, ADecl, ASize);
+  Table.Add(AName, Result);
 end;
 
 { TNPC_AST }
@@ -658,13 +784,13 @@ begin
   inherited;
   &Type := AST_EXPRESSION;
   Flags := 0;
-  //
-  InferredType := Nil;
+//  //
+//  InferredType := Nil;
 end;
 
 destructor TNPC_ASTExpression.Destroy;
 begin
-  InferredType := Nil;
+//  InferredType := Nil;
   inherited;
 end;
 
@@ -693,17 +819,29 @@ end;
 
 { TNPC_ASTTypeDefinition }
 
-constructor TNPC_ASTTypeDefinition.Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Byte);
+constructor TNPC_ASTTypeDefinition.Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Integer);
 begin
   inherited Create(ALocation);
   &Type := AST_TYPE_DEFINITION;
   Name := AName;
   SizeInBytes := ASizeInBytes;
+  EnumDescription := Nil;
+  SetDescription := Nil;
+  ArrayDescription := Nil;
+  RecordDescription := Nil;
 end;
 
 destructor TNPC_ASTTypeDefinition.Destroy;
 begin
   Name := '';
+  if EnumDescription <> Nil then
+    EnumDescription.Free;
+  if SetDescription <> Nil then
+    SetDescription.Free;
+  if ArrayDescription <> Nil then
+    ArrayDescription.Free;
+  if RecordDescription <> Nil then
+    RecordDescription.Free;
   inherited;
 end;
 
@@ -737,7 +875,7 @@ end;
 constructor TNPC_ASTTypeEnum.Create;
 begin
   inherited;
-  &Type := AST_ENUM;
+  &Type := AST_TYPE_ENUM;
   Members := TDictionary<UTF8String, Integer>.Create;
 end;
 
@@ -758,16 +896,19 @@ end;
 
 { TNPC_ASTTypeSet }
 
-constructor TNPC_ASTTypeSet.Create;
+constructor TNPC_ASTTypeSet.Create(const ALocation: TNPCLocation; const AElementType: TNPC_ASTTypeExpression);
 begin
-  inherited;
-  &Type := AST_SET;
-  ElementType := Nil;
+  inherited Create(ALocation);
+  &Type := AST_TYPE_SET;
+  ElementType := AElementType;
+  Elements := TObjectList<TNPC_ASTExpression>.Create(True);
 end;
 
 destructor TNPC_ASTTypeSet.Destroy;
 begin
-  ElementType := Nil;
+  if ElementType <> Nil then
+    ElementType.Free;
+  Elements.Free;
   inherited;
 end;
 
@@ -781,7 +922,7 @@ end;
 constructor TNPC_ASTTypeArray.Create(const ALocation: TNPCLocation; AElementType, AIndexType: TNPC_ASTTypeExpression);
 begin
   inherited Create(ALocation);
-  &Type := AST_ARRAY;
+  &Type := AST_TYPE_ARRAY;
   ElementType := AElementType;
   IndexType := AIndexType;
 end;
@@ -803,7 +944,7 @@ end;
 constructor TNPC_ASTTypeRecord.Create;
 begin
   inherited;
-  &Type := AST_RECORD_DESCRIPTION;
+  &Type := AST_TYPE_RECORD_DESCRIPTION;
   Fields := TDictionary<UTF8String, TNPC_ASTTypeExpression>.Create;
 end;
 
@@ -850,7 +991,7 @@ end;
 constructor TNPC_ASTExpressionEnumConst.Create(const ALocation: TNPCLocation; const AName: UTF8String; AValue: Integer; AType: TNPC_ASTTypeExpression);
 begin
   inherited Create(ALocation);
-  &Type := AST_ENUM_CONST;
+  &Type := AST_EXPRESSION_ENUM_CONST;
   Name := AName;
   Value := AValue;
   EnumType := AType;
@@ -869,18 +1010,38 @@ begin
   Result := '<enum-const>';
 end;
 
+{ TNPC_ASTExpressionSet }
+
+constructor TNPC_ASTExpressionSet.Create(const ALocation: TNPCLocation; const AElementType: TNPC_ASTTypeExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_SET;
+  ElementType := AElementType;
+  Elements := TObjectList<TNPC_ASTExpression>.Create(True);
+end;
+
+destructor TNPC_ASTExpressionSet.Destroy;
+begin
+  if ElementType <> Nil then
+    ElementType.Free;
+  Elements.Free;
+  inherited;
+end;
+
 { TNPC_ASTExpressionSetLiteral }
 
 constructor TNPC_ASTExpressionSetLiteral.Create(const ALocation: TNPCLocation; AType: TNPC_ASTTypeSet);
 begin
   inherited Create(ALocation);
-  &Type := AST_SET_LITERAL;
-  Elements := TObjectList<TNPC_ASTExpression>.Create(True);
+  &Type := AST_EXPRESSION_SET_LITERAL;
   SetType := AType;
+  Elements := TObjectList<TNPC_ASTExpression>.Create(True);
 end;
 
 destructor TNPC_ASTExpressionSetLiteral.Destroy;
 begin
+  if SetType <> Nil then
+    SetType.Free;
   Elements.Free;
   inherited;
 end;
@@ -964,7 +1125,7 @@ end;
 constructor TNPC_ASTExpressionString.Create(const ALocation: TNPCLocation; const AValue: UTF8String);
 begin
   inherited Create(ALocation);
-  &Type := AST_STRING;
+  &Type := AST_EXPRESSION_STRING;
   Value := AValue;
 end;
 
@@ -1028,12 +1189,49 @@ begin
   Result := '<binary>';
 end;
 
+{ TNPC_ASTExpressionCase }
+
+constructor TNPC_ASTExpressionCase.Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_CASE;
+  Selector := ASelector;
+  Branches := TNPC_ASTCaseBranches.Create(True);
+  DefaultExpr := ADefault;
+end;
+
+destructor TNPC_ASTExpressionCase.Destroy;
+begin
+  if Selector <> Nil then
+    Selector.Free;
+  if DefaultExpr <> Nil then
+    DefaultExpr.Free;
+  Branches.Free;
+  inherited;
+end;
+
+function TNPC_ASTExpressionCase.ToString: String;
+begin
+  Result := '<case-expr>';
+end;
+
 { TNPC_ASTExpressionInOp }
 
 constructor TNPC_ASTExpressionInOp.Create(const ALocation: TNPCLocation; ALeft, ARight: TNPC_ASTExpression);
 begin
   inherited Create(ALocation, ALeft, 'in', ARight);
-  &Type := AST_IN_OP;
+  &Type := AST_EXPRESSION_IN_OP;
+  Left := ALeft;
+  Right := ARight;
+end;
+
+destructor TNPC_ASTExpressionInOp.Destroy;
+begin
+  if Left <> Nil then
+    Left.Free;
+  if Right <> Nil then
+    Right.Free;
+  inherited;
 end;
 
 function TNPC_ASTExpressionInOp.ToString: String;
@@ -1046,7 +1244,7 @@ end;
 constructor TNPC_ASTExpressionArray.Create(const ALocation: TNPCLocation; ABase, AIndex: TNPC_ASTExpression; AElemType: TNPC_ASTTypeExpression);
 begin
   inherited Create(ALocation);
-  &Type := AST_ARRAY;
+  &Type := AST_EXPRESSION_ARRAY;
   Base := ABase;
   Index := AIndex;
   ElemType := AElemType;
@@ -1073,7 +1271,7 @@ end;
 constructor TNPC_ASTExpressionRecord.Create(const ALocation: TNPCLocation; ABase: TNPC_ASTExpression; const AFieldName: UTF8String; AFieldType: TNPC_ASTTypeExpression);
 begin
   inherited Create(ALocation);
-  &Type := AST_RECORD;
+  &Type := AST_EXPRESSION_RECORD;
   Base := ABase;
   FieldName := AFieldName;
   FieldType := AFieldType;
@@ -1122,7 +1320,7 @@ end;
 constructor TNPC_ASTExpressionMember.Create(const ALocation: TNPCLocation; AOwner: TNPC_ASTExpression; const AMember: UTF8String; const AMemberType: TNPC_ASTTypeExpression);
 begin
   inherited Create(ALocation);
-  &Type := AST_STRUCT_MEMBER;
+  &Type := AST_EXPRESSION_STRUCT_MEMBER;
   Owner := AOwner;
   Member := AMember;
   MemberType := AMemberType;
@@ -1148,7 +1346,7 @@ end;
 constructor TNPC_ASTExpressionIndex.Create(const ALocation: TNPCLocation; ATarget, AIndex: TNPC_ASTExpression);
 begin
   inherited Create(ALocation);
-  &Type := AST_ARRAY_INDEX;
+  &Type := AST_EXPRESSION_ARRAY_INDEX;
   Target := ATarget;
   Index := AIndex;
 end;
@@ -1226,9 +1424,9 @@ begin
   inherited;
 end;
 
-{ TNPC_ASTStatementTypeDecl }
+{ TNPC_ASTStatementTypeDeclaration }
 
-constructor TNPC_ASTStatementTypeDecl.Create(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPC_ASTTypeExpression);
+constructor TNPC_ASTStatementTypeDeclaration.Create(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPC_ASTTypeExpression);
 begin
   inherited Create(ALocation);
   &Type := AST_STATEMENT_TYPE_DECL;
@@ -1236,7 +1434,7 @@ begin
   DeclaredType := AType;
 end;
 
-destructor TNPC_ASTStatementTypeDecl.Destroy;
+destructor TNPC_ASTStatementTypeDeclaration.Destroy;
 begin
   Name := '';
   if DeclaredType <> Nil then
@@ -1244,9 +1442,9 @@ begin
   inherited;
 end;
 
-{ TNPC_ASTStatementVarDecl }
+{ TNPC_ASTStatementVariableDeclaration }
 
-constructor TNPC_ASTStatementVarDecl.Create(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPC_ASTTypeExpression; AInit: TNPC_ASTExpression);
+constructor TNPC_ASTStatementVariableDeclaration.Create(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPC_ASTTypeExpression; AInit: TNPC_ASTExpression);
 begin
   inherited Create(ALocation);
   &Type := AST_STATEMENT_VAR_DECL;
@@ -1256,7 +1454,7 @@ begin
   SymbolRef := Nil; // symbol created when parsing
 end;
 
-destructor TNPC_ASTStatementVarDecl.Destroy;
+destructor TNPC_ASTStatementVariableDeclaration.Destroy;
 begin
   Name := '';
   if DeclaredType <> Nil then
@@ -1273,7 +1471,7 @@ end;
 constructor TNPC_ASTStatementLabel.Create(const ALocation: TNPCLocation; const AIdent: UTF8String; AStmt: TNPC_ASTStatement);
 begin
   inherited Create(ALocation);
-  &Type := AST_LABEL;
+  &Type := AST_STATEMENT_LABEL;
   Ident := AIdent;
   Statement := AStmt;
 end;
@@ -1291,7 +1489,7 @@ end;
 constructor TNPC_ASTStatementAssign.Create(const ALocation: TNPCLocation; ATarget, AValue: TNPC_ASTExpression);
 begin
   inherited Create(ALocation);
-  &Type := AST_ASSIGN;
+  &Type := AST_STATEMENT_ASSIGN;
   Target := ATarget; // usually TIdentExpr or member/index
   Value := AValue;
 end;
@@ -1310,7 +1508,7 @@ end;
 constructor TNPC_ASTStatementIf.Create(const ALocation: TNPCLocation; ACond: TNPC_ASTExpression; AThen, AElse: TNPC_ASTStatement);
 begin
   inherited Create(ALocation);
-  &Type := AST_IF;
+  &Type := AST_STATEMENT_IF;
   Cond := ACond;
   ThenStmt := AThen;
   ElseStmt := AElse;
@@ -1329,9 +1527,23 @@ end;
 
 { TNPC_ASTStatementCase }
 
+constructor TNPC_ASTStatementCase.Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_STATEMENT_CASE;
+  Selector := ASelector;
+  Branches := ABranches; // TNPC_ASTCaseBranches.Create(True);
+  DefaultExpr := ADefault;
+end;
+
 destructor TNPC_ASTStatementCase.Destroy;
 begin
-
+  if Selector <> Nil then
+    Selector.Free;
+  if Branches <> Nil then
+    Branches.Free;
+  if DefaultExpr <> Nil then
+    DefaultExpr.Free;
   inherited;
 end;
 
@@ -1341,7 +1553,7 @@ constructor TNPC_ASTStatementFor.Create(const ALocation: TNPCLocation; const AVa
   ABody: TNPC_ASTStatement);
 begin
   inherited Create(ALocation);
-  &Type := AST_FOR;
+  &Type := AST_STATEMENT_FOR;
   VarName := AVarName;
   InitExpr := AInitExpr;
   EndExpr := AEndExpr;
@@ -1366,7 +1578,7 @@ end;
 constructor TNPC_ASTStatementWhile.Create(const ALocation: TNPCLocation; ACond: TNPC_ASTExpression; ABody: TNPC_ASTStatement);
 begin
   inherited Create(ALocation);
-  &Type := AST_WHILE;
+  &Type := AST_STATEMENT_WHILE;
   Cond := ACond;
   Body := ABody;
 end;

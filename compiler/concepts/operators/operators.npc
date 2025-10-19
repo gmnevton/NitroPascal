@@ -1,0 +1,35 @@
+﻿code 'expression operators';
+
+{.
+  in programming languages we have expression operators, like: '+', '-', '*', '/', etc.
+  some of them are 2 or 3 characters long, NitroPascal supports this:
+  
+  + , - , * , / ,
+  ++, --, < , >
+  +=, -=, *=, /=,
+  = , !=, <=, >=
+  %=, &=
+  
+  and:
+  
+  ( ) [ ] { }
+  
+  
+  we can use them in non conventional ways, like:
+  - adding elements to a set:
+    var set: MySetType = ();
+    set += (elem1, elem2),
+
+  - subtracting from set:
+    set -= (elem1, elem2),
+
+  - adding elements to a enum:
+    var enum: MyEnumType = [];
+    enum += [enum1, enum2],
+
+  - subtracting from enum:
+    enum -= [enum1, enum2],
+
+.}
+
+end.

@@ -71,7 +71,8 @@ type
     function NextToken: TNPCToken; inline; // grabs next token and preserves actual index
     procedure SkipToken; inline; // increase index to next position
     //
-    function ExpectToken(const ATokens: Array of TNPCTokenType; const APeekToken: Boolean = False; const AIdentWithMinus: Boolean = False): TNPCToken;
+    function ExpectToken(const AToken: TNPCTokenType; const AErrorMessage: String; const APeekToken: Boolean = False; const AIdentWithMinus: Boolean = False): TNPCToken; overload;
+    function ExpectToken(const ATokens: Array of TNPCTokenType; const APeekToken: Boolean = False; const AIdentWithMinus: Boolean = False): TNPCToken; overload;
     function ExpectReservedToken(const AReservedWord: TNPCReservedIdents): TNPCToken; inline;
     function ExpectReservedSymbol(const AReservedSymbol: TNPCReservedSymbols): TNPCToken; inline;
   end;
@@ -361,6 +362,29 @@ begin
   if FIndex >= FCount then
     Exit;
   Inc(FIndex);
+end;
+
+function TNPCTokensParser.ExpectToken(const AToken: TNPCTokenType; const AErrorMessage: String; const APeekToken, AIdentWithMinus: Boolean): TNPCToken;
+begin
+  if AIdentWithMinus then
+    Result := GetTokenWithMinus
+  else begin
+    if APeekToken then
+      Result := PeekToken
+    else
+      Result := GetToken;
+  end;
+  if Result = Nil then begin
+    raise NPCSyntaxError.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
+  end;
+
+  if Result.&Type = AToken then
+    Exit;
+
+  if Length(AErrorMessage) > 0 then
+    raise NPCSyntaxError.LexerError(Result.Location, AErrorMessage)
+  else
+    raise NPCSyntaxError.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
 end;
 
 function TNPCTokensParser.ExpectToken(const ATokens: Array of TNPCTokenType; const APeekToken: Boolean = False; const AIdentWithMinus: Boolean = False): TNPCToken;
