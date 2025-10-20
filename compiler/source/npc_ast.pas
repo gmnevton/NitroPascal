@@ -12,10 +12,13 @@ interface
 uses
   SysUtils,
   Classes,
+  Variants,
   Generics.Collections,
   npc_location;
 
 type
+  TNPC_ASTValue = Variant; // for simplicity
+
   TNPC_ASTTypeExpression = class;
 
   TNPCSymbolKind = (
@@ -49,7 +52,7 @@ type
     DeclNode: TObject; // pointer/reference to the declaration AST node (optional)
     Size: Integer;
     IsConst: Boolean;
-    ConstValue: Integer; // used if Kind=skDecl and IsConst=True
+    ConstValue: TNPC_ASTValue; // used if Kind=skDecl and IsConst=True
     //
     constructor Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject; ASize: Integer = -1; AValue: Integer = 0);
   end;
@@ -133,6 +136,7 @@ type
     AST_EXPRESSION_ARRAY,
     AST_EXPRESSION_ARRAY_SLICE,
     AST_EXPRESSION_RECORD,
+    AST_EXPRESSION_ASSIGN,
     AST_EXPRESSION_IF, // ternary, eg: x := if cond then true_expr else false_expr;
     AST_EXPRESSION_CASE, // ternary, eg: x := case selector of branches_expr else default_expr end;
     AST_EXPRESSION_IN_OP,
@@ -188,6 +192,7 @@ type
     constructor Create(const ALocation: TNPCLocation); override;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; virtual; abstract;
     function ToString: String; virtual;
   end;
 
@@ -376,6 +381,7 @@ type
     constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; ASymbol: TNPCSymbol); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -439,24 +445,54 @@ type
     function ToString: String; override;
   end;
 
-  TNPC_ASTCaseBranch = class
+  TNPC_ASTExpressionAssign = class(TNPC_ASTExpression)
   public
-    IfValues: TObjectList<TNPC_ASTExpression>; // constants like 1, 2, 3
-    ResultExpr: TNPC_ASTExpression; // expression for this branch
+    // &Type = AST_EXPRESSION_ASSIGN
+    Target: TNPC_ASTExpressionVariable; // usually TIdentExpr or member/index
+    ValueExpr: TNPC_ASTExpression;
+    //
+    constructor Create(const ALocation: TNPCLocation; ATarget: TNPC_ASTExpressionVariable; AValue: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+    //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
   end;
 
-  TNPC_ASTCaseBranches = TObjectList<TNPC_ASTCaseBranch>;
+  TNPC_ASTExpressionIf = class(TNPC_ASTExpression)
+    // &Type = AST_EXPRESSION_IF
+    Cond: TNPC_ASTExpression;
+    ThenExpr,
+    ElseExpr: TNPC_ASTExpression;
+    //
+    constructor Create(const ALocation: TNPCLocation; ACond: TNPC_ASTExpression; AThen, AElse: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+    //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
+  end;
+
+  TNPC_ASTExpressionCaseBranch = class
+  public
+    IfValues: TObjectList<TNPC_ASTExpression>; // list of constant expressions like 1, 2, 3
+    ResultExpr: TNPC_ASTExpression; // expression for this branch
+    //
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTExpressionCaseBranches = TObjectList<TNPC_ASTExpressionCaseBranch>;
 
   TNPC_ASTExpressionCase = class(TNPC_ASTExpression)
   public
     // &Type = AST_EXPRESSION_CASE
     Selector: TNPC_ASTExpression;
-    Branches: TNPC_ASTCaseBranches;
+    Branches: TNPC_ASTExpressionCaseBranches;
     DefaultExpr: TNPC_ASTExpression;
     //
-    constructor Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTExpressionCaseBranches; ADefault: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -629,16 +665,16 @@ type
   TNPC_ASTStatementAssign = class(TNPC_ASTStatement)
   public
     // &Type = AST_ASSIGN
-    Target: TNPC_ASTExpression; // usually TIdentExpr or member/index
+    Target: TNPC_ASTExpression; // TNPC_ASTExpressionVariable // usually TIdentExpr or member/index
     Value: TNPC_ASTExpression;
     //
-    constructor Create(const ALocation: TNPCLocation; ATarget, AValue: TNPC_ASTExpression); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; ATarget: TNPC_ASTExpression{Variable}; AValue: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
   end;
 
   TNPC_ASTStatementIf = class(TNPC_ASTStatement)
   public
-    // &Type = AST_IF
+    // &Type = AST_STATEMENT_IF
     Cond: TNPC_ASTExpression;
     ThenStmt,
     ElseStmt: TNPC_ASTStatement;
@@ -647,14 +683,25 @@ type
     destructor Destroy; override;
   end;
 
+  TNPC_ASTStatementCaseBranch = class
+  public
+    IfValues: TObjectList<TNPC_ASTExpression>; // list of constant expressions like 1, 2, 3
+    Stmt: TNPC_ASTStatement; // body statement for this branch
+    //
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTStatementCaseBranches = TObjectList<TNPC_ASTStatementCaseBranch>;
+
   TNPC_ASTStatementCase = class(TNPC_ASTStatement)
   public
     // &Type = AST_CASE
     Selector: TNPC_ASTExpression;
-    Branches: TNPC_ASTCaseBranches;
-    DefaultExpr: TNPC_ASTExpression;
+    Branches: TNPC_ASTStatementCaseBranches;
+    DefaultStmt: TNPC_ASTStatement;
     //
-    constructor Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTStatementCaseBranches; ADefault: TNPC_ASTStatement); reintroduce;
     destructor Destroy; override;
   end;
 
@@ -1069,6 +1116,13 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionVariable.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  if not Assigned(Symbol) then
+    Symbol := Scope.Resolve(Name);
+  Result := Symbol.ConstValue;
+end;
+
 function TNPC_ASTExpressionVariable.ToString: String;
 begin
   Result := '<variable>';
@@ -1189,14 +1243,97 @@ begin
   Result := '<binary>';
 end;
 
+{ TNPC_ASTExpressionAssign }
+
+constructor TNPC_ASTExpressionAssign.Create(const ALocation: TNPCLocation; ATarget: TNPC_ASTExpressionVariable; AValue: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_ASSIGN;
+  Target := ATarget; // usually TIdentExpr or member/index
+  ValueExpr := AValue;
+end;
+
+destructor TNPC_ASTExpressionAssign.Destroy;
+begin
+  if Target <> Nil then
+    Target.Free;
+  if ValueExpr <> Nil then
+    ValueExpr.Free;
+  inherited;
+end;
+
+function TNPC_ASTExpressionAssign.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := ValueExpr.Eval(Scope);
+  Target.Symbol.ConstValue := Result;
+end;
+
+function TNPC_ASTExpressionAssign.ToString: String;
+begin
+  Result := '<assign-expr>';
+end;
+
+{ TNPC_ASTExpressionIf }
+
+constructor TNPC_ASTExpressionIf.Create(const ALocation: TNPCLocation; ACond, AThen, AElse: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_IF;
+  Cond := ACond;
+  ThenExpr := AThen;
+  ElseExpr := AElse;
+end;
+
+destructor TNPC_ASTExpressionIf.Destroy;
+begin
+  if Cond <> Nil then
+    Cond.Free;
+  if ThenExpr <> Nil then
+    ThenExpr.Free;
+  if ElseExpr <> Nil then
+    ElseExpr.Free;
+  inherited;
+end;
+
+function TNPC_ASTExpressionIf.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  if Boolean(Cond.Eval(Scope)) then
+    Result := ThenExpr.Eval(Scope)
+  else if Assigned(ElseExpr) then
+    Result := ElseExpr.Eval(Scope)
+  else
+    Result := Null; // or raise an error if missing
+end;
+
+function TNPC_ASTExpressionIf.ToString: String;
+begin
+  Result := '<if-expr>';
+end;
+
+{ TNPC_ASTExpressionCaseBranch }
+
+constructor TNPC_ASTExpressionCaseBranch.Create;
+begin
+  IfValues := TObjectList<TNPC_ASTExpression>.Create(True);
+  ResultExpr := Nil;
+end;
+
+destructor TNPC_ASTExpressionCaseBranch.Destroy;
+begin
+  IfValues.Free;
+  if ResultExpr <> Nil then
+    ResultExpr.Free;
+  inherited;
+end;
+
 { TNPC_ASTExpressionCase }
 
-constructor TNPC_ASTExpressionCase.Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression);
+constructor TNPC_ASTExpressionCase.Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTExpressionCaseBranches; ADefault: TNPC_ASTExpression);
 begin
   inherited Create(ALocation);
   &Type := AST_EXPRESSION_CASE;
   Selector := ASelector;
-  Branches := TNPC_ASTCaseBranches.Create(True);
+  Branches := ABranches; // TNPC_ASTCaseBranches.Create(True);
   DefaultExpr := ADefault;
 end;
 
@@ -1204,10 +1341,38 @@ destructor TNPC_ASTExpressionCase.Destroy;
 begin
   if Selector <> Nil then
     Selector.Free;
+  if Branches <> Nil then
+    Branches.Free;
   if DefaultExpr <> Nil then
     DefaultExpr.Free;
-  Branches.Free;
   inherited;
+end;
+
+function TNPC_ASTExpressionCase.Eval(Scope: TNPCScope): TNPC_ASTValue;
+var
+  SelValue, Val: TNPC_ASTValue;
+  B: TNPC_ASTExpressionCaseBranch;
+  MatchFound: Boolean;
+  V: TNPC_ASTExpression;
+begin
+  SelValue := Selector.Eval(Scope);
+  MatchFound := False;
+
+  for B in Branches do begin
+    for V in B.IfValues do begin
+      Val := V.Eval(Scope);
+      if Val = SelValue then begin
+        Result := B.ResultExpr.Eval(Scope);
+        Exit;
+      end;
+    end;
+  end;
+
+  // Else branch
+  if Assigned(DefaultExpr) then
+    Result := DefaultExpr.Eval(Scope)
+  else
+    Result := Null;
 end;
 
 function TNPC_ASTExpressionCase.ToString: String;
@@ -1486,7 +1651,7 @@ end;
 
 { TNPC_ASTStatementAssign }
 
-constructor TNPC_ASTStatementAssign.Create(const ALocation: TNPCLocation; ATarget, AValue: TNPC_ASTExpression);
+constructor TNPC_ASTStatementAssign.Create(const ALocation: TNPCLocation; ATarget: TNPC_ASTExpression{Variable}; AValue: TNPC_ASTExpression);
 begin
   inherited Create(ALocation);
   &Type := AST_STATEMENT_ASSIGN;
@@ -1525,15 +1690,31 @@ begin
   inherited;
 end;
 
+{ TNPC_ASTStatementCaseBranch }
+
+constructor TNPC_ASTStatementCaseBranch.Create;
+begin
+  IfValues := TObjectList<TNPC_ASTExpression>.Create(True);
+  Stmt := Nil;
+end;
+
+destructor TNPC_ASTStatementCaseBranch.Destroy;
+begin
+  IfValues.Free;
+  if Stmt <> Nil then
+    Stmt.Free;
+  inherited;
+end;
+
 { TNPC_ASTStatementCase }
 
-constructor TNPC_ASTStatementCase.Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTCaseBranches; ADefault: TNPC_ASTExpression);
+constructor TNPC_ASTStatementCase.Create(const ALocation: TNPCLocation; ASelector: TNPC_ASTExpression; ABranches: TNPC_ASTStatementCaseBranches; ADefault: TNPC_ASTStatement);
 begin
   inherited Create(ALocation);
   &Type := AST_STATEMENT_CASE;
   Selector := ASelector;
   Branches := ABranches; // TNPC_ASTCaseBranches.Create(True);
-  DefaultExpr := ADefault;
+  DefaultStmt := ADefault;
 end;
 
 destructor TNPC_ASTStatementCase.Destroy;
@@ -1542,8 +1723,8 @@ begin
     Selector.Free;
   if Branches <> Nil then
     Branches.Free;
-  if DefaultExpr <> Nil then
-    DefaultExpr.Free;
+  if DefaultStmt <> Nil then
+    DefaultStmt.Free;
   inherited;
 end;
 

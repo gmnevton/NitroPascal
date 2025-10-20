@@ -141,6 +141,34 @@ type
     procedure ParseDirectives(const ABlock: TNPC_AST);
     procedure ParseComment;
 
+//  NUD (Null Denotation) and LED (Left Denotation) are two types of parsing functions in a Pratt parser
+//  that handle different contexts for a given operator or token.
+//  A nud function is called when a token appears at the beginning of an expression (in a prefix or "null" context),
+//  such as a number or a unary minus.
+//  An led function is called when a token appears after an expression in an infix context,
+//  like a binary operator such as addition or multiplication.
+//
+//  Feature | NUD (Null Denotation)                    | LED (Left Denotation)
+//  -----------------------------------------------------------------------------------------------------
+//  Context	| Prefix (no expression to its left)       | Infix (an expression is to its left)
+//          |                                          |
+//  Example | Handling - in -5 or a number literal 123 | Handling + in 1 + 2 or * in 2 * 3
+//          |                                          |
+//  Purpose | To parse the expression that follows the | To parse the token and the expression that follows it,
+//          | token without a preceding expression.	   | using the preceding expression as the left-hand side.
+//          |                                          |
+//  Function| Often returns a literal value or         | Often creates a new AST node with the left-hand side expression
+//          | a unary AST node.                        | and a right-hand side expression parsed by a recursive call.
+
+//type
+//  TNudFunc = function: TExpr of object;
+//  TLedFunc = function(Left: TExpr): TExpr of object;
+//
+//procedure TParser.RegisterNud(TokenKind: TTokenKind; NudFunc: TNudFunc);
+//begin
+//  FNudTable[TokenKind] := NudFunc;
+//end;
+
     function  ParseStatement(const AFlags: TNPCParseStatementFlags): TNPC_ASTStatement;
     function  ParseExpression(const AToken: TNPCToken; Precedence: Integer = 0): TNPC_ASTExpression;
     function  ParsePrimaryExpression(const AToken: TNPCToken): TNPC_ASTExpression;
@@ -164,9 +192,12 @@ type
     function  ParseSet(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseIndex(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
     function  ParseRecordMember(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
-    function  ParseIf(const AToken: TNPCToken): TNPC_ASTStatementIf;
-    function  ParseCase(const AToken: TNPCToken): TNPC_ASTStatementCase;
-    function  ParseCaseBranches(const ASelector: TNPC_ASTExpression; const ACaseOf: Boolean; out ADefaultBranch: TNPC_ASTExpression): TNPC_ASTCaseBranches;
+    function  ParseIfExpression(const AToken: TNPCToken): TNPC_ASTExpressionIf;
+    function  ParseIfStatement(const AToken: TNPCToken): TNPC_ASTStatementIf;
+    function  ParseCaseExpression(const AToken: TNPCToken): TNPC_ASTExpressionCase;
+    function  ParseCaseExpressionBranches(const ASelector: TNPC_ASTExpression; const ACaseOf: Boolean; out ADefaultBranch: TNPC_ASTExpression): TNPC_ASTExpressionCaseBranches;
+    function  ParseCaseStatement(const AToken: TNPCToken): TNPC_ASTStatementCase;
+    function  ParseCaseStatementBranches(const ASelector: TNPC_ASTExpression; const ACaseOf: Boolean; out ADefaultBranch: TNPC_ASTStatement): TNPC_ASTStatementCaseBranches;
     function  ParseFor(const AToken: TNPCToken): TNPC_ASTStatementFor;
     procedure ParseForParams;
     function  ParseWhile(const AToken: TNPCToken): TNPC_ASTStatementWhile;
@@ -1396,7 +1427,10 @@ begin
     Result := Nil;
   end
   else if TokenIsReservedIdent(token, ri_if) then begin
-    Result := ParseIf(token);
+    Result := ParseIfStatement(token);
+  end
+  else if TokenIsReservedIdent(token, ri_case) then begin
+    Result := ParseCaseStatement(token);
   end
   else if TokenIsReservedIdent(token, ri_for) then begin
     Result := ParseFor(token);
@@ -1478,7 +1512,7 @@ var
 //  opTok: TNPCToken;
 begin
   token := Texer.PeekToken;
-  left := ParsePrimaryExpression(token); // nud
+  left := ParsePrimaryExpression(token); // nud - null denotation
   try
     while True do begin
       token := Texer.PeekToken;
@@ -1489,7 +1523,7 @@ begin
         Break;
 //      opTok := token;
 //      Texer.SkipToken;
-      left := ParseSimpleExpression(token, left); // led
+      left := ParseSimpleExpression(token, left); // led - left denotation
     end;
     Result := left;
   except
@@ -1602,6 +1636,13 @@ begin
   end
   else if TokenIsReservedSymbol(AToken, rs_OBracket) then begin // indexing: '[' expr ']'
     Result := ParseIndex(AToken, ALeft);
+  end
+  else if TokenIsReservedIdent(AToken, ri_if) then begin // 'if' expression
+    right := ParseIfExpression(AToken);
+    Result := TNPC_ASTExpressionBinary.Create(AToken.Location, ALeft, op, right);
+  end
+  else if TokenIsReservedIdent(AToken, ri_case) then begin // 'case' expression
+    Result := ParseCaseExpression(AToken);
   end
   else if TokenIsReservedIdent(AToken, ri_in) then begin // 'in'
 //      var RightExpr := ParseExpression;
@@ -2540,6 +2581,15 @@ begin
   Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Field, FieldType);
 end;
 
+function TNPCSourceParser.ParseIfExpression(const AToken: TNPCToken): TNPC_ASTExpressionIf;
+begin
+//  if not IsBoolean(Expr.Condition.Typ) then
+//    Error('Condition in if-expression must be Boolean');
+//  Expr.Typ := ResolveCommonType(Expr.ThenExpr.Typ, Expr.ElseExpr.Typ);
+
+
+end;
+
 // if_stmt    = 'if' expr 'then' stmt ['else' stmt] ';' .
 //
 // expr        = simp_expr [ ('<' | '<=' | '=' | '>' | '>=' | ('<>' | '!=')) simp_expr ] [ ';' ] .
@@ -2579,7 +2629,7 @@ end;
 //  Result := TIfStmt.Create(cond, thenS, elseS);
 //end;
 
-function TNPCSourceParser.ParseIf(const AToken: TNPCToken): TNPC_ASTStatementIf;
+function TNPCSourceParser.ParseIfStatement(const AToken: TNPCToken): TNPC_ASTStatementIf;
 var
   token: TNPCToken;
   cond: TNPC_ASTExpression;
@@ -2640,13 +2690,13 @@ end;
 //
 // ConstExpression = Expression .
 
-function TNPCSourceParser.ParseCase(const AToken: TNPCToken): TNPC_ASTStatementCase;
+function TNPCSourceParser.ParseCaseExpression(const AToken: TNPCToken): TNPC_ASTExpressionCase;
 var
 //  AToken: TNPCToken;
   token: TNPCToken;
   case_selector: TNPC_ASTExpression;
   case_of: Boolean;
-  case_branches: TNPC_ASTCaseBranches;
+  case_branches: TNPC_ASTExpressionCaseBranches;
   case_default: TNPC_ASTExpression;
 begin
 //  AToken := Texer.PeekToken;
@@ -2659,7 +2709,7 @@ begin
   if not TokenIsReservedIdent(token, ri_of) and not TokenIsReservedSymbol(token, rs_OCurly) then
     raise NPCSyntaxError.ParserError(Texer.LastToken.Location, Format(sParserUnexpectedTokenIn, [Texer.LastToken.TokenToString, 'case ', sStatement]));
   // parse if branches
-  case_branches := ParseCaseBranches(case_selector, case_of, case_default);
+  case_branches := ParseCaseExpressionBranches(case_selector, case_of, case_default);
   //
   token := Texer.GetToken;
   if (case_of and not TokenIsReservedIdent(token, ri_end)) or (not case_of and not TokenIsReservedSymbol(token, rs_CCurly)) then
@@ -2670,7 +2720,7 @@ begin
 //    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.TokenToString, 'case ', sStatement]));
     raise NPCSyntaxError.ParserError(Texer.LastToken.Location.After, Format(sParserExpectedButGot, [NPCReservedSymbolToString(rs_Semicolon), token.TokenToString]));
 
-  Result := TNPC_ASTStatementCase.Create(AToken.Location, case_selector, case_branches, case_default);
+  Result := TNPC_ASTExpressionCase.Create(AToken.Location, case_selector, case_branches, case_default);
 end;
 
 // CaseElement = 'if' CaseLabel { ',' CaseLabel } ':' [ '{@next' [ ':' CaseElement ] '}' ] Statement .
@@ -2679,7 +2729,7 @@ end;
 //
 // ConstExpression = Expression .
 
-function TNPCSourceParser.ParseCaseBranches(const ASelector: TNPC_ASTExpression; const ACaseOf: Boolean; out ADefaultBranch: TNPC_ASTExpression): TNPC_ASTCaseBranches;
+function TNPCSourceParser.ParseCaseExpressionBranches(const ASelector: TNPC_ASTExpression; const ACaseOf: Boolean; out ADefaultBranch: TNPC_ASTExpression): TNPC_ASTExpressionCaseBranches;
 type
   // Ordinal types are the predefined types Integer, Char, WideChar, Boolean, and declared enumerated types
   TCaseSelectorType = (
@@ -2693,7 +2743,7 @@ type
 
 var
   token: TNPCToken;
-  Branch: TNPC_ASTCaseBranch;
+  Branch: TNPC_ASTExpressionCaseBranch;
   expr: TNPC_ASTExpression;
   selector_type: TCaseSelectorType;
   branch_type: TCaseSelectorType;
@@ -2717,11 +2767,11 @@ begin
   if selector_type = cstUnknown then
     raise NPCSyntaxError.ParserError(ASelector.Location, Format(sParserExpectedElementsButGot, ['selector to be one of {<literal>, <enum>, <set>, <type>, <pointer>}', ASelector.ToString, 'case statement', '']));
 
-  Result := TNPC_ASTCaseBranches.Create(True);
+  Result := TNPC_ASTExpressionCaseBranches.Create(True);
 
   token := Texer.PeekToken;
   while not (ACaseOf and TokenIsReservedIdent(token, ri_end)) and not TokenIsReservedIdent(token, ri_else) do begin
-    Branch := TNPC_ASTCaseBranch.Create;
+    Branch := TNPC_ASTExpressionCaseBranch.Create;
     Texer.ExpectReservedToken(ri_if);
     repeat
       token := Texer.PeekToken;
@@ -2772,6 +2822,48 @@ begin
   Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
 end;
 
+function TNPCSourceParser.ParseCaseStatement(const AToken: TNPCToken): TNPC_ASTStatementCase;
+begin
+
+end;
+//var
+//  CaseStmt: TStmtCase;
+//  Branch: TCaseBranchStmt;
+//begin
+//  Expect(tkCase);
+//
+//  CaseStmt := TStmtCase.Create;
+//  CaseStmt.Selector := ParseExpression(0);
+//  Expect(tkOf);
+//
+//  while not Check(tkEnd) and not Check(tkElse) do
+//  begin
+//    Branch := TCaseBranchStmt.Create;
+//
+//    // one or more constant values
+//    repeat
+//      Branch.Values.Add(ParseExpression(0));
+//    until not Match(tkComma);
+//
+//    Expect(tkColon);
+//    Branch.Stmt := ParseStatement; // <---- difference here
+//    CaseStmt.Branches.Add(Branch);
+//
+//    Match(tkSemicolon); // optional
+//  end;
+//
+//  if Match(tkElse) then
+//    CaseStmt.ElseStmt := ParseStatement;
+//
+//  Expect(tkEnd);
+//  Result := CaseStmt;
+//end;
+
+function TNPCSourceParser.ParseCaseStatementBranches(const ASelector: TNPC_ASTExpression; const ACaseOf: Boolean; out ADefaultBranch: TNPC_ASTStatement): TNPC_ASTStatementCaseBranches;
+begin
+
+end;
+
 // for i := 0; i < 10; i += 1 {
 //
 // for_loop   = 'for' loop_cntrl ( 'do' statement ';' | '{' statement ';' [ statement ';' ] '}' ) .
@@ -2818,6 +2910,7 @@ function TNPCSourceParser.ParseFor(const AToken: TNPCToken): TNPC_ASTStatementFo
 //end;
 var
   // This is a simplified for ... to/downto ... do parser that expects: for i := expr to expr do stmt
+  token: TNPCToken;
   varName: string;
   assignTok: TToken;
   startExpr, endExpr: TNPC_ASTExpression;
@@ -2825,7 +2918,8 @@ var
   dummyAssign: TAssignStmt;
   beginStmt: TBlockStmt;
 begin
-  Eat(tkFor);
+  Texer.SkipToken; // skip 'for'
+  token := Texer.PeekToken;
   if FToken.Kind <> tkIdentifier then
     raise Exception.Create('Expected identifier after for');
   varName := FToken.Text;
@@ -3847,7 +3941,7 @@ var
   procedure PrintExpr(const Expr: TNPC_ASTExpression; Level: Integer = 0);
   var
     Elem: TNPC_ASTExpression;
-    Branch: TNPC_ASTCaseBranch;
+    Branch: TNPC_ASTExpressionCaseBranch;
   begin
     if Expr is TNPC_ASTExpressionLiteral then begin
       Indent(Level);
@@ -3904,6 +3998,21 @@ var
       tf.WriteLine('Unary(' + TNPC_ASTExpressionUnary(Expr).Op + ')');
       PrintExpr(TNPC_ASTExpressionUnary(Expr).Right, Level+1);
     end
+    else if Expr is TNPC_ASTExpressionIf then begin
+      Indent(Level);
+      tf.Writeln('IfExpr');
+      Indent(Level+1);
+      tf.Writeln('Condition:');
+      PrintExpr(TNPC_ASTExpressionIf(Expr).Condition, Level+2);
+      Indent(Level+1);
+      tf.Writeln('Then:');
+      PrintExpr(TNPC_ASTExpressionIf(Expr).ThenExpr, Level+2);
+      if Assigned(TNPC_ASTExpressionIf(Expr).ElseExpr) then begin
+        Indent(Level+1);
+        tf.Writeln('Else:');
+        PrintExpr(TNPC_ASTExpressionIf(Expr).ElseExpr, Level+2);
+      end;
+    end
     else if Expr is TNPC_ASTExpressionCase then begin
       Indent(Level);
       tf.WriteLine('CaseExpr');
@@ -3932,6 +4041,8 @@ var
   procedure PrintStmt(Stmt: TNPC_ASTStatement; Level: Integer = 0);
   var
     i: Integer;
+    Elem: TNPC_ASTStatement;
+    Branch: TNPC_ASTStatementCaseBranch;
   begin
     if Stmt is TNPC_ASTStatementBlock then begin
       Indent(Level);
@@ -3973,7 +4084,27 @@ var
     end
     else if Stmt is TNPC_ASTStatementCase then begin
       Indent(Level);
-      tf.WriteLine('Case<not-implemented>');
+      //tf.WriteLine('Case<not-implemented>');
+      tf.Writeln('CaseStmt');
+      Indent(Level+1);
+      tf.Writeln('Selector:');
+      PrintExpr(TNPC_ASTStatementCase(Stmt).Selector, Level+2);
+
+      for Branch in TNPC_ASTStatementCase(Stmt).Branches do begin
+        Indent(Level+1);
+        tf.Writeln('Branch:');
+        for Elem in Branch.IfValues do
+          PrintExpr(Elem, Level+2);
+        Indent(Level+2);
+        tf.Writeln('Stmt:');
+        PrintStmt(Branch.Stmt, Level+3);
+      end;
+
+      if Assigned(TNPC_ASTStatementCase(Stmt).DefaultStmt) then begin
+        Indent(Level+1);
+        tf.Writeln('Else:');
+        PrintStmt(TNPC_ASTStatementCase(Stmt).DefaultStmt, Level+2);
+      end;
     end
     else if Stmt is TNPC_ASTStatementWhile then begin
       Indent(Level);
