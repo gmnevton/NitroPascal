@@ -25,6 +25,7 @@ type
     skBuiltinType,
     skType,
     skVar // const
+    //skProc
   );
 
   TNPCSymbolType = (
@@ -55,6 +56,7 @@ type
     ConstValue: TNPC_ASTValue; // used if Kind=skDecl and IsConst=True
     //
     constructor Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject; ASize: Integer = -1; AValue: Integer = 0);
+    destructor Destroy; override;
   end;
 
 //  TNPCListEntry = packed record
@@ -707,14 +709,16 @@ type
 
   TNPC_ASTStatementFor = class(TNPC_ASTStatement)
   public
-    // &Type = AST_FOR
-    VarName: UTF8String;
-    InitExpr: TNPC_ASTExpression;
+    // &Type = AST_STATEMENT_FOR
+    //VarName: UTF8String;
+    InitStmt: TNPC_ASTStatement;
+    CondExpr: TNPC_ASTExpression;
     EndExpr: TNPC_ASTExpression;
     Reverse: Boolean;
     Body: TNPC_ASTStatement;
     //
-    constructor Create(const ALocation: TNPCLocation; const AVarName: UTF8String; AInitExpr, AEndExpr: TNPC_ASTExpression; const ADownTo: Boolean; ABody: TNPC_ASTStatement); reintroduce;
+    //constructor Create(const ALocation: TNPCLocation; const AVarName: UTF8String; AInitExpr, AEndExpr: TNPC_ASTExpression; const ADownTo: Boolean; ABody: TNPC_ASTStatement); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; AInitStmt: TNPC_ASTStatement; ACondExpr, AEndExpr: TNPC_ASTExpression; const ADownTo: Boolean; ABody: TNPC_ASTStatement); reintroduce;
     destructor Destroy; override;
   end;
 
@@ -743,6 +747,17 @@ begin
   Size := ASize;
   IsConst := AConst;
   ConstValue := AValue;
+end;
+
+destructor TNPCSymbol.Destroy;
+begin
+  Name := '';
+  TypeRef := Nil;
+//  if TypeRef <> Nil then
+//    TypeRef.Free;
+  DeclNode := Nil;
+  ConstValue := Unassigned;
+  inherited;
 end;
 
 { TNPCScope }
@@ -812,7 +827,9 @@ constructor TNPC_AST.Create(const ALocation: TNPCLocation);
 begin
   &Type := AST_UNKNOWN;
   ASTFlags := 0;
-  Location := ALocation.Copy;
+  Location := Nil;
+  if ALocation <> Nil then
+    Location := ALocation.Copy;
 end;
 
 destructor TNPC_AST.Destroy;
@@ -948,13 +965,17 @@ begin
   inherited Create(ALocation);
   &Type := AST_TYPE_SET;
   ElementType := AElementType;
-  Elements := TObjectList<TNPC_ASTExpression>.Create(True);
+  Elements := TObjectList<TNPC_ASTExpression>.Create(False);
 end;
 
 destructor TNPC_ASTTypeSet.Destroy;
+var
+  i: Integer;
 begin
   if ElementType <> Nil then
     ElementType.Free;
+  for i := 0 to Elements.Count - 1 do
+    Elements.Items[i].Free;
   Elements.Free;
   inherited;
 end;
@@ -1064,13 +1085,17 @@ begin
   inherited Create(ALocation);
   &Type := AST_EXPRESSION_SET;
   ElementType := AElementType;
-  Elements := TObjectList<TNPC_ASTExpression>.Create(True);
+  Elements := TObjectList<TNPC_ASTExpression>.Create(False);
 end;
 
 destructor TNPC_ASTExpressionSet.Destroy;
+var
+  i: Integer;
 begin
   if ElementType <> Nil then
     ElementType.Free;
+  for i := 0 to Elements.Count - 1 do
+    Elements.Items[i].Free;
   Elements.Free;
   inherited;
 end;
@@ -1082,13 +1107,17 @@ begin
   inherited Create(ALocation);
   &Type := AST_EXPRESSION_SET_LITERAL;
   SetType := AType;
-  Elements := TObjectList<TNPC_ASTExpression>.Create(True);
+  Elements := TObjectList<TNPC_ASTExpression>.Create(False);
 end;
 
 destructor TNPC_ASTExpressionSetLiteral.Destroy;
+var
+  i: Integer;
 begin
   if SetType <> Nil then
     SetType.Free;
+  for i := 0 to Elements.Count - 1 do
+    Elements.Items[i].Free;
   Elements.Free;
   inherited;
 end;
@@ -1314,12 +1343,16 @@ end;
 
 constructor TNPC_ASTExpressionCaseBranch.Create;
 begin
-  IfValues := TObjectList<TNPC_ASTExpression>.Create(True);
+  IfValues := TObjectList<TNPC_ASTExpression>.Create(False);
   ResultExpr := Nil;
 end;
 
 destructor TNPC_ASTExpressionCaseBranch.Destroy;
+var
+  i: Integer;
 begin
+  for i := 0 to IfValues.Count - 1 do
+    IfValues.Items[i].Free;
   IfValues.Free;
   if ResultExpr <> Nil then
     ResultExpr.Free;
@@ -1464,13 +1497,17 @@ begin
   inherited Create(ALocation);
   &Type := AST_CALL;
   Callee := ACallee;
-  Args := TObjectList<TNPC_ASTExpression>.Create(True);
+  Args := TObjectList<TNPC_ASTExpression>.Create(False);
 end;
 
 destructor TNPC_ASTExpressionCall.Destroy;
+var
+  i: Integer;
 begin
   if Callee <> Nil then
     Callee.Free;
+  for i := 0 to Args.Count - 1 do
+    Args.Items[i].Free;
   Args.Free;
   inherited;
 end;
@@ -1557,11 +1594,16 @@ begin
   inherited Create(ALocation);
   &Type := AST_BLOCK;
   ParentBlock := AParent;
-  Statements := TObjectList<TNPC_ASTStatement>.Create(True);
+  Statements := TObjectList<TNPC_ASTStatement>.Create(False);
 end;
 
 destructor TNPC_ASTStatementBlock.Destroy;
+var
+  i: Integer;
 begin
+  ParentBlock := Nil;
+  for i := 0 to Statements.Count - 1 do
+    Statements.Items[i].Free;
   Statements.Free;
   inherited;
 end;
@@ -1626,8 +1668,9 @@ begin
     DeclaredType.Free;
   if Init <> Nil then
     Init.Free;
-  if SymbolRef <> Nil then
-    SymbolRef.Free;
+  SymbolRef := Nil;
+//  if SymbolRef <> Nil then
+//    SymbolRef.Free;
   inherited;
 end;
 
@@ -1694,12 +1737,16 @@ end;
 
 constructor TNPC_ASTStatementCaseBranch.Create;
 begin
-  IfValues := TObjectList<TNPC_ASTExpression>.Create(True);
+  IfValues := TObjectList<TNPC_ASTExpression>.Create(False);
   Stmt := Nil;
 end;
 
 destructor TNPC_ASTStatementCaseBranch.Destroy;
+var
+  i: Integer;
 begin
+  for i := 0 to IfValues.Count - 1 do
+    IfValues.Items[i].Free;
   IfValues.Free;
   if Stmt <> Nil then
     Stmt.Free;
@@ -1730,13 +1777,13 @@ end;
 
 { TNPC_ASTStatementFor }
 
-constructor TNPC_ASTStatementFor.Create(const ALocation: TNPCLocation; const AVarName: UTF8String; AInitExpr, AEndExpr: TNPC_ASTExpression; const ADownTo: Boolean;
-  ABody: TNPC_ASTStatement);
+constructor TNPC_ASTStatementFor.Create(const ALocation: TNPCLocation; AInitStmt: TNPC_ASTStatement; ACondExpr, AEndExpr: TNPC_ASTExpression; const ADownTo: Boolean; ABody: TNPC_ASTStatement);
 begin
   inherited Create(ALocation);
   &Type := AST_STATEMENT_FOR;
-  VarName := AVarName;
-  InitExpr := AInitExpr;
+  //VarName := AVarName;
+  InitStmt := AInitStmt;
+  CondExpr := ACondExpr;
   EndExpr := AEndExpr;
   Reverse := ADownTo;
   Body := ABody;
@@ -1744,9 +1791,11 @@ end;
 
 destructor TNPC_ASTStatementFor.Destroy;
 begin
-  VarName := '';
-  if InitExpr <> Nil then
-    InitExpr.Free;
+//  VarName := '';
+  if InitStmt <> Nil then
+    InitStmt.Free;
+  if CondExpr <> Nil then
+    CondExpr.Free;
   if EndExpr <> Nil then
     EndExpr.Free;
   if Body <> Nil then

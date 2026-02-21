@@ -375,7 +375,7 @@ begin
       Result := GetToken;
   end;
   if Result = Nil then begin
-    raise NPCSyntaxError.LexerError(Location, Format('expected "%s" but got end of file', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens))]));
+    raise NPCSyntaxError.LexerError(Location, Format('expected "%s" but got end of file', [ArrayOfTokenToArrayOfString(AToken)]));
   end;
 
   if Result.&Type = AToken then
@@ -384,7 +384,7 @@ begin
   if Length(AErrorMessage) > 0 then
     raise NPCSyntaxError.LexerError(Result.Location, AErrorMessage)
   else
-    raise NPCSyntaxError.LexerError(Result.Location, Format('expected "%s" but got "%s"', [String.Join('" or "', ArrayOfTokenToArrayOfString(ATokens)), LiteralTokenToChar(Result.&Type)]));
+    raise NPCSyntaxError.LexerError(Result.Location, Format('expected "%s" but got "%s"', [ArrayOfTokenToArrayOfString(AToken), LiteralTokenToChar(Result.&Type)]));
 end;
 
 function TNPCTokensParser.ExpectToken(const ATokens: Array of TNPCTokenType; const APeekToken: Boolean = False; const AIdentWithMinus: Boolean = False): TNPCToken;

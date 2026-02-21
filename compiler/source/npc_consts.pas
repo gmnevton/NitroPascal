@@ -44,7 +44,7 @@ const
   sParserExpectedNameAfterKeyword  = 'expected %s name after "%s" keyword';
   sParserTypeMismatchInLiteral     = 'type mismatch in %s: expected %s, found %s';
   sParserUnknownTypeFor            = 'unknown type "%s" for %s%s';
-  sParserUnknown                   = 'unknown %s: %s';
+  sParserUnknown                   = 'unknown %s: "%s"';
   sParserLeftSideOfMustBe          = 'left side of %s must be a %s';
 //  sParserEmptySetAssignRequiresSet = 'can''t assign empty set to variable "%s"';
   sParserIntrinsicFuncExpects      = 'intrinsic function %s expects %s as %s';

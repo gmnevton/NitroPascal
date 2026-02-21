@@ -2,9 +2,16 @@
 
 {$program-type Windows32 GUI}
 
+var
+  ConsoleAvailable: Boolean = True;
+  
+Writeln(const Value: String) {
+
+};
+
 begin
   // program initialization code
-//  SomeString := 'this is a text';
+  SomeString := 'this is a text';
   if ConsoleAvailable then {
     Writeln(SomeString);
     ConsolePause;
