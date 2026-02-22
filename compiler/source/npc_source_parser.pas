@@ -190,6 +190,8 @@ type
     function  ParseVariableType(const AVarToken: TNPCToken; const AVarName: String): TNPC_ASTTypeExpression;
 
     function  ParseBlock(const AToken: TNPCToken): TNPC_ASTStatement;
+    function  ParseProcedureDefinition(const AToken: TNPCToken): TNPC_ASTStatement;
+    function  ParseProcedureParameter(const AToken: TNPCToken): TNPC_ASTParameter;
     function  ParseAssignment(const ALeftToken: TNPCToken): TNPC_ASTStatement;
     function  ParseAssignmentNew(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
@@ -221,9 +223,9 @@ type
     procedure ParseBegin(const AToken: TNPCToken);
     procedure ParseEnd(const AToken: TNPCToken);
 
-    function  ParseDeclarations(const AToken: TNPCToken): Boolean;
-    function  ParseStatements(var AToken: TNPCToken; const AExitOnReservedIdents: Array of TNPCReservedIdents; const ALevel: Integer): Boolean;
-    procedure ParseLambdaParams(const AToken: TNPCToken);
+//    function  ParseDeclarations(const AToken: TNPCToken): Boolean;
+//    function  ParseStatements(var AToken: TNPCToken; const AExitOnReservedIdents: Array of TNPCReservedIdents; const ALevel: Integer): Boolean;
+//    procedure ParseLambdaParams(const AToken: TNPCToken);
     //
     property Settings: Pointer read SettingsPtr;
   public
@@ -963,7 +965,7 @@ end;
 
 procedure TNPCSourceParser.ParseProjectBody(const ABlock: TNPC_AST);
 var
-  token: TNPCToken;
+  token, next_token: TNPCToken;
 begin
   while Texer.IsNotEmpty do begin
     SkipComments;
@@ -976,8 +978,10 @@ begin
       else
         ParseComment;
     end
-    else if TokenIsIdent(token) then begin // maybe function declaration
-      ParseDeclarations(token);
+    else if TokenIsIdent(token) then begin // probably function declaration, function calls are possible only in procedures/functions bodys
+      next_token := Texer.PeekToken;
+      if TokenIsReservedSymbol(next_token, rs_OParen) then // '('
+        AddStatement(ParseProcedureDefinition(token));
     end
     else if TokenIsReservedIdent(token, ri_imports) then begin
       ParseImports(ABlock);
@@ -1424,9 +1428,13 @@ var
   expr: TNPC_ASTExpression;
   block: TNPC_ASTStatementBlock;
 begin
+  SkipComments;
   token := Texer.PeekToken;
   //
-  if TokenIsIdent(token) then begin // might be: label, assignment, expression-statement
+  if TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly) then begin
+    Result := Nil;
+  end
+  else if TokenIsIdent(token) then begin // might be: label, assignment, expression-statement
     next_token := Texer.NextToken;
     if TokenIsReservedSymbol(next_token, rs_Colon) then begin // ':' - label
       Texer.SkipToken;
@@ -2295,7 +2303,8 @@ begin
         raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedElementsButGot, ['statement', 'EOF', 'block ', sDeclaration]));
       stmt := ParseStatement([stafEmptyStatementIsAcceptable]);
       if Assigned(stmt) then
-        AddStatement(stmt);
+        //AddStatement(stmt);
+        CurrentBlock.AddStatement(stmt);
       token := Texer.PeekToken;
     end;
     //token := Texer.PeekToken;
@@ -2308,6 +2317,153 @@ begin
     CurrentBlock := oldBlock;
     LeaveScope;
   end;
+end;
+
+// ProcedureDecl = Identifier [ "(" ParameterList ")" ] [ ":" "(" TypesList ")" ] [ Statements ] ";"
+function TNPCSourceParser.ParseProcedureDefinition(const AToken: TNPCToken): TNPC_ASTStatement;
+var
+  token: TNPCToken;
+  param: TNPC_ASTParameter;
+  stmt: TNPC_ASTStatement;
+  oldBlock: TNPC_ASTStatementBlock;
+  Proc: TNPC_ASTStatementProcedure;
+begin
+  Texer.ExpectReservedSymbol(rs_OParen); // '('
+  Proc := TNPC_ASTStatementProcedure.Create(AToken.Location, CurrentBlock, AToken.Value, False, []);
+
+  // collect parameters, if any available
+  token := Texer.PeekToken;
+  if Texer.IsNotEmpty and not TokenIsReservedSymbol(token, rs_CParen) then begin // ')'
+    while not TokenIsReservedSymbol(token, rs_CParen) do begin
+      param := ParseProcedureParameter(token);
+      if Assigned(param) then
+        Proc.Parameters.Add(param);
+
+      token := Texer.PeekToken;
+      if TokenIsReservedSymbol(token, rs_Comma) then begin
+        Texer.SkipToken;
+        token := Texer.PeekToken;
+      end
+      else
+        Break;
+    end;
+  end;
+  Texer.ExpectReservedSymbol(rs_CParen); // ')'
+
+  // collect returns, if any available
+  token := Texer.PeekToken;
+  if Texer.IsNotEmpty and TokenIsReservedSymbol(token, rs_Colon) then begin // ':'
+    Texer.SkipToken;
+    Proc.IsFunction := True;
+    Proc.Returns := TObjectList<TNPC_ASTParameter>.Create(False);
+    //
+    Texer.ExpectReservedSymbol(rs_OParen); // '('
+      while not TokenIsReservedSymbol(token, rs_CParen) do begin
+        param := ParseProcedureParameter(token);
+        if Assigned(param) then
+          Proc.Returns.Add(param);
+
+        token := Texer.PeekToken;
+        if TokenIsReservedSymbol(token, rs_Comma) then begin
+          Texer.SkipToken;
+          token := Texer.PeekToken;
+        end
+        else
+          Break;
+      end;
+    Texer.ExpectReservedSymbol(rs_CParen); // ')'
+    token := Texer.PeekToken;
+  end;
+
+  // body
+  if not TokenIsReservedIdent(token, ri_begin) and not TokenIsReservedSymbol(token, rs_OCurly) then
+    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
+  EnterScope(CurrentScope); // new lexical scope for this block
+  try
+////    oldBlock := CurrentBlock;
+////    CurrentBlock := TNPC_ASTStatementBlock(stmt);
+//    token := Texer.PeekToken;
+//    while not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) do begin
+//      if TokenIsOfType(token, [tokEOF]) then
+//        raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedElementsButGot, ['statement', 'EOF', 'block ', sDeclaration]));
+//      stmt := ParseStatement([stafEmptyStatementIsAcceptable]);
+//      if Assigned(stmt) then
+//        Proc.AddStatement(stmt);
+//      token := Texer.PeekToken;
+//    end;
+//    //token := Texer.PeekToken;
+//    if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
+//      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
+//    Texer.SkipToken;
+//    //Texer.ExpectToken([tokSemicolon]);
+    Proc.Body := ParseBlock(token);
+  finally
+//    CurrentBlock := oldBlock;
+    LeaveScope;
+  end;
+//  token := Texer.PeekToken;
+//  if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
+//    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
+  Texer.ExpectReservedSymbol(rs_Semicolon);
+
+  CurrentScope.DefineProcedure(Proc.Name, Proc);
+  Result := Proc;
+end;
+
+function TNPCSourceParser.ParseProcedureParameter(const AToken: TNPCToken): TNPC_ASTParameter;
+var
+  token, next_token: TNPCToken;
+  Modifier: TNPC_ASTParamModifier;
+  Name: UTF8String;
+  TypeSym: TNPCSymbol;
+  Init: TNPC_ASTExpression;
+begin
+  Modifier := pmNone;
+
+  // const / var / out
+  if TokenIsReservedIdent(AToken, ri_const) then begin
+    Modifier := pmConst;
+    Texer.SkipToken;
+    Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function', ' parameter definition'])).Value;
+  end
+  else if TokenIsReservedIdent(AToken, ri_var) then begin
+    Modifier := pmVar;
+    Texer.SkipToken;
+    Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function', ' parameter definition'])).Value;
+  end
+  else if TokenIsReservedIdent(AToken, ri_out) then begin
+    Modifier := pmOut;
+    Texer.SkipToken;
+    Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function', ' parameter definition'])).Value;
+  end
+  else if TokenIsIdent(AToken) then begin // no const / var / out, just param name
+    Name := AToken.Value;
+    Texer.SkipToken;
+  end
+  else
+    raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserExpectedElementsButGot, ['const/var/out or param name', AToken.Value, 'procedure/function', ' parameter definition']));
+
+  Texer.ExpectReservedSymbol(rs_Colon); // ':'
+
+  // get type
+  token := Texer.GetToken;
+  if not TokenIsLiteral(token) and not TokenIsReservedIdent(token) then
+    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownTypeFor, [token.Value, 'procedure/function', ' parameter definition']));
+
+  TypeSym := CurrentScope.Resolve(token.Value);
+
+  // get init value
+  Init := Nil;
+  next_token := Texer.PeekToken;
+  if TokenIsReservedSymbol(next_token, rs_Equal) then begin // '='
+    token := next_token;
+    Texer.SkipToken;
+    Init := ParseExpression(token, 0);
+  end;
+
+  AToken.Location.SetEndRowCol(token.Location.EndRow, token.Location.EndCol);
+
+  Result := TNPC_ASTParameter.Create(AToken.Location, Name, TypeSym.TypeRef, Modifier, Init);
 end;
 
 // assignment = ident [param_list] ":=" expr
@@ -3684,10 +3840,10 @@ begin
   while Texer.IsNotEmpty do begin
     SkipComments;
     token := Texer.PeekToken; // just peek a token
-    if ParseStatements(token, [ri_finalization, ri_begin], FLevel + 1) then begin
-      // if statements ware parsed than do nothing
-      has_body := True;
-    end;
+//    if ParseStatements(token, [ri_finalization, ri_begin], FLevel + 1) then begin
+//      // if statements ware parsed than do nothing
+//      has_body := True;
+//    end;
     //
     if TokenIsReservedIdent(token, ri_finalization) or TokenIsReservedIdent(token, ri_begin) then begin
       if not has_body then
@@ -3710,10 +3866,10 @@ begin
   while Texer.IsNotEmpty do begin
     SkipComments;
     token := Texer.PeekToken; // just peek a token
-    if ParseStatements(token, [ri_begin], FLevel + 1) then begin
-      // if statements ware parsed than do nothing
-      has_body := True;
-    end;
+//    if ParseStatements(token, [ri_begin], FLevel + 1) then begin
+//      // if statements ware parsed than do nothing
+//      has_body := True;
+//    end;
     //
     if TokenIsReservedIdent(token, ri_begin) then begin
       if not has_body then
@@ -3802,6 +3958,7 @@ begin
   Texer.SkipToken;
 end;
 
+(*
 function TNPCSourceParser.ParseDeclarations(const AToken: TNPCToken): Boolean;
 begin
   Result := False;
@@ -3938,6 +4095,7 @@ begin
 //      AddToken(TNPCToken.Create(tokSetting, AToken.Location.Copy, False, False, '$program-type', EmptyTokenMD5));
 
 end;
+*)
 
 function TNPCSourceParser.ParseImportFile(const ASourceFile: String): Boolean;
 var
@@ -4155,14 +4313,66 @@ var
   procedure PrintStmt(Stmt: TNPC_ASTStatement; Level: Integer = 0);
   var
     i: Integer;
+    Param: TNPC_ASTParameter;
+    TypeDef: TNPC_ASTTypeDefinition;
     Elem: TNPC_ASTExpression;
     Branch: TNPC_ASTStatementCaseBranch;
   begin
-    if Stmt is TNPC_ASTStatementBlock then begin
+    if (Stmt is TNPC_ASTStatementBlock) and not (Stmt is TNPC_ASTStatementProcedure) then begin
       Indent(Level);
       tf.WriteLine('Block');
       for i := 0 to TNPC_ASTStatementBlock(Stmt).Statements.Count-1 do
         PrintStmt(TNPC_ASTStatementBlock(Stmt).Statements[i], Level+1);
+    end
+    else if Stmt is TNPC_ASTStatementProcedure then begin
+      Indent(Level);
+      tf.WriteLine(IfThen(TNPC_ASTStatementProcedure(Stmt).IsFunction, 'Function', 'Procedure' ) + '(' + TNPC_ASTStatementProcedure(Stmt).Name + ')');
+      //
+      for Param in TNPC_ASTStatementProcedure(Stmt).Parameters do begin
+        Indent(Level+1);
+        TypeDef := TNPC_ASTTypeDefinition(Param.DeclaredType);
+        tf.WriteLine('Param(' + Param.Name + ': ' + TypeDef.Name + ')');
+        //
+        Indent(Level+2);
+        tf.Write('Modifier:');
+        case Param.Modifier of
+          pmConst: tf.WriteLine(' const');
+          pmVar  : tf.WriteLine(' var');
+          pmOut  : tf.WriteLine(' out');
+        else
+          tf.WriteLine;
+        end;
+        Indent(Level+2);
+        tf.WriteLine('Init:');
+        PrintExpr(Param.Init, Level+3);
+      end;
+      //
+      if TNPC_ASTStatementProcedure(Stmt).IsFunction and (TNPC_ASTStatementProcedure(Stmt).Returns <> Nil) then begin
+        for Param in TNPC_ASTStatementProcedure(Stmt).Returns do begin
+          Indent(Level+1);
+          TypeDef := TNPC_ASTTypeDefinition(Param.DeclaredType);
+          tf.WriteLine('Return(' + Param.Name + ': ' + TypeDef.Name + ')');
+          //
+          Indent(Level+2);
+          tf.Write('Modifier:');
+          case Param.Modifier of
+            pmConst: tf.WriteLine(' const');
+            pmVar  : tf.WriteLine(' var');
+            pmOut  : tf.WriteLine(' out');
+          else
+            tf.WriteLine;
+          end;
+          Indent(Level+2);
+          tf.WriteLine('Init:');
+          PrintExpr(Param.Init, Level+3);
+        end;
+      end;
+      //
+      if TNPC_ASTStatementProcedure(Stmt).Body <> Nil then begin
+        Indent(Level+1);
+        tf.WriteLine('Body:');
+        PrintStmt(TNPC_ASTStatementProcedure(Stmt).Body, Level+2);
+      end;
     end
     else if Stmt is TNPC_ASTStatementExpression then begin
 //      Indent(Level);

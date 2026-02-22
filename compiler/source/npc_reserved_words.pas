@@ -59,6 +59,7 @@ type
     ri_object,
     ri_of,
     ri_or,
+    ri_out,
     ri_packed,
     ri_procedure,
 //    ri_program,
@@ -138,6 +139,7 @@ const
     (Ident: 'object';         MD5: (A: $a8cfde63; B: $31bd59eb; C: $2ac96f89; D: $11c4b666)), // a8cfde63 31bd59eb 2ac96f89 11c4b666
     (Ident: 'of';             MD5: (A: $8bf8854b; B: $ebe10818; C: $3caeb845; D: $c7676ae4)), // 8bf8854b ebe10818 3caeb845 c7676ae4
     (Ident: 'or';             MD5: (A: $e81c4e4f; B: $2b7b93b4; C: $81e13a85; D: $53c2ae1b)), // e81c4e4f 2b7b93b4 81e13a85 53c2ae1b
+    (Ident: 'out';            MD5: (A: $c68271a6; B: $3ddbc431; C: $c307beb7; D: $d2918275)), // c68271a6 3ddbc431 c307beb7 d2918275
     (Ident: 'packed';         MD5: (A: $f59dcd30; B: $6ec32930; C: $f1e78a1d; D: $82280b48)), // f59dcd30 6ec32930 f1e78a1d 82280b48
     (Ident: 'procedure';      MD5: (A: $66260990; B: $8ab8e0f3; C: $72d83dea; D: $3511370b)), // 66260990 8ab8e0f3 72d83dea 3511370b
 //    (Ident: 'program';        MD5: (A: $a9c449d4; B: $fa44e9e5; C: $a41c574a; D: $e55ce4d9)), // a9c449d4 fa44e9e5 a41c574a e55ce4d9

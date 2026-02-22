@@ -20,12 +20,13 @@ type
   TNPC_ASTValue = Variant; // for simplicity
 
   TNPC_ASTTypeExpression = class;
+  TNPC_ASTStatementProcedure = class;
 
   TNPCSymbolKind = (
     skBuiltinType,
     skType,
-    skVar // const
-    //skProc
+    skVar, // const
+    skProc
   );
 
   TNPCSymbolType = (
@@ -90,6 +91,7 @@ type
     function DefineType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject): TNPCSymbol;
     function DefineConst(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject; AValue: Integer): TNPCSymbol;
     function DefineVar(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject): TNPCSymbol;
+    function DefineProcedure(const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
   end;
 
   TNPC_ASTType = (
@@ -649,6 +651,27 @@ type
     destructor Destroy; override;
   end;
 
+  TNPC_ASTParamModifier = (pmNone, pmConst, pmVar, pmOut);
+
+  TNPC_ASTParameter = class(TNPC_ASTStatementVariableDeclaration)
+  public
+    Modifier: TNPC_ASTParamModifier;
+    //
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPC_ASTTypeExpression; AModifier: TNPC_ASTParamModifier; AInit: TNPC_ASTExpression); reintroduce;
+  end;
+
+  TNPC_ASTStatementProcedure = class(TNPC_ASTStatementBlock)
+  public
+    Name: UTF8String;
+    IsFunction: Boolean;
+    Parameters: TObjectList<TNPC_ASTParameter>;
+    Returns: TObjectList<TNPC_ASTParameter>;
+    Body: TNPC_ASTStatement;
+    //
+    constructor Create(const ALocation: TNPCLocation; AParent: TNPC_ASTStatementBlock; const AName: UTF8String; AIsFunction: Boolean; const AFlags: TNPC_BlockFlags = []); reintroduce;
+    destructor Destroy; override;
+  end;
+
   TNPC_ASTStatementLabel = class(TNPC_ASTStatement)
   public
     // &Type = AST_LABEL
@@ -818,6 +841,12 @@ end;
 function TNPCScope.DefineVar(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTTypeExpression; ADecl: TObject): TNPCSymbol;
 begin
   Result := TNPCSymbol.Create(AName, skVar, AType, False, ATypeRef, ADecl, ASize);
+  Table.Add(AName, Result);
+end;
+
+function TNPCScope.DefineProcedure(const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
+begin
+  Result := TNPCSymbol.Create(AName, skProc, stProcedure, False, Nil, AProcedure);
   Table.Add(AName, Result);
 end;
 
@@ -1671,6 +1700,48 @@ begin
   SymbolRef := Nil;
 //  if SymbolRef <> Nil then
 //    SymbolRef.Free;
+  inherited;
+end;
+
+{ TNPC_ASTParameter }
+
+constructor TNPC_ASTParameter.Create(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPC_ASTTypeExpression; AModifier: TNPC_ASTParamModifier;
+  AInit: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation, AName, AType, AInit);
+  Modifier := AModifier;
+end;
+
+{ TNPC_ASTStatementProcedure }
+
+constructor TNPC_ASTStatementProcedure.Create(const ALocation: TNPCLocation; AParent: TNPC_ASTStatementBlock; const AName: UTF8String; AIsFunction: Boolean; const AFlags: TNPC_BlockFlags = []);
+begin
+  inherited Create(ALocation, AParent, AFlags);
+  Name := AName;
+  IsFunction := AIsFunction;
+  Parameters := TObjectList<TNPC_ASTParameter>.Create(False);
+  Returns := Nil;
+  Body := Nil;
+  if IsFunction then
+    Returns := TObjectList<TNPC_ASTParameter>.Create(False);
+end;
+
+destructor TNPC_ASTStatementProcedure.Destroy;
+var
+  i: Integer;
+begin
+  Name := '';
+  for i := 0 to Parameters.Count - 1 do
+    Parameters.Items[i].Free;
+  Parameters.Free;
+  if Returns <> Nil then begin
+    for i := 0 to Returns.Count - 1 do
+      Returns.Items[i].Free;
+    Returns.Free;
+  end;
+  Body := Nil;
+//  if Body <> Nil then
+//    Body.Free;
   inherited;
 end;
 
