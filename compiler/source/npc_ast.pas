@@ -662,6 +662,7 @@ type
 
   TNPC_ASTStatementProcedure = class(TNPC_ASTStatementBlock)
   public
+    // &Type = AST_PROCEDURE
     Name: UTF8String;
     IsFunction: Boolean;
     Parameters: TObjectList<TNPC_ASTParameter>;
@@ -1073,8 +1074,9 @@ end;
 destructor TNPC_ASTExpressionLiteral.Destroy;
 begin
   Value := '';
-  if LiteralType <> Nil then
-    LiteralType.Free;
+  LiteralType := Nil;
+//  if (LiteralType <> Nil) and (TNPC_ASTTypeDefinition(LiteralType). = ) then
+//    LiteralType.Free;
   inherited;
 end;
 
@@ -1717,6 +1719,7 @@ end;
 constructor TNPC_ASTStatementProcedure.Create(const ALocation: TNPCLocation; AParent: TNPC_ASTStatementBlock; const AName: UTF8String; AIsFunction: Boolean; const AFlags: TNPC_BlockFlags = []);
 begin
   inherited Create(ALocation, AParent, AFlags);
+  &Type := AST_PROCEDURE;
   Name := AName;
   IsFunction := AIsFunction;
   Parameters := TObjectList<TNPC_ASTParameter>.Create(False);
@@ -1739,9 +1742,9 @@ begin
       Returns.Items[i].Free;
     Returns.Free;
   end;
-  Body := Nil;
-//  if Body <> Nil then
-//    Body.Free;
+//  Body := Nil;
+  if Body <> Nil then
+    Body.Free;
   inherited;
 end;
 

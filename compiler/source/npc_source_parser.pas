@@ -558,11 +558,11 @@ begin
 //    FreeAndNil(TokensArray[i]);
 //  SetLength(TokensArray, 0);
   FLevel := 0;
+  if ASTree <> Nil then
+    FreeAndNil(ASTree);
   // clear scopes
   while ScopeStack.Count > 0 do
     LeaveScope;
-  if ASTree <> Nil then
-    FreeAndNil(ASTree);
 end;
 
 procedure TNPCSourceParser.AddImport(const AImportType: TNPCImportType; const AImportName, AImportPath: String);
@@ -2380,8 +2380,8 @@ begin
     raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
   EnterScope(CurrentScope); // new lexical scope for this block
   try
-////    oldBlock := CurrentBlock;
-////    CurrentBlock := TNPC_ASTStatementBlock(stmt);
+    oldBlock := CurrentBlock;
+    CurrentBlock := TNPC_ASTStatementBlock(Proc);
 //    token := Texer.PeekToken;
 //    while not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) do begin
 //      if TokenIsOfType(token, [tokEOF]) then
@@ -2398,7 +2398,7 @@ begin
 //    //Texer.ExpectToken([tokSemicolon]);
     Proc.Body := ParseBlock(token);
   finally
-//    CurrentBlock := oldBlock;
+    CurrentBlock := oldBlock;
     LeaveScope;
   end;
 //  token := Texer.PeekToken;
@@ -4164,31 +4164,36 @@ var
   var
     Pair: TPair<UTF8String, Integer>;
     Field: TPair<UTF8String, TNPC_ASTTypeExpression>;
+    idx: Integer;
   begin
     if Typ is TNPC_ASTTypeDefinition then begin
       Indent(Level);
-      tf.WriteLine('TypeName(' + TNPC_ASTTypeDefinition(Typ).Name + ')');
+      tf.WriteLine('Type: ' + TNPC_ASTTypeDefinition(Typ).Name);
     end
     else if Typ is TNPC_ASTTypeEnum then begin
       Indent(Level);
-      tf.WriteLine('Enum');
+      tf.WriteLine('Enum(' + IntToStr(TNPC_ASTTypeEnum(Typ).Members.Count) + '):');
+      idx := 0;
       for Pair in TNPC_ASTTypeEnum(Typ).Members do begin
         Indent(Level+1);
-        tf.WriteLine(Pair.Key + ' = ' + Pair.Value.ToString);
+        tf.WriteLine('[' + IntToStr(idx) + ']: ' + Pair.Key + ' = ' + Pair.Value.ToString);
+        Inc(idx);
       end;
     end
     else if Typ is TNPC_ASTTypeArray then begin
       Indent(Level);
-      tf.WriteLine('ArrayOf');
+      tf.WriteLine('ArrayOf:');
       PrintType(TNPC_ASTTypeArray(Typ).ElementType, Level+1);
     end
     else if Typ is TNPC_ASTTypeRecord then begin
       Indent(Level);
-      tf.WriteLine('Record');
+      tf.WriteLine('Record:');
+      idx := 0;
       for Field in TNPC_ASTTypeRecord(Typ).Fields do begin
         Indent(Level+1);
-        tf.WriteLine(Field.Key + ':');
+        tf.WriteLine('[' + IntToStr(idx) + ']: ' + Field.Key + ':');
         PrintType(Field.Value, Level+2);
+        Inc(idx);
       end;
     end
     else
@@ -4202,11 +4207,17 @@ var
   begin
     if Expr is TNPC_ASTExpressionLiteral then begin
       Indent(Level);
-      tf.WriteLine('Literal(' + LiteralTypeToString(TNPC_ASTExpressionLiteral(Expr).LiteralType) + ': "' + TNPC_ASTExpressionLiteral(Expr).Value + '")');
+      tf.WriteLine('Literal:');
+      Indent(Level+1);
+      tf.WriteLine('Type: ' + LiteralTypeToString(TNPC_ASTExpressionLiteral(Expr).LiteralType));
+      Indent(Level+1);
+      tf.WriteLine('Value: "' + TNPC_ASTExpressionLiteral(Expr).Value + '"');
     end
     else if Expr is TNPC_ASTExpressionIdent then begin
       Indent(Level);
-      tf.WriteLine('Ident(' + TNPC_ASTExpressionIdent(Expr).Name + ')');
+      tf.WriteLine('Ident:');
+      Indent(Level+1);
+      tf.WriteLine('Name: ' + TNPC_ASTExpressionIdent(Expr).Name);
     end
     else if Expr is TNPC_ASTExpressionEnumConst then begin
       Indent(Level);
@@ -4310,30 +4321,41 @@ var
     end;
   end;
 
-  procedure PrintStmt(Stmt: TNPC_ASTStatement; Level: Integer = 0);
+  procedure PrintStmt(const Prefix: String; Stmt: TNPC_ASTStatement; Level: Integer = 0);
   var
     i: Integer;
     Param: TNPC_ASTParameter;
     TypeDef: TNPC_ASTTypeDefinition;
     Elem: TNPC_ASTExpression;
     Branch: TNPC_ASTStatementCaseBranch;
+    idx: Integer;
   begin
     if (Stmt is TNPC_ASTStatementBlock) and not (Stmt is TNPC_ASTStatementProcedure) then begin
       Indent(Level);
-      tf.WriteLine('Block');
-      for i := 0 to TNPC_ASTStatementBlock(Stmt).Statements.Count-1 do
-        PrintStmt(TNPC_ASTStatementBlock(Stmt).Statements[i], Level+1);
+      tf.WriteLine(Prefix + 'Block(' + IntToStr(TNPC_ASTStatementBlock(Stmt).Statements.Count) + ')');
+      for i := 0 to TNPC_ASTStatementBlock(Stmt).Statements.Count-1 do begin
+        PrintStmt('[' + IntToStr(i) + ']: ', TNPC_ASTStatementBlock(Stmt).Statements[i], Level+1);
+        tf.WriteLine;
+      end;
     end
     else if Stmt is TNPC_ASTStatementProcedure then begin
       Indent(Level);
-      tf.WriteLine(IfThen(TNPC_ASTStatementProcedure(Stmt).IsFunction, 'Function', 'Procedure' ) + '(' + TNPC_ASTStatementProcedure(Stmt).Name + ')');
+      tf.WriteLine(Prefix + IfThen(TNPC_ASTStatementProcedure(Stmt).IsFunction, 'Function', 'Procedure' ));
+      Indent(Level+1);
+      tf.WriteLine('Name: ' + TNPC_ASTStatementProcedure(Stmt).Name);
       //
+      Indent(Level+1);
+      tf.WriteLine('Params(' + IntToStr(TNPC_ASTStatementProcedure(Stmt).Parameters.Count) + '):');
+      idx := 0;
       for Param in TNPC_ASTStatementProcedure(Stmt).Parameters do begin
-        Indent(Level+1);
-        TypeDef := TNPC_ASTTypeDefinition(Param.DeclaredType);
-        tf.WriteLine('Param(' + Param.Name + ': ' + TypeDef.Name + ')');
-        //
         Indent(Level+2);
+        tf.WriteLine('[' + IntToStr(idx) + ']: Param:');
+        TypeDef := TNPC_ASTTypeDefinition(Param.DeclaredType);
+        Indent(Level+3);
+        tf.WriteLine('Name: ' + Param.Name);
+        Indent(Level+3);
+        tf.WriteLine('Type: ' + TypeDef.Name);
+        Indent(Level+3);
         tf.Write('Modifier:');
         case Param.Modifier of
           pmConst: tf.WriteLine(' const');
@@ -4342,9 +4364,9 @@ var
         else
           tf.WriteLine;
         end;
-        Indent(Level+2);
+        Indent(Level+3);
         tf.WriteLine('Init:');
-        PrintExpr(Param.Init, Level+3);
+        PrintExpr(Param.Init, Level+4);
       end;
       //
       if TNPC_ASTStatementProcedure(Stmt).IsFunction and (TNPC_ASTStatementProcedure(Stmt).Returns <> Nil) then begin
@@ -4371,7 +4393,7 @@ var
       if TNPC_ASTStatementProcedure(Stmt).Body <> Nil then begin
         Indent(Level+1);
         tf.WriteLine('Body:');
-        PrintStmt(TNPC_ASTStatementProcedure(Stmt).Body, Level+2);
+        PrintStmt('', TNPC_ASTStatementProcedure(Stmt).Body, Level+2);
       end;
     end
     else if Stmt is TNPC_ASTStatementExpression then begin
@@ -4381,14 +4403,16 @@ var
     end
     else if Stmt is TNPC_ASTStatementTypeDeclaration then begin
       Indent(Level);
-      tf.WriteLine('TypeDecl(' + TNPC_ASTStatementTypeDeclaration(Stmt).Name + ')');
+      tf.WriteLine(Prefix + 'TypeDecl(' + TNPC_ASTStatementTypeDeclaration(Stmt).Name + ')');
       PrintType(TNPC_ASTStatementTypeDeclaration(Stmt).DeclaredType, Level+1);
     end
     else if Stmt is TNPC_ASTStatementVariableDeclaration then begin
       //Indent(Level);
       //WriteLine('VarDecl(', TStmtVar(Stmt).Name, ':', TStmtVar(Stmt).TypeName, ')');
       Indent(Level);
-      tf.WriteLine('VarDecl(' + TNPC_ASTStatementVariableDeclaration(Stmt).Name + ')');
+      tf.WriteLine(Prefix + 'VarDecl');
+      Indent(Level+1);
+      tf.WriteLine('Name: ' + TNPC_ASTStatementVariableDeclaration(Stmt).Name);
       PrintType(TNPC_ASTStatementVariableDeclaration(Stmt).DeclaredType, Level+1);
       if Assigned(TNPC_ASTStatementVariableDeclaration(Stmt).Init) then begin
         Indent(Level+1);
@@ -4398,28 +4422,30 @@ var
     end
     else if Stmt is TNPC_ASTStatementAssign then begin
       Indent(Level);
-      tf.WriteLine('Assign(' + TypeToName(TNPC_ASTStatementAssign(Stmt).Target) + ')');
+      tf.WriteLine(Prefix + 'Assign');
+      Indent(Level+1);
+      tf.WriteLine('Variable: ' + TypeToName(TNPC_ASTStatementAssign(Stmt).Target));
       PrintExpr(TNPC_ASTStatementAssign(Stmt).Value, Level+1);
     end
     else if Stmt is TNPC_ASTStatementIf then begin
       Indent(Level);
-      tf.WriteLine('If');
+      tf.WriteLine(Prefix + 'IfStmt');
       Indent(Level+1);
       tf.WriteLine('Cond:');
       PrintExpr(TNPC_ASTStatementIf(Stmt).Cond, Level+2);
       Indent(Level+1);
       tf.WriteLine('Then:');
-      PrintStmt(TNPC_ASTStatementIf(Stmt).ThenStmt, Level+2);
+      PrintStmt('', TNPC_ASTStatementIf(Stmt).ThenStmt, Level+2);
       if Assigned(TNPC_ASTStatementIf(Stmt).ElseStmt) then begin
         Indent(Level+1);
         tf.WriteLine('Else:');
-        PrintStmt(TNPC_ASTStatementIf(Stmt).ElseStmt, Level+2);
+        PrintStmt('', TNPC_ASTStatementIf(Stmt).ElseStmt, Level+2);
       end;
     end
     else if Stmt is TNPC_ASTStatementCase then begin
       Indent(Level);
       //tf.WriteLine('Case<not-implemented>');
-      tf.WriteLine('CaseStmt');
+      tf.WriteLine(Prefix + 'CaseStmt');
       Indent(Level+1);
       tf.WriteLine('Selector:');
       PrintExpr(TNPC_ASTStatementCase(Stmt).Selector, Level+2);
@@ -4431,20 +4457,20 @@ var
           PrintExpr(Elem, Level+2);
         Indent(Level+2);
         tf.WriteLine('Stmt:');
-        PrintStmt(Branch.Stmt, Level+3);
+        PrintStmt('', Branch.Stmt, Level+3);
       end;
 
       if Assigned(TNPC_ASTStatementCase(Stmt).DefaultStmt) then begin
         Indent(Level+1);
         tf.WriteLine('Else:');
-        PrintStmt(TNPC_ASTStatementCase(Stmt).DefaultStmt, Level+2);
+        PrintStmt('', TNPC_ASTStatementCase(Stmt).DefaultStmt, Level+2);
       end;
     end
     else if Stmt is TNPC_ASTStatementWhile then begin
       Indent(Level);
-      tf.WriteLine('While');
+      tf.WriteLine(Prefix + 'WhileStmt');
       PrintExpr(TNPC_ASTStatementWhile(Stmt).Cond, Level+1);
-      PrintStmt(TNPC_ASTStatementWhile(Stmt).Body, Level+1);
+      PrintStmt('', TNPC_ASTStatementWhile(Stmt).Body, Level+1);
     end
     else if Stmt is TNPC_ASTStatementFor then begin
 //      Indent(Level);
@@ -4452,9 +4478,11 @@ var
 //        tf.WriteLine('For ' + TNPC_ASTStatementFor(Stmt).VarName + ' downto')
 //      else
 //        tf.WriteLine('For ' + TNPC_ASTStatementFor(Stmt).VarName + ' to');
+      Indent(Level);
+      tf.WriteLine(Prefix + 'ForStmt');
       Indent(Level+1);
       tf.WriteLine('Init:');
-      PrintStmt(TNPC_ASTStatementFor(Stmt).InitStmt, Level+2);
+      PrintStmt('', TNPC_ASTStatementFor(Stmt).InitStmt, Level+2);
       Indent(Level+1);
       tf.WriteLine('Cond:');
       PrintExpr(TNPC_ASTStatementFor(Stmt).CondExpr, Level+2);
@@ -4463,16 +4491,16 @@ var
       PrintExpr(TNPC_ASTStatementFor(Stmt).EndExpr, Level+2);
       Indent(Level+1);
       tf.WriteLine('Body:');
-      PrintStmt(TNPC_ASTStatementFor(Stmt).Body, Level+2);
-    end
-    else if Stmt is TNPC_ASTStatementWhile then begin
-      Indent(Level);
-      tf.WriteLine('Cond:');
-      PrintExpr(TNPC_ASTStatementWhile(Stmt).Cond, Level+1);
-      Indent(Level);
-      tf.WriteLine('Body:');
-      PrintStmt(TNPC_ASTStatementWhile(Stmt).Body, Level+1);
+      PrintStmt('', TNPC_ASTStatementFor(Stmt).Body, Level+2);
     end;
+//    else if Stmt is TNPC_ASTStatemenWhile then begin
+//      Indent(Level);
+//      tf.WriteLine('Cond:');
+//      PrintExpr(TNPC_ASTStatementWhile(Stmt).Cond, Level+1);
+//      Indent(Level);
+//      tf.WriteLine('Body:');
+//      PrintStmt(TNPC_ASTStatementWhile(Stmt).Body, Level+1);
+//    end;
   end;
 
 begin
@@ -4488,7 +4516,7 @@ begin
       end;
 
       tf.WriteLine(Format('%s (%d:%d):', [AST.Location.FileName, AST.Location.StartRow, AST.Location.StartCol]));
-      PrintStmt(TNPC_ASTStatement(AST));
+      PrintStmt('', TNPC_ASTStatement(AST));
     finally
       tf.Free;
     end;
