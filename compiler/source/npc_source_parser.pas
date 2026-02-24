@@ -78,12 +78,17 @@ type
     CurrentBlock: TNPC_ASTStatementBlock;
   private
     Imports: TNPCImportArray;
-    Builtin_BooleanType: TNPC_ASTTypeDefinition;
+    Builtin_Type_Boolean: TNPC_ASTTypeDefinition;
     //
-    Builtin_IntegerType: TNPC_ASTTypeDefinition;
-    Builtin_RealType: TNPC_ASTTypeDefinition;
+    Builtin_Type_Byte: TNPC_ASTTypeDefinition;
+    Builtin_Type_Integer: TNPC_ASTTypeDefinition;
+    Builtin_Type_Integer64: TNPC_ASTTypeDefinition;
     //
-    Builtin_StringType: TNPC_ASTTypeDefinition;
+    Builtin_Type_Single: TNPC_ASTTypeDefinition;
+    Builtin_Type_Double: TNPC_ASTTypeDefinition;
+    Builtin_Type_Extended: TNPC_ASTTypeDefinition;
+    //
+    Builtin_Type_String: TNPC_ASTTypeDefinition;
   private
     FLevel: Integer;
     //
@@ -500,17 +505,30 @@ end;
 procedure TNPCSourceParser.InitBuiltins(const AScope: TNPCScope);
 begin
   // register built-in types
-  Builtin_BooleanType := TNPC_ASTTypeDefinition.Create(Nil, 'Boolean', 1);
-  AScope.DefineBuiltinType('Boolean', stLiteral, 1, Builtin_BooleanType);
-  AScope.DefineConst('True', stLiteral, 1, Builtin_BooleanType, Nil, 1);
-  AScope.DefineConst('False', stLiteral, 1, Builtin_BooleanType, Nil, 0);
-  AScope.DefineConst('Error', stLiteral, 1, Builtin_BooleanType, Nil, -1);
-
-  Builtin_IntegerType := TNPC_ASTTypeDefinition.Create(Nil, 'Integer', 4);
-  AScope.DefineBuiltinType('Integer', stLiteral, 4, Builtin_IntegerType);
-
-  Builtin_RealType := TNPC_ASTTypeDefinition.Create(Nil, 'Real', 8);
-  AScope.DefineBuiltinType('Real', stLiteral, 8, Builtin_RealType);
+  Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(Nil, 'Boolean', 1);
+  AScope.DefineBuiltinType('Boolean', stLiteral, 1, Builtin_Type_Boolean);
+  AScope.DefineConst('True', stLiteral, 1, Builtin_Type_Boolean, Nil, 1);
+  AScope.DefineConst('False', stLiteral, 1, Builtin_Type_Boolean, Nil, 0);
+  AScope.DefineConst('Error', stLiteral, 1, Builtin_Type_Boolean, Nil, -1);
+  //
+  Builtin_Type_Byte := TNPC_ASTTypeDefinition.Create(Nil, 'Byte', 1);
+  AScope.DefineBuiltinType('Byte', stLiteral, 1, Builtin_Type_Byte);
+  //
+  Builtin_Type_Integer := TNPC_ASTTypeDefinition.Create(Nil, 'Integer', 4);
+  AScope.DefineBuiltinType('Integer', stLiteral, 4, Builtin_Type_Integer);
+  //
+  Builtin_Type_Integer64 := TNPC_ASTTypeDefinition.Create(Nil, 'Integer64', 8);
+  AScope.DefineBuiltinType('Integer64', stLiteral, 8, Builtin_Type_Integer64);
+  //
+  Builtin_Type_Single := TNPC_ASTTypeDefinition.Create(Nil, 'Single', 4);
+  AScope.DefineBuiltinType('Single', stLiteral, 4, Builtin_Type_Single);
+  //
+  Builtin_Type_Double := TNPC_ASTTypeDefinition.Create(Nil, 'Double', 8);
+  AScope.DefineBuiltinType('Double', stLiteral, 8, Builtin_Type_Double);
+  AScope.DefineBuiltinType('Real', stLiteral, 8, Builtin_Type_Double); // alias
+  //
+  Builtin_Type_Extended := TNPC_ASTTypeDefinition.Create(Nil, 'Extended', 10);
+  AScope.DefineBuiltinType('Extended', stLiteral, 10, Builtin_Type_Extended);
 
   // String type definition:
   //                | offset | field: type: size
@@ -520,8 +538,8 @@ begin
   //                |    -16 | CharLength: UInt64 (8)
   //                |     -8 | ByteCount: UInt64 (8)
   // entry point -> |      0 | Data: Byte[ByteCount]
-  Builtin_StringType := TNPC_ASTTypeDefinition.Create(Nil, 'String', 32);
-  AScope.DefineBuiltinType('String', stLiteral, 32, Builtin_StringType);
+  Builtin_Type_String := TNPC_ASTTypeDefinition.Create(Nil, 'String', 32);
+  AScope.DefineBuiltinType('String', stLiteral, 32, Builtin_Type_String);
 
 //var
 //  intSym, boolSym, strSym: TNPCSymbol;
@@ -990,7 +1008,7 @@ begin
       ParseExports(token);
     end
     else if TokenIsReservedIdent(token, ri_type) then begin
-      ParseTypes(token);
+      ParseTypeDeclaration(token, []);
     end
     else if TokenIsReservedIdent(token, ri_const) then begin
       ParseConsts(token);
@@ -1739,8 +1757,9 @@ var
   stmt: TNPC_ASTStatementTypeDeclaration;
 begin
   // assume current token at 'type'
-  Texer.ExpectReservedToken(ri_type);
+  //Texer.ExpectReservedToken(ri_type);
   while Texer.IsNotEmpty do begin
+    SkipComments;
     token := Texer.ExpectToken(tokIdent, Format(sParserExpectedNameAfterKeyword, ['type', 'type']));
 
     Texer.ExpectReservedSymbol(rs_Equal); // '='
@@ -1819,7 +1838,7 @@ begin
   else if TokenIsReservedIdent(token, ri_array) then begin // 'array'
     _array:
     Texer.SkipToken;
-    token := Texer.PeekToken;
+    //token := Texer.PeekToken;
     Result := ParseArrayType(ATypeToken, ATypeName);
 //    Result := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
 //    Result.DefinitionType := DEF_Array;
@@ -1870,7 +1889,7 @@ var
 begin
   Enum := TNPC_ASTTypeEnum.Create(ATypeToken.Location);
   Value := 0;
-  repeat
+  while True do begin
     Ident := Texer.ExpectToken([tokIdent]);
 
     // support explicit values: (Red=10, Green, Blue=30)
@@ -1883,15 +1902,19 @@ begin
       if not (Lit is TNPC_ASTExpressionLiteral) then
         raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedButGot, ['literal', Lit.ToString]));
       Value := StrToInt(TNPC_ASTExpressionLiteral(Lit).Value);
+      token := Texer.PeekToken;
     end;
 
     Enum.Members.Add(Ident.Value, Value);
 
     // add enum member to current scope as constant
-    CurrentScope.DefineConst(Ident.Value, stEnumConst, 4, Builtin_IntegerType, Enum, Value);
+    CurrentScope.DefineConst(Ident.Value, stEnumConst, 4, Builtin_Type_Integer, Enum, Value);
 
     Inc(Value);
-  until not TokenIsReservedSymbol(token, rs_Comma);
+    if not TokenIsReservedSymbol(token, rs_Comma) then
+      Break;
+    Texer.SkipToken;
+  end;
   Texer.ExpectReservedSymbol(rs_CParen); // ')'
 
   // add enum to current scope as type
@@ -2005,7 +2028,7 @@ begin
 //    Result := TTypeArray.Create(ParseType);
 //    Texer.ExpectReservedSymbol(rs_OBracket); // '['
   IndexType := Nil;
-  Texer.SkipToken;
+  //Texer.SkipToken;
   token := Texer.PeekToken;
   if TokenIsReservedSymbol(token, rs_OBracket) then begin // '[' expr ']'
     Texer.SkipToken;
@@ -2032,7 +2055,18 @@ begin
   token := Texer.PeekToken;
   expr := ParseExpression(token, 0);
 
-  if expr is TNPC_ASTExpressionEnumConst then
+  if expr is TNPC_ASTExpressionIdent then begin
+    if TNPC_ASTExpressionIdent(expr).ResolvedSymbol <> Nil then
+      Sym := TNPC_ASTExpressionIdent(expr).ResolvedSymbol
+    else begin
+      Sym := CurrentScope.Resolve(TNPC_ASTExpressionIdent(expr).Name);
+      if not Assigned(Sym) then
+        raise NPCSyntaxError.ParserError(expr.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(expr).Name, 'array declaration ', sStatement]));
+      TNPC_ASTExpressionIdent(expr).ResolvedSymbol := Sym;
+    end;
+    ElemType := Sym.TypeRef;
+  end
+  else if expr is TNPC_ASTExpressionEnumConst then
     ElemType := TNPC_ASTExpressionEnumConst(expr).EnumType
   else if expr is TNPC_ASTExpressionLiteral then
     ElemType := TNPC_ASTExpressionLiteral(expr).LiteralType
@@ -2593,7 +2627,7 @@ begin
     Texer.ExpectReservedSymbol(rs_CParen); // ')'
 
     if Arg is TNPC_ASTExpressionEnumConst then
-      Result := TNPC_ASTExpressionLiteral.Create(AToken.Location, IntToStr(TNPC_ASTExpressionEnumConst(Arg).Value), Builtin_IntegerType)
+      Result := TNPC_ASTExpressionLiteral.Create(AToken.Location, IntToStr(TNPC_ASTExpressionEnumConst(Arg).Value), Builtin_Type_Integer)
     else
       raise NPCSyntaxError.ParserError(token.Location, Format(sParserIntrinsicFuncExpects, ['ord()', 'enum const', 'input param']));
   end
@@ -2682,7 +2716,7 @@ begin
 //      Sym := CurrentScope.Resolve(ALeftToken.Value);
 //      if not Assigned(Sym) then
 //        raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnknown, ['variable', AToken.Value]));
-      Result := TNPC_ASTExpressionLiteral.Create(AToken.Location, AToken.Value, Builtin_StringType);
+      Result := TNPC_ASTExpressionLiteral.Create(AToken.Location, AToken.Value, Builtin_Type_String);
     end;
   else
     raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnknownIdentIn, [AToken.Value, sExpression, '']));

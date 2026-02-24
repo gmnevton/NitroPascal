@@ -2,11 +2,26 @@
 
 {$program-type Windows32 GUI}
 
+type
+  TFileOpenModeEnum = (fomNormal, fomRead, fomWrite, fomReadWrite);
+  TBytes = Array of Byte;
+
 var
   ConsoleAvailable: Boolean = True;
   
 Writeln(const Value: String) {
 // empty procedure
+};
+
+ReadAllBytes(const FileName: String, const Mode: TFileOpenModeEnum): (ok: Boolean, output: TBytes) {
+  ok, file := FileIO.OpenFile(FileName, Mode);
+  if !ok then
+    Return .{ok, null};
+  defer FileIO.CloseFile(File);
+
+  ok, bytes := FileIO.ReadAllBytes(File);
+
+  Result .{ok, bytes};
 };
 
 begin
