@@ -6,10 +6,13 @@
 .}  
 
 type
-  Enum = record {
-    union {
+  Enum = structure link {
+    some_array: Array[10] of Word;
+    structure link {
       field1: u8,
       field2: u32
+    } @ensure {
+      this.size = some_array.size; // 
     }
   } @io {
     @override read(): u8 {
@@ -28,14 +31,14 @@ type
       field2 = value;
       write_u32(field2, field2.offset);
     }
-};
+  };
   
 {.
   the declaration: 
   
-  union - this directive tels the compiler to allocate fields as one shared memory space
+  structure link - this directive tels the compiler to allocate fields as one shared memory space
   it means, that field1 has offset 0 and field2 also has offset 0, but total space allocated in memory consists of 32 bits,
-  where field1 is left padded by zeros.
+  where field1 is left padded by zeros in BE (big-endian) format.
   
   take this memeory layout:
   

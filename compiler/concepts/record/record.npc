@@ -6,7 +6,7 @@
 .}  
 
 type
-  FileHeader = record {
+  FileHeader = structure {
     file_id: u32, // [4] ascii char
     field_1: u8,
     field_2: u32
@@ -33,6 +33,9 @@ type
         result := false;
       };
     }
+  } @restrict {
+    @override max_field_count := 3; // if somebody modifies the structure by adding another field, trigger compile-time error, default value id -1, meaning no bounds
+//    @override max_structure_size := xxx; // if somebody modifies the structure by adding another field, trigger compile-time error, default value id -1, meaning no bounds
   };
   
 {.
