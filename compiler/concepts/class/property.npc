@@ -3,8 +3,8 @@
 type
   TestClass = class
   private
-    SomePrivateField: String;
-    SomePrivateFieldInitProc1 = { Return := ''; };
+    SomePrivateField: String; // field
+    SomePrivateFieldInitProc1 = { Return := ''; }; // private symbol = anonymous function
     SomePrivateFieldInitProc2 = { Return := 'This is a test !'; };
   protected 
   public

@@ -379,7 +379,7 @@ begin
             line := list.Strings[i - 1];
             line_len := Length(line);
             ident_start := ALocation.StartCol;
-            ident_end := IfThen(ALocation.EndCol > 0, ALocation.EndCol, ALocation.StartCol);
+            ident_end := IfThen(ALocation.EndCol > 0, ALocation.EndCol, ALocation.StartCol) - 1;
             if ident_start <= line_len then begin
               for j:=1 to line_len do begin
                 if j = ident_start then

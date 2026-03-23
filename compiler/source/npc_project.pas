@@ -143,7 +143,7 @@ begin
   if Result then
     Exit;
   //
-  raise NPCSyntaxError.ParserError(Token.Location, Format(sParserUnexpectedTokenIn, [Token.TokenToString, '', sProjectFile]));
+  raise NPCSyntaxError.ParserError(Token.Location, Format(sParserUnexpectedTokenTypeIn, [Token.TokenToString, Token.Value, '', sProjectFile]));
 end;
 
 //------------------------------------------------------------------------------------------------------------------------------

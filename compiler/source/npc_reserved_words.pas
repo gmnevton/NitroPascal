@@ -25,6 +25,7 @@ type
     ri_code,
     ri_const,
     ri_constructor,
+    ri_default,
     ri_destructor,
     ri_dispinterface,
     ri_div,
@@ -35,7 +36,7 @@ type
     ri_except,
     ri_export,
     ri_exports,
-    ri_file,
+//    ri_file,
     ri_finalization,
     ri_finally,
     ri_for,
@@ -45,6 +46,7 @@ type
     ri_implementation,
     ri_in,
     ri_inherited,
+    ri_init,
     ri_initialization,
     ri_inline,
     ri_interface,
@@ -61,11 +63,15 @@ type
     ri_or,
     ri_out,
     ri_packed,
-    ri_procedure,
+    ri_private,
+//    ri_procedure,
 //    ri_program,
+    ri_protected,
     ri_project,
     ri_property,
+    ri_public,
     ri_raise,
+    ri_read,
     ri_record,
     ri_repeat,
     ri_resourcestring,
@@ -84,6 +90,7 @@ type
     ri_var,
     ri_while,
     ri_with,
+    ri_write,
     ri_xor
   );
 
@@ -105,6 +112,7 @@ const
     (Ident: 'code';           MD5: (A: $c1336794; B: $5d5d4c91; C: $047b3b50; D: $234aa7ab)), // c1336794 5d5d4c91 047b3b50 234aa7ab
     (Ident: 'const';          MD5: (A: $6680dba0; B: $0f3a88f6; C: $6f8029a9; D: $3d71d93c)), // 6680dba0 0f3a88f6 6f8029a9 3d71d93c
     (Ident: 'constructor';    MD5: (A: $6ca26837; B: $1eeb5d93; C: $eefeb68f; D: $96157666)), // 6ca26837 1eeb5d93 eefeb68f 96157666
+    (Ident: 'default';        MD5: (A: $c21f969b; B: $5f03d33d; C: $43e04f8f; D: $136e7682)), // c21f969b 5f03d33d 43e04f8f 136e7682
     (Ident: 'destructor';     MD5: (A: $334baa9d; B: $da4aaf36; C: $7f0efb87; D: $b12c824e)), // 334baa9d da4aaf36 7f0efb87 b12c824e
     (Ident: 'dispinterface';  MD5: (A: $e7fe19e8; B: $f505b9f1; C: $c6f568eb; D: $58a49abe)), // e7fe19e8 f505b9f1 c6f568eb 58a49abe
     (Ident: 'div';            MD5: (A: $38696558; B: $dc98494c; C: $08d951c0; D: $52900a2a)), // 38696558 dc98494c 08d951c0 52900a2a
@@ -115,7 +123,7 @@ const
     (Ident: 'except';         MD5: (A: $d1cc652b; B: $86b9858f; C: $e7805851; D: $1716e92f)), // d1cc652b 86b9858f e7805851 1716e92f
     (Ident: 'export';         MD5: (A: $b2507468; B: $f9515635; C: $8fa490fd; D: $543ad2f0)), // b2507468 f9515635 8fa490fd 543ad2f0
     (Ident: 'exports';        MD5: (A: $2be75656; B: $0ea379b2; C: $23d85159; D: $24d4ffad)), // 2be75656 0ea379b2 23d85159 24d4ffad
-    (Ident: 'file';           MD5: (A: $8c7dd922; B: $ad47494f; C: $c02c388e; D: $12c00eac)), // 8c7dd922 ad47494f c02c388e 12c00eac
+//    (Ident: 'file';           MD5: (A: $8c7dd922; B: $ad47494f; C: $c02c388e; D: $12c00eac)), // 8c7dd922 ad47494f c02c388e 12c00eac
     (Ident: 'finalization';   MD5: (A: $f3e88483; B: $6172a769; C: $a69b0fe0; D: $c246ce5f)), // f3e88483 6172a769 a69b0fe0 c246ce5f
     (Ident: 'finally';        MD5: (A: $2025c244; B: $29eb6fb6; C: $d4a2867d; D: $478db1a2)), // 2025c244 29eb6fb6 d4a2867d 478db1a2
     (Ident: 'for';            MD5: (A: $d5566982; B: $2f1a8cf7; C: $2ec1911e; D: $462a54eb)), // d5566982 2f1a8cf7 2ec1911e 462a54eb
@@ -125,6 +133,7 @@ const
     (Ident: 'implementation'; MD5: (A: $b6fa1536; B: $0b4cdce4; C: $806bf9a0; D: $580c8f0f)), // b6fa1536 0b4cdce4 806bf9a0 580c8f0f
     (Ident: 'in';             MD5: (A: $13b5bfe9; B: $6f3e2fe4; C: $11c9f66f; D: $4a582adf)), // 13b5bfe9 6f3e2fe4 11c9f66f 4a582adf
     (Ident: 'inherited';      MD5: (A: $cae4eae4; B: $c3b46142; C: $380966d0; D: $0cc5e446)), // cae4eae4 c3b46142 380966d0 0cc5e446
+    (Ident: 'init';           MD5: (A: $e37f0136; B: $aa3ffaf1; C: $49b351f6; D: $a4c948e9)), // e37f0136 aa3ffaf1 49b351f6 a4c948e9
     (Ident: 'initialization'; MD5: (A: $2d56c84e; B: $16cd8283; C: $af0b9c9c; D: $0c661405)), // 2d56c84e 16cd8283 af0b9c9c 0c661405
     (Ident: 'inline';         MD5: (A: $03fdad15; B: $5b754888; C: $4584c7c3; D: $9b0c5cd2)), // 03fdad15 5b754888 4584c7c3 9b0c5cd2
     (Ident: 'interface';      MD5: (A: $8eb58dd5; B: $e328e978; C: $169c7b0c; D: $bd30d43f)), // 8eb58dd5 e328e978 169c7b0c bd30d43f
@@ -141,11 +150,15 @@ const
     (Ident: 'or';             MD5: (A: $e81c4e4f; B: $2b7b93b4; C: $81e13a85; D: $53c2ae1b)), // e81c4e4f 2b7b93b4 81e13a85 53c2ae1b
     (Ident: 'out';            MD5: (A: $c68271a6; B: $3ddbc431; C: $c307beb7; D: $d2918275)), // c68271a6 3ddbc431 c307beb7 d2918275
     (Ident: 'packed';         MD5: (A: $f59dcd30; B: $6ec32930; C: $f1e78a1d; D: $82280b48)), // f59dcd30 6ec32930 f1e78a1d 82280b48
-    (Ident: 'procedure';      MD5: (A: $66260990; B: $8ab8e0f3; C: $72d83dea; D: $3511370b)), // 66260990 8ab8e0f3 72d83dea 3511370b
+    (Ident: 'private';        MD5: (A: $2c17c639; B: $3771ee30; C: $48ae34d6; D: $b380c5ec)), // 2c17c639 3771ee30 48ae34d6 b380c5ec
+//    (Ident: 'procedure';      MD5: (A: $66260990; B: $8ab8e0f3; C: $72d83dea; D: $3511370b)), // 66260990 8ab8e0f3 72d83dea 3511370b
 //    (Ident: 'program';        MD5: (A: $a9c449d4; B: $fa44e9e5; C: $a41c574a; D: $e55ce4d9)), // a9c449d4 fa44e9e5 a41c574a e55ce4d9
+    (Ident: 'protected';      MD5: (A: $2d07fad7; B: $8478d88e; C: $bafdc581; D: $a91696bf)), // 2d07fad7 8478d88e bafdc581 a91696bf
     (Ident: 'project';        MD5: (A: $46f86faa; B: $6bbf9ac9; C: $4a7e4595; D: $09a20ed0)), // 46f86faa 6bbf9ac9 4a7e4595 09a20ed0
     (Ident: 'property';       MD5: (A: $1a8db4c9; B: $96d8ed82; C: $89da5f95; D: $7879ab94)), // 1a8db4c9 96d8ed82 89da5f95 7879ab94
+    (Ident: 'public';         MD5: (A: $4c9184f3; B: $7cff01bc; C: $dc32dc48; D: $6ec36961)), // 4c9184f3 7cff01bc dc32dc48 6ec36961
     (Ident: 'raise';          MD5: (A: $09024528; B: $9ce5a188; C: $ea08adfb; D: $0defd1cb)), // 09024528 9ce5a188 ea08adfb 0defd1cb
+    (Ident: 'read';           MD5: (A: $ecae1311; B: $7d6f0584; C: $c25a9da6; D: $c8f8415e)), // ecae1311 7d6f0584 c25a9da6 c8f8415e
     (Ident: 'record';         MD5: (A: $de17f0f2; B: $4b49f836; C: $4187891f; D: $8550ffbb)), // de17f0f2 4b49f836 4187891f 8550ffbb
     (Ident: 'repeat';         MD5: (A: $32cf6da1; B: $34a8b268; C: $cf4ab6b7; D: $9a9a5ad9)), // 32cf6da1 34a8b268 cf4ab6b7 9a9a5ad9
     (Ident: 'resourcestring'; MD5: (A: $d9e8974b; B: $988b6a8f; C: $141bf88c; D: $fe8b4a34)), // d9e8974b 988b6a8f 141bf88c fe8b4a34
@@ -164,6 +177,7 @@ const
     (Ident: 'var';            MD5: (A: $b2145aac; B: $704ce76d; C: $be1ac7ad; D: $ac535b23)), // b2145aac 704ce76d be1ac7ad ac535b23
     (Ident: 'while';          MD5: (A: $901889f4; B: $f34f8ca1; C: $8ac2f53d; D: $1fed346e)), // 901889f4 f34f8ca1 8ac2f53d 1fed346e
     (Ident: 'with';           MD5: (A: $23a58bf9; B: $274bedb1; C: $9375e527; D: $a0744fa9)), // 23a58bf9 274bedb1 9375e527 a0744fa9
+    (Ident: 'write';          MD5: (A: $efb2a684; B: $e4afb7d5; C: $5e6147fb; D: $e5a332ee)), // efb2a684 e4afb7d5 5e6147fb e5a332ee
     (Ident: 'xor';            MD5: (A: $a3929604; B: $21913165; C: $197845f3; D: $4bf5d1a8))  // a3929604 21913165 197845f3 4bf5d1a8
   );
 

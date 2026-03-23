@@ -2,13 +2,37 @@
 
 {$program-type Windows32 GUI}
 
+//import
+//  FileIO;
+
 type
   TFileOpenModeEnum = (fomNormal, fomRead, fomWrite, fomReadWrite);
   TBytes = Array of Byte;
 
+  FileIO = class
+  public
+    OpenFile(const FileName: String, const FileOpenMode: Byte): (ok: Boolean, FileHandle: Integer);
+    CloseFile(const FileHandle: Integer): Boolean;
+    ReadAllBytes(const FileHandle: Integer): (ok: Boolean, Bytes: Array of Byte);
+  end;
+
 var
   ConsoleAvailable: Boolean = True;
-  
+
+// class FileIO methods definition
+
+FileIO.OpenFile(const FileName: String, const FileOpenMode: Byte): (ok: Boolean, FileHandle: Integer) {
+// to be filled later
+};
+
+FileIO.CloseFile(const FileHandle: Integer): Boolean {
+// to be filled later
+};
+
+FileIO.ReadAllBytes(const FileHandle: Integer): (ok: Boolean, Bytes: Array of Byte) {
+// to be filled later
+};
+
 Writeln(const Value: String) {
 // empty procedure
 };

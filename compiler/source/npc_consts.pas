@@ -27,7 +27,7 @@ const
   sStatement      = 'statement';
   sExpression     = 'expression';
 
-  sParserUnexpectedTokenIn         = 'unexpected token "%s" in %s%s';
+  sParserUnexpectedTokenTypeIn     = 'unexpected %s "%s" in %s%s';
   sParserUnexpectedType            = 'unexpected type "%s", expected "%s"';
   sPareserUnexpectedSyntax         = 'unexpected %s syntax, expected %s';
   sParserSectionHasNoBody          = '"%s" section has no body';
@@ -49,6 +49,8 @@ const
 //  sParserEmptySetAssignRequiresSet = 'can''t assign empty set to variable "%s"';
   sParserIntrinsicFuncExpects      = 'intrinsic function %s expects %s as %s';
   sParserIdentifierNotValidInExpr  = 'identifier not valid in expression: %s';
+  sParserInvalidPropertySpecifier  = 'invalid property specifier "%s" in %s%s, allowed options: %s';
+  sParseSymbolNotFound             = 'symbol "%s" not found in %s%s';
 
   sProjectError = '%s - ProjectError(%s): %s';
 
