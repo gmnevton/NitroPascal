@@ -60,7 +60,10 @@ type
   TNPCParseStatementFlags = set of TNPCParseStatementFlag;
 
   TNPCParseDeclarationFlag = (
-    decfNone
+    decfNone,
+    decfDoNotAddSymbol,
+    decfBodyMayBeSkipped,
+    decfInlineSymbolDeclaration
   );
   TNPCParseDeclarationFlags = set of TNPCParseDeclarationFlag;
 
@@ -89,6 +92,8 @@ type
     Builtin_Type_Extended: TNPC_ASTTypeDefinition;
     //
     Builtin_Type_String: TNPC_ASTTypeDefinition;
+    //
+    Builtin_Type_ClassSymbol: TNPC_ASTTypeDefinition;
   private
     FLevel: Integer;
     //
@@ -200,7 +205,8 @@ type
     function  ParseVariableType(const AVarToken: TNPCToken; const AVarName: String): TNPC_ASTType;
 
     function  ParseBlock(const AToken: TNPCToken): TNPC_ASTStatement;
-    function  ParseProcedureDefinition(const AToken: TNPCToken): TNPC_ASTStatement;
+    function  ParseProcedureDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
+    function  ParseProcedureDefinition(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
     function  ParseProcedureParameter(const AToken: TNPCToken): TNPC_ASTParameter;
     function  ParseAssignment(const ALeftToken: TNPCToken): TNPC_ASTStatement;
     function  ParseAssignmentNew(const AToken: TNPCToken): TNPC_ASTStatement;
@@ -550,6 +556,9 @@ begin
   // entry point -> |      0 | Data: Byte[ByteCount]
   Builtin_Type_String := TNPC_ASTTypeDefinition.Create(Nil, 'String', 32);
   AScope.DefineBuiltinType('String', stLiteral, 32, Builtin_Type_String);
+  //
+  Builtin_Type_ClassSymbol := TNPC_ASTTypeDefinition.Create(Nil, 'Symbol', 32);
+  AScope.DefineBuiltinType('Symbol', stProcedure, 32, Builtin_Type_ClassSymbol);
 
 //var
 //  intSym, boolSym, strSym: TNPCSymbol;
@@ -1009,7 +1018,7 @@ begin
     else if TokenIsIdent(token) then begin // probably function declaration, function calls are possible only in procedures/functions bodys
       next_token := Texer.PeekToken;
       if TokenIsReservedSymbol(next_token, rs_OParen) then // '('
-        AddStatement(ParseProcedureDefinition(token));
+        AddStatement(ParseProcedureDefinition(token, []));
     end
     else if TokenIsReservedIdent(token, ri_imports) then begin
       ParseImports(ABlock);
@@ -2478,46 +2487,77 @@ end;
 
 procedure TNPCSourceParser.ParseClassMember(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
 var
-  token: TNPCToken;
-  Prop: TNPC_ASTTypeClassProperty;
-  Name: String;
+  token, tokenName: TNPCToken;
+  Typ: TNPC_ASTType;
   Sym: TNPCSymbol;
   Expr: TNPC_ASTExpression;
-  Typ: TNPC_ASTType;
+  Method: TNPC_ASTTypeClassMethod;
+  ProcDecl: TNPC_ASTStatement;
 begin
-  Name := Token.Text;
-  Expect(tkIdentifier);
+  token := Texer.PeekToken;
+  if not TokenIsIdent(token) then
+    raise NPCSyntaxError.ParserError(token.Location, Format(sParserInvalidPropertySpecifier, [token.Value, 'class ', sDeclaration, 'read / write / init / default']));
+  Texer.SkipToken;
 
-  if Token.Kind = tkColon then
-  begin
-    // FIELD
-    NextToken;
+  tokenName := token;
+
+  token := Texer.PeekToken;
+  if TokenIsReservedSymbol(token, rs_Colon) then begin // ':' - FIELD
+    Texer.SkipToken;
     Typ := ParseTypeReference;
-    Expect(tkSemicolon);
+    Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
 
-    Sym := TSymbol.Create(Name);
-    Sym.RefType := Typ;
-    Sym.Kind := skField;
+    CurrentScope.DefineClassField(tokenName.Value, stClass, Typ, ATypeClass);
 
-    CurrentScope.Define(Sym);
-    Cls.Fields.Add(Sym);
+    if ATypeClass.Fields = Nil then
+      ATypeClass.Fields := TDictionary<UTF8String, TNPC_ASTType>.Create;
+
+    ATypeClass.Fields.Add(tokenName.Value, Typ);
   end
-  else if Token.Kind = tkEqual then
-  begin
-    // Init block or expression member
-    NextToken;
+  else if TokenIsReservedSymbol(token, rs_Equal) then begin // '=' - Init block or expression member
+    Texer.SkipToken;
 
-    Expr := ParseExpression(0);
-    Expect(tkSemicolon);
+    token := Texer.PeekToken;
+    Expr := ParseExpression(token, 0);
+    Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
 
-    Sym := TSymbol.Create(Name);
-    Sym.Kind := skMethod; // or skFieldWithInit
+    Method := TNPC_ASTTypeClassMethod.Create(tokenName.Location, tokenName.Value, AVisibilityType);
+
+    Sym := CurrentScope.DefineClassMethod(tokenName.Value, stClass, Method, ATypeClass);  // or skFieldWithInit
     Sym.ValueExpr := Expr;
 
-    CurrentScope.Define(Sym);
+    if ATypeClass.Methods = Nil then
+      ATypeClass.Methods := TObjectList<TNPC_ASTTypeClassMethod>.Create(True);
+
+    ATypeClass.Methods.Add(Method);
+  end
+  else if TokenIsReservedSymbol(token, rs_OParen) or TokenIsReservedSymbol(token, rs_Semicolon) then begin // '(' or ';'
+    // Example:
+    // MyProc(const A: String);
+    // MyFunc(A: Integer): String;
+    // MyProc(...) { ... };
+
+    ProcDecl := ParseProcedureDeclaration(tokenName, [decfDoNotAddSymbol, decfBodyMayBeSkipped, decfInlineSymbolDeclaration]);
+    if not (ProcDecl is TNPC_ASTStatementProcedure) then
+      raise NPCSyntaxError.ParserError(tokenName.Location, Format(sParserExpectedElementsButGot, ['method declaration', tokenName.Value, 'class ', sDeclaration]));
+
+    Method := TNPC_ASTTypeClassMethod.Create(tokenName.Location, tokenName.Value, AVisibilityType);
+
+    Sym := CurrentScope.DefineClassMethod(tokenName.Value, stClass, Method, ATypeClass);  // or skFieldWithInit
+    Sym.ProcDecl := TNPC_ASTStatementProcedure(ProcDecl);
+
+    if ATypeClass.Methods = Nil then
+      ATypeClass.Methods := TObjectList<TNPC_ASTTypeClassMethod>.Create(True);
+
+    ATypeClass.Methods.Add(Method);
+
+//    Sym := TSymbol.Create(Name);
+//    Sym.Kind := skMethod;
+//    Sym.RefType := ProcDecl.ReturnType;
+//    Sym.ProcDecl := ProcDecl;
   end
   else
-    Error('Invalid class member');
+    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknown, ['class member', token.Value]));
 end;
 
 procedure TNPCSourceParser.ParseVariableDeclaration(const AToken: TNPCToken);
@@ -2618,7 +2658,16 @@ begin
 end;
 
 // ProcedureDecl = Identifier [ "(" ParameterList ")" ] [ ":" "(" TypesList ")" ] [ Statements ] ";"
-function TNPCSourceParser.ParseProcedureDefinition(const AToken: TNPCToken): TNPC_ASTStatement;
+function TNPCSourceParser.ParseProcedureDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
+var
+  Proc: TNPC_ASTStatement;
+begin
+  Proc := ParseProcedureDefinition(AToken, AFlags);
+  Result := Proc;
+end;
+
+// ProcedureDecl = Identifier [ "(" ParameterList ")" ] [ ":" "(" TypesList ")" ] [ Statements ] ";"
+function TNPCSourceParser.ParseProcedureDefinition(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
 var
   token: TNPCToken;
   param: TNPC_ASTParameter;
@@ -2682,37 +2731,44 @@ begin
   end;
 
   // body
-  if not TokenIsReservedIdent(token, ri_begin) and not TokenIsReservedSymbol(token, rs_OCurly) then
-    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenTypeIn, [token.TokenToString, token.Value, '', sStatement]));
-  EnterScope(CurrentScope); // new lexical scope for this block
-  try
-    oldBlock := CurrentBlock;
-    CurrentBlock := TNPC_ASTStatementBlock(Proc);
-//    token := Texer.PeekToken;
-//    while not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) do begin
-//      if TokenIsOfType(token, [tokEOF]) then
-//        raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedElementsButGot, ['statement', 'EOF', 'block ', sDeclaration]));
-//      stmt := ParseStatement([stafEmptyStatementIsAcceptable]);
-//      if Assigned(stmt) then
-//        Proc.AddStatement(stmt);
-//      token := Texer.PeekToken;
-//    end;
-//    //token := Texer.PeekToken;
-//    if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
-//      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
-//    Texer.SkipToken;
-//    //Texer.ExpectToken([tokSemicolon]);
-    Proc.Body := ParseBlock(token);
-  finally
-    CurrentBlock := oldBlock;
-    LeaveScope;
+  if TokenIsReservedSymbol(token, rs_Semicolon) and (decfBodyMayBeSkipped in AFlags) and (decfInlineSymbolDeclaration in AFlags) then begin // ';' - no body
+    // declaration only
+    Texer.SkipToken;
+  end
+  else begin
+    if not TokenIsReservedIdent(token, ri_begin) and not TokenIsReservedSymbol(token, rs_OCurly) then
+      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenTypeIn, [token.TokenToString, token.Value, '', sStatement]));
+    EnterScope(CurrentScope); // new lexical scope for this block
+    try
+      oldBlock := CurrentBlock;
+      CurrentBlock := TNPC_ASTStatementBlock(Proc);
+  //    token := Texer.PeekToken;
+  //    while not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) do begin
+  //      if TokenIsOfType(token, [tokEOF]) then
+  //        raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedElementsButGot, ['statement', 'EOF', 'block ', sDeclaration]));
+  //      stmt := ParseStatement([stafEmptyStatementIsAcceptable]);
+  //      if Assigned(stmt) then
+  //        Proc.AddStatement(stmt);
+  //      token := Texer.PeekToken;
+  //    end;
+  //    //token := Texer.PeekToken;
+  //    if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
+  //      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
+  //    Texer.SkipToken;
+  //    //Texer.ExpectToken([tokSemicolon]);
+      Proc.Body := ParseBlock(token);
+    finally
+      CurrentBlock := oldBlock;
+      LeaveScope;
+    end;
+  //  token := Texer.PeekToken;
+  //  if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
+  //    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
+    Texer.ExpectReservedSymbol(rs_Semicolon);
   end;
-//  token := Texer.PeekToken;
-//  if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
-//    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
-  Texer.ExpectReservedSymbol(rs_Semicolon);
 
-  CurrentScope.DefineProcedure(Proc.Name, Proc);
+  if not (decfDoNotAddSymbol in AFlags) then
+    CurrentScope.DefineProcedure(Proc.Name, Proc);
   Result := Proc;
 end;
 

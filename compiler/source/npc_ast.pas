@@ -23,6 +23,8 @@ type
   TNPC_ASTTypeClassProperty = class;
   TNPC_ASTStatementProcedure = class;
 
+  TNPC_ASTExpression = class;
+
   TNPCSymbolKind = (
     skBuiltinType,
     skBuiltinTypeAlias, // builtin-type alias
@@ -67,7 +69,12 @@ type
     IsConst: Boolean;
     ConstValue: TNPC_ASTValue; // used if Kind=skDecl and IsConst=True
     //
-    constructor Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject; ASize: Integer = -1; AValue: Integer = 0);
+    // for inline methods: Name = { ... }
+    ValueExpr: TNPC_ASTExpression;
+    // for declared procedures
+    ProcDecl: TNPC_ASTStatementProcedure;
+    //
+    constructor Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject);
     destructor Destroy; override;
   end;
 
@@ -111,6 +118,9 @@ type
     function DefineTupleItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
     function DefineRecordItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
     function DefineProcedure(const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
+    function DefineClassField(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineClassMethod(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineClassProperty(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
   end;
 
   TNPC_ASTTypes = (
@@ -150,6 +160,7 @@ type
     AST_TYPE_RECORD_DESCRIPTION,
     AST_TYPE_CLASS,
     AST_TYPE_CLASS_DESCRIPTION,
+    AST_TYPE_CLASS_METHOD,
     AST_TYPE_CLASS_PROPERTY,
 
     // expressions
@@ -216,7 +227,7 @@ type
   public
     // &Type = AST_EXPRESSION
     Flags: LongWord;
-//    InferredType: TNPC_ASTType; //TNPC_ASTTypeDefinition;
+    InferredType: TNPC_ASTType; //TNPC_ASTTypeDefinition;
     //
     constructor Create(const ALocation: TNPCLocation); override;
     destructor Destroy; override;
@@ -358,6 +369,21 @@ type
     VIS_Public
   );
 
+  TNPC_ASTTypeClassMethod = class(TNPC_ASTType)
+  public
+    // &Type = AST_TYPE_CLASS_METHOD
+    Name: UTF8String;
+    VisibilityType: TNPC_ASTClassVisibilityTypeEnum;
+    //
+    Expr: TNPC_ASTExpression; // unified representation
+    //
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum); reintroduce; overload;
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum; AExpr: TNPC_ASTExpression); overload;
+    destructor Destroy; override;
+    //
+    function ToString: String; override;
+  end;
+
   TNPC_ASTTypeClassProperty = class(TNPC_ASTType)
   public
     // &Type = AST_TYPE_CLASS_PROPERTY
@@ -383,11 +409,13 @@ type
   public
     // &Type = AST_TYPE_CLASS
     Fields: TDictionary<UTF8String, TNPC_ASTType>; // TClassField
-    Methods: TObjectList<TNPC_ASTExpression>; // TClassMethod     TNPC_ASTExpressionCall = class(TNPC_ASTExpression)
+    Methods: TObjectList<TNPC_ASTTypeClassMethod>; // TClassMethod     TNPC_ASTExpressionCall = class(TNPC_ASTExpression)
+    //Methods: TDictionary<UTF8String, TNPC_ASTExpression>;
     Properties: TObjectList<TNPC_ASTTypeClassProperty>;
     //
     constructor Create(const ALocation: TNPCLocation); overload; override;
-    constructor Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTExpression>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>); reintroduce; overload;
+    constructor Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTTypeClassMethod>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>); reintroduce; overload;
+    //constructor Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TDictionary<UTF8String, TNPC_ASTExpression>; TObjectList<TNPC_ASTTypeClassProperty>); reintroduce; overload;
     destructor Destroy; override;
     //
     function ToString: String; override;
@@ -851,7 +879,7 @@ implementation
 
 { TNPCSymbol }
 
-constructor TNPCSymbol.Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject; ASize: Integer = -1; AValue: Integer = 0);
+constructor TNPCSymbol.Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject);
 begin
   inherited Create;
   Name := AName;
@@ -860,9 +888,11 @@ begin
   TypeRef := ATypeRef;
   PropInfo := Nil;
   DeclNode := ADecl;
-  Size := ASize;
+  Size := -1;
   IsConst := AConst;
-  ConstValue := AValue;
+  ConstValue := Null; // used if Kind=skDecl and IsConst=True
+  ValueExpr := Nil;
+  ProcDecl := Nil;
 end;
 
 destructor TNPCSymbol.Destroy;
@@ -876,6 +906,10 @@ begin
 //    PropInfo.Free;
   DeclNode := Nil;
   ConstValue := Unassigned;
+  if ValueExpr <> Nil then
+    ValueExpr.Free;
+  if ProcDecl <> Nil then
+    ProcDecl.Free;
   inherited;
 end;
 
@@ -918,55 +952,85 @@ end;
 
 function TNPCScope.DefineBuiltinType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skBuiltinType, AType, False, ATypeRef, Nil, Asize);
+  Result := TNPCSymbol.Create(AName, skBuiltinType, AType, False, ATypeRef, Nil);
+  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineBuiltinTypeAlias(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skBuiltinTypeAlias, AType, False, ATypeRef, Nil, Asize);
+  Result := TNPCSymbol.Create(AName, skBuiltinTypeAlias, AType, False, ATypeRef, Nil);
+  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skType, AType, False, ATypeRef, ADecl, ASize);
+  Result := TNPCSymbol.Create(AName, skType, AType, False, ATypeRef, ADecl);
+  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineTypeAlias(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skTypeAlias, AType, False, ATypeRef, ADecl, ASize);
+  Result := TNPCSymbol.Create(AName, skTypeAlias, AType, False, ATypeRef, ADecl);
+  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineConst(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject; AValue: Integer): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skVar, AType, True, ATypeRef, ADecl, ASize, AValue);
+  Result := TNPCSymbol.Create(AName, skVar, AType, True, ATypeRef, ADecl);
+  Result.Size := ASize;
+  Result.ConstValue := AValue;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineVar(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skVar, AType, False, ATypeRef, ADecl, ASize);
+  Result := TNPCSymbol.Create(AName, skVar, AType, False, ATypeRef, ADecl);
+  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineTupleItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skTuple, AType, False, ATypeRef, ADecl, ASize);
+  Result := TNPCSymbol.Create(AName, skTuple, AType, False, ATypeRef, ADecl);
+  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineRecordItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skRecord, AType, False, ATypeRef, ADecl, ASize);
+  Result := TNPCSymbol.Create(AName, skRecord, AType, False, ATypeRef, ADecl);
+  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineProcedure(const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
 begin
   Result := TNPCSymbol.Create(AName, skProc, stProcedure, False, Nil, AProcedure);
+  Table.Add(AName, Result);
+end;
+
+function TNPCScope.DefineClassField(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+begin
+  Result := TNPCSymbol.Create(AName, skField, AType, False, ATypeRef, ADecl);
+//  Result.Size := ASize;
+  Table.Add(AName, Result);
+end;
+
+function TNPCScope.DefineClassMethod(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+begin
+  Result := TNPCSymbol.Create(AName, skMethod, AType, False, ATypeRef, ADecl);
+//  Result.Size := ASize;
+  Table.Add(AName, Result);
+end;
+
+function TNPCScope.DefineClassProperty(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+begin
+  Result := TNPCSymbol.Create(AName, skProperty, AType, False, ATypeRef, ADecl);
+//  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
@@ -997,13 +1061,13 @@ begin
   inherited;
   &Type := AST_EXPRESSION;
   Flags := 0;
-//  //
-//  InferredType := Nil;
+  //
+  InferredType := Nil;
 end;
 
 destructor TNPC_ASTExpression.Destroy;
 begin
-//  InferredType := Nil;
+  InferredType.Free;
   inherited;
 end;
 
@@ -1204,6 +1268,38 @@ begin
   Result := '<record>';
 end;
 
+{ TNPC_ASTTypeClassMethod }
+
+constructor TNPC_ASTTypeClassMethod.Create(const ALocation: TNPCLocation; const AName: UTF8String; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
+begin
+  inherited Create(ALocation);
+  &Type := AST_TYPE_CLASS_METHOD;
+  //
+  Name := AName;
+  VisibilityType := AVisibilityType;
+  //
+  Expr := Nil; // unified representation
+end;
+
+constructor TNPC_ASTTypeClassMethod.Create(const ALocation: TNPCLocation; const AName: UTF8String; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum; AExpr: TNPC_ASTExpression);
+begin
+  Create(ALocation, AName, AVisibilityType);
+  Expr := AExpr; // unified representation
+end;
+
+destructor TNPC_ASTTypeClassMethod.Destroy;
+begin
+  Name := '';
+  if Expr <> Nil then
+    Expr.Free;
+  inherited;
+end;
+
+function TNPC_ASTTypeClassMethod.ToString: String;
+begin
+  Result := '<method>';
+end;
+
 { TNPC_ASTTypeClassProperty }
 
 //constructor TNPC_ASTTypeClassProperty.Create(const ALocation: TNPCLocation; const AName: UTF8String; APropertyType: TNPC_ASTType; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
@@ -1266,7 +1362,8 @@ begin
   Properties := Nil;
 end;
 
-constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTExpression>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>);
+constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTTypeClassMethod>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>);
+//constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TDictionary<UTF8String, TNPC_ASTExpression>; AProperties: TDictionary<UTF8String, TNPC_ASTTypeClassProperty>);
 begin
   Create(ALocation);
   Fields := AFields;
