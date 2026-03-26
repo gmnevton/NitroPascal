@@ -14,7 +14,8 @@ uses
   Classes,
   Variants,
   Generics.Collections,
-  npc_location;
+  npc_location,
+  npc_lexer;
 
 type
   TNPC_ASTValue = Variant; // for simplicity
@@ -36,6 +37,7 @@ type
     skTuple,
     //skReturnTuple,
     skRecord,
+    skRecordField,
     skProc,
     // class
     skField,
@@ -156,6 +158,7 @@ type
     AST_TERNARY,
 
     // types
+    AST_TYPE_REFERENCE,
     AST_TYPE_DECLARATION, // type
     AST_TYPE_DEFINITION, // ident = type_definition
     AST_TYPE_NAME,
@@ -238,6 +241,7 @@ type
     // &Type = AST_EXPRESSION
     Flags: LongWord;
     InferredType: TNPC_ASTType; //TNPC_ASTTypeDefinition;
+    EndToken: TNPCToken;
     //
     constructor Create(const ALocation: TNPCLocation); override;
     destructor Destroy; override;
@@ -259,6 +263,38 @@ type
   end;
 
   TNPC_ASTTypeClassType = class of TNPC_ASTType;
+
+  TNPCTypeReferenceKind = (
+    REF_Unknown,
+    REF_Named,   // String, MyType, List<T>
+    REF_Array,   // Array of T
+    REF_Record,  // record ... end
+    REF_Function // function/procedure
+  );
+
+  TNPC_ASTTypeReference = class(TNPC_ASTType)
+  public
+    // &Type = AST_TYPE_REFERENCE
+    //
+    Kind: TNPCTypeReferenceKind;
+    //
+    // REF_Named
+    BaseSymbol: TNPCSymbol; // e.g. Array / Map / String
+    GenericArgs: TObjectList<TNPC_ASTTypeReference>; // nested types for generics
+    // REF_Array
+    ElementType: TNPC_ASTTypeReference;
+    // REF_Record
+    Fields: TObjectList<TNPCSymbol>;
+    // REF_Function
+    Params: TObjectList<TNPCSymbol>;
+    ReturnType: TNPC_ASTTypeReference;
+    IsProcedure: Boolean;
+    //
+    constructor Create(const ALocation: TNPCLocation); override;
+    destructor Destroy; override;
+    //
+    function ToString: String; override;
+  end;
 
   TNPC_ASTTypeEnum = class;
   TNPC_ASTTypeSet = class;
@@ -919,7 +955,7 @@ begin
   DeclNode := ADecl;
   Size := -1;
   IsConst := AConst;
-  ConstValue := Null; // used if Kind=skDecl and IsConst=True
+  ConstValue := Unassigned; // used if Kind=skDecl and IsConst=True
   ValueExpr := Nil;
   ProcDecl := Nil;
 end;
@@ -1156,10 +1192,12 @@ begin
   Flags := 0;
   //
   InferredType := Nil;
+  EndToken := Nil;
 end;
 
 destructor TNPC_ASTExpression.Destroy;
 begin
+  EndToken := Nil;
   InferredType.Free;
   inherited;
 end;
@@ -1185,6 +1223,49 @@ end;
 function TNPC_ASTType.ToString: String;
 begin
   Result := '<type>';
+end;
+
+{ TNPC_ASTTypeReference }
+
+constructor TNPC_ASTTypeReference.Create(const ALocation: TNPCLocation);
+begin
+  inherited Create(ALocation);
+  &Type := AST_TYPE_REFERENCE;
+  //
+  Kind := REF_Unknown;
+  // REF_Named
+  BaseSymbol := Nil;  // e.g. Array / Map / String
+  GenericArgs := Nil; // nested types for generics
+  // REF_Array
+  ElementType := Nil;
+  // REF_Record
+  Fields := Nil;
+  // REF_Function
+  Params := Nil;
+  ReturnType := Nil;
+  IsProcedure := False;
+end;
+
+destructor TNPC_ASTTypeReference.Destroy;
+begin
+  BaseSymbol := Nil;
+  if GenericArgs <> Nil then
+    GenericArgs.Free;
+  ElementType := Nil;
+  // REF_Record
+  if Fields <> Nil then
+    Fields.Free;
+  // REF_Function
+  if Params <> Nil then
+    Params.Free;
+  if ReturnType <> Nil then
+    ReturnType.Free;
+  inherited;
+end;
+
+function TNPC_ASTTypeReference.ToString: String;
+begin
+  Result := '<type-ref>';
 end;
 
 { TNPC_ASTTypeDefinition }
