@@ -63,7 +63,9 @@ type
     decfNone,
     decfDoNotAddSymbol,
     decfBodyMayBeSkipped,
-    decfInlineSymbolDeclaration
+    decfInlineSymbolDeclaration,
+    decfParamDeclarationAsTuple,
+    decfParamMayContainModifier
   );
   TNPCParseDeclarationFlags = set of TNPCParseDeclarationFlag;
 
@@ -207,7 +209,7 @@ type
     function  ParseBlock(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseProcedureDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
     function  ParseProcedureDefinition(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
-    function  ParseProcedureParameter(const AToken: TNPCToken): TNPC_ASTParameter;
+    function  ParseProcedureParameter(const AToken: TNPCToken; const AProcedureDecl: TNPC_ASTStatementProcedure; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
     function  ParseAssignment(const ALeftToken: TNPCToken): TNPC_ASTStatement;
     function  ParseAssignmentNew(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
@@ -519,32 +521,35 @@ begin
 end;
 
 procedure TNPCSourceParser.InitBuiltins(const AScope: TNPCScope);
+var
+  loc: TNPCLocation;
 begin
+  loc := TNPCLocation.Create(Self.UnitName, 521, 0);
   // register built-in types
-  Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(Nil, 'Boolean', 1);
-  AScope.DefineBuiltinType('Boolean', stLiteral, 1, Builtin_Type_Boolean);
-  AScope.DefineConst('True', stLiteral, 1, Builtin_Type_Boolean, Nil, 1);
-  AScope.DefineConst('False', stLiteral, 1, Builtin_Type_Boolean, Nil, 0);
-  AScope.DefineConst('Error', stLiteral, 1, Builtin_Type_Boolean, Nil, -1);
+  Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(loc, 'Boolean', 1);
+  AScope.DefineBuiltinType(loc, 'Boolean', stLiteral, 1, Builtin_Type_Boolean);
+  AScope.DefineConst(loc, 'True', stLiteral, 1, Builtin_Type_Boolean, Nil, 1);
+  AScope.DefineConst(loc, 'False', stLiteral, 1, Builtin_Type_Boolean, Nil, 0);
+  AScope.DefineConst(loc, 'Error', stLiteral, 1, Builtin_Type_Boolean, Nil, -1);
   //
-  Builtin_Type_Byte := TNPC_ASTTypeDefinition.Create(Nil, 'Byte', 1);
-  AScope.DefineBuiltinType('Byte', stLiteral, 1, Builtin_Type_Byte);
+  Builtin_Type_Byte := TNPC_ASTTypeDefinition.Create(loc, 'Byte', 1);
+  AScope.DefineBuiltinType(loc, 'Byte', stLiteral, 1, Builtin_Type_Byte);
   //
-  Builtin_Type_Integer := TNPC_ASTTypeDefinition.Create(Nil, 'Integer', 4);
-  AScope.DefineBuiltinType('Integer', stLiteral, 4, Builtin_Type_Integer);
+  Builtin_Type_Integer := TNPC_ASTTypeDefinition.Create(loc, 'Integer', 4);
+  AScope.DefineBuiltinType(loc, 'Integer', stLiteral, 4, Builtin_Type_Integer);
   //
-  Builtin_Type_Integer64 := TNPC_ASTTypeDefinition.Create(Nil, 'Integer64', 8);
-  AScope.DefineBuiltinType('Integer64', stLiteral, 8, Builtin_Type_Integer64);
+  Builtin_Type_Integer64 := TNPC_ASTTypeDefinition.Create(loc, 'Integer64', 8);
+  AScope.DefineBuiltinType(loc, 'Integer64', stLiteral, 8, Builtin_Type_Integer64);
   //
-  Builtin_Type_Single := TNPC_ASTTypeDefinition.Create(Nil, 'Single', 4);
-  AScope.DefineBuiltinType('Single', stLiteral, 4, Builtin_Type_Single);
+  Builtin_Type_Single := TNPC_ASTTypeDefinition.Create(loc, 'Single', 4);
+  AScope.DefineBuiltinType(loc, 'Single', stLiteral, 4, Builtin_Type_Single);
   //
-  Builtin_Type_Double := TNPC_ASTTypeDefinition.Create(Nil, 'Double', 8);
-  AScope.DefineBuiltinType('Double', stLiteral, 8, Builtin_Type_Double);
-  AScope.DefineBuiltinTypeAlias('Real', stLiteral, 8, Builtin_Type_Double); // alias
+  Builtin_Type_Double := TNPC_ASTTypeDefinition.Create(loc, 'Double', 8);
+  AScope.DefineBuiltinType(loc, 'Double', stLiteral, 8, Builtin_Type_Double);
+  AScope.DefineBuiltinTypeAlias(loc, 'Real', stLiteral, 8, Builtin_Type_Double); // alias
   //
-  Builtin_Type_Extended := TNPC_ASTTypeDefinition.Create(Nil, 'Extended', 10);
-  AScope.DefineBuiltinType('Extended', stLiteral, 10, Builtin_Type_Extended);
+  Builtin_Type_Extended := TNPC_ASTTypeDefinition.Create(loc, 'Extended', 10);
+  AScope.DefineBuiltinType(loc, 'Extended', stLiteral, 10, Builtin_Type_Extended);
 
   // String type definition:
   //                | offset | field: type: size
@@ -554,11 +559,11 @@ begin
   //                |    -16 | CharLength: UInt64 (8)
   //                |     -8 | ByteCount: UInt64 (8)
   // entry point -> |      0 | Data: Byte[ByteCount]
-  Builtin_Type_String := TNPC_ASTTypeDefinition.Create(Nil, 'String', 32);
-  AScope.DefineBuiltinType('String', stLiteral, 32, Builtin_Type_String);
+  Builtin_Type_String := TNPC_ASTTypeDefinition.Create(loc, 'String', 32);
+  AScope.DefineBuiltinType(loc, 'String', stLiteral, 32, Builtin_Type_String);
   //
-  Builtin_Type_ClassSymbol := TNPC_ASTTypeDefinition.Create(Nil, 'Symbol', 32);
-  AScope.DefineBuiltinType('Symbol', stProcedure, 32, Builtin_Type_ClassSymbol);
+  Builtin_Type_ClassSymbol := TNPC_ASTTypeDefinition.Create(loc, 'Symbol', 32);
+  AScope.DefineBuiltinType(loc, 'Symbol', stProcedure, 32, Builtin_Type_ClassSymbol);
 
 //var
 //  intSym, boolSym, strSym: TNPCSymbol;
@@ -576,6 +581,7 @@ begin
 //  globalScope.AddOrSetValue('Boolean', boolSym);
 //  globalScope.AddOrSetValue('String', strSym);
 //end;
+  loc.Free;
 end;
 
 procedure TNPCSourceParser.Clear;
@@ -867,7 +873,8 @@ begin
   //
   scope := ScopeStack.Last;
   // allow shadowing: put symbol in current scope
-  scope.AddOrSetValue(AName, ASym);
+  //scope.AddOrSetSymbol(AName, ASym);
+  scope.AddSymbol(AName, ASym);
 end;
 
 function TNPCSourceParser.LookupSymbol(const AName: String): TNPCSymbol;
@@ -879,7 +886,7 @@ begin
   Result := Nil;
   for i := ScopeStack.Count - 1 downto 0 do begin
     scope := ScopeStack[i];
-    if scope.TryGetValue(AName, sym) then
+    if scope.TryGetSymbol(AName, sym) then
       Exit(sym);
   end;
 end;
@@ -889,7 +896,7 @@ var
   VarSym: TNPCSymbol;
 begin
   AType := Nil;
-  VarSym := CurrentScope.Resolve(ATypeName);
+  VarSym := CurrentScope.ResolveSymbol(ATypeName);
   if not Assigned(VarSym) then
     Exit(False);
 
@@ -1950,7 +1957,7 @@ begin
     Enum.Members.Add(Ident.Value, Value);
 
     // add enum member to current scope as constant
-    CurrentScope.DefineConst(Ident.Value, stEnumConst, 4, Builtin_Type_Integer, Enum, Value);
+    CurrentScope.DefineConst(Ident.Location, Ident.Value, stEnumConst, 4, Builtin_Type_Integer, Enum, Value);
 
     Inc(Value);
     if not TokenIsReservedSymbol(token, rs_Comma) then
@@ -1960,7 +1967,7 @@ begin
   Texer.ExpectReservedSymbol(rs_CParen); // ')'
 
   // add enum to current scope as type
-  CurrentScope.DefineType(ATypeName, stEnum, 4, Enum, CurrentBlock);
+  CurrentScope.DefineType(Enum.Location, ATypeName, stEnum, 4, Enum, CurrentBlock);
 
   TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
   TypeDef.DefinitionType := DEF_Enum;
@@ -2011,7 +2018,7 @@ begin
         else if Elem is TNPC_ASTExpressionLiteral then
           ThisType := TNPC_ASTExpressionLiteral(Elem).LiteralType
         else if Elem is TNPC_ASTExpressionVariable then begin
-          Sym := CurrentScope.Resolve(TNPC_ASTExpressionVariable(Elem).Name);
+          Sym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionVariable(Elem).Name);
           if not Assigned(Sym) then
             raise NPCSyntaxError.ParserError(Elem.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(Elem).Name, 'set declaration ', sStatement]));
           ThisType := Sym.TypeRef;
@@ -2042,7 +2049,7 @@ begin
   end;
 
   // add set to current scope as type
-  CurrentScope.DefineType(ATypeName, stSet, 4, SetType, CurrentBlock);
+  CurrentScope.DefineType(ATypeToken.Location, ATypeName, stSet, 4, SetType, CurrentBlock);
 
   TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
   TypeDef.DefinitionType := DEF_Set;
@@ -2082,7 +2089,7 @@ begin
     else if expr is TNPC_ASTExpressionLiteral then
       IndexType := TNPC_ASTExpressionLiteral(expr).LiteralType
     else if expr is TNPC_ASTExpressionVariable then begin
-      Sym := CurrentScope.Resolve(TNPC_ASTExpressionVariable(expr).Name);
+      Sym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionVariable(expr).Name);
       if not Assigned(Sym) then
         raise NPCSyntaxError.ParserError(expr.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(expr).Name, 'array declaration ', sStatement]));
       IndexType := Sym.TypeRef;
@@ -2101,7 +2108,7 @@ begin
     if TNPC_ASTExpressionIdent(expr).ResolvedSymbol <> Nil then
       Sym := TNPC_ASTExpressionIdent(expr).ResolvedSymbol
     else begin
-      Sym := CurrentScope.Resolve(TNPC_ASTExpressionIdent(expr).Name);
+      Sym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionIdent(expr).Name);
       if not Assigned(Sym) then
         raise NPCSyntaxError.ParserError(expr.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(expr).Name, 'array declaration ', sStatement]));
       TNPC_ASTExpressionIdent(expr).ResolvedSymbol := Sym;
@@ -2113,7 +2120,7 @@ begin
   else if expr is TNPC_ASTExpressionLiteral then
     ElemType := TNPC_ASTExpressionLiteral(expr).LiteralType
   else if expr is TNPC_ASTExpressionVariable then begin
-    Sym := CurrentScope.Resolve(TNPC_ASTExpressionVariable(expr).Name);
+    Sym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionVariable(expr).Name);
     if not Assigned(Sym) then
       raise NPCSyntaxError.ParserError(expr.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(expr).Name, 'array declaration ', sStatement]));
     ElemType := Sym.TypeRef;
@@ -2124,7 +2131,7 @@ begin
   ArrayType := TNPC_ASTTypeArray.Create(ATypeToken.Location, ElemType, IndexType);
 
   // add array to current scope as type
-  CurrentScope.DefineType(ATypeName, stArray, 4, ArrayType, CurrentBlock);
+  CurrentScope.DefineType(ATypeToken.Location, ATypeName, stArray, 4, ArrayType, CurrentBlock);
 
   TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
   TypeDef.DefinitionType := DEF_Array;
@@ -2216,7 +2223,7 @@ begin
   TypeDef.DefinitionType := DEF_Record;
   TypeDef.RecordDescription := RecordType; // put record to type definition
   // add record to current scope as type, before processing fields
-  CurrentScope.DefineType(ATypeName, stRecord, 4, RecordType, CurrentBlock);
+  CurrentScope.DefineType(ATypeToken.Location, ATypeName, stRecord, 4, RecordType, CurrentBlock);
   //Sym := CurrentScope.LastSymbol;
 
 //  // allocate the Fields dictionary
@@ -2277,7 +2284,7 @@ begin
         for fieldName in Fields do begin
           // create a symbol for the field: kind = skVar, Typ = fieldType
           //Sym := TNPCSymbol.Create(fieldName.Value, skVar, stRecordField, False, fieldSym.TypeRef, TypeDef);
-          CurrentScope.DefineVar(fieldName.Value, stRecordField, -1, fieldType, TypeDef);
+          CurrentScope.DefineVar(fieldName.Location, fieldName.Value, stRecordField, -1, fieldType, TypeDef);
           RecordType.Fields.Add(fieldName.Value, fieldType);
         end;
 
@@ -2423,7 +2430,7 @@ begin
   TypeDef.DefinitionType := DEF_Class;
   TypeDef.ClassDescription := TypeClass;
 
-  CurrentScope.DefineType(ATypeName, stClass, -1, TypeDef, CurrentBlock);
+  CurrentScope.DefineType(ATypeToken.Location, ATypeName, stClass, -1, TypeDef, CurrentBlock);
 
   // return declaration
   Result := TNPC_ASTStatementTypeDeclaration.Create(ATypeToken.Location, ATypeName, TypeDef);
@@ -2452,7 +2459,7 @@ begin
     if TokenIsReservedIdent(token, ri_read) then begin
       Texer.SkipToken;
       token := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['read symbol name', Texer.PeekToken.ToString, 'class ', sDeclaration]));
-      Sym := CurrentScope.Resolve(token.Value);
+      Sym := CurrentScope.ResolveSymbol(token.Value);
       if Sym = Nil then
         raise NPCSyntaxError.ParserError(token.Location, Format(sParseSymbolNotFound, [token.Value, 'class ', sDeclaration]));
       Prop.ReadField := Sym;
@@ -2460,7 +2467,7 @@ begin
     else if TokenIsReservedIdent(token, ri_write) then begin
       Texer.SkipToken;
       token := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['write symbol name', Texer.PeekToken.ToString, 'class ', sDeclaration]));
-      Sym := CurrentScope.Resolve(token.Value);
+      Sym := CurrentScope.ResolveSymbol(token.Value);
       if Sym = Nil then
         raise NPCSyntaxError.ParserError(token.Location, Format(sParseSymbolNotFound, [token.Value, 'class ', sDeclaration]));
       Prop.WriteField := Sym;
@@ -2507,7 +2514,7 @@ begin
     Typ := ParseTypeReference;
     Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
 
-    CurrentScope.DefineClassField(tokenName.Value, stClass, Typ, ATypeClass);
+    CurrentScope.DefineClassField(tokenName.Location, tokenName.Value, stClass, Typ, ATypeClass);
 
     if ATypeClass.Fields = Nil then
       ATypeClass.Fields := TDictionary<UTF8String, TNPC_ASTType>.Create;
@@ -2523,7 +2530,7 @@ begin
 
     Method := TNPC_ASTTypeClassMethod.Create(tokenName.Location, tokenName.Value, AVisibilityType);
 
-    Sym := CurrentScope.DefineClassMethod(tokenName.Value, stClass, Method, ATypeClass);  // or skFieldWithInit
+    Sym := CurrentScope.DefineClassMethod(tokenName.Location, tokenName.Value, stClass, Method, ATypeClass);  // or skFieldWithInit
     Sym.ValueExpr := Expr;
 
     if ATypeClass.Methods = Nil then
@@ -2543,7 +2550,7 @@ begin
 
     Method := TNPC_ASTTypeClassMethod.Create(tokenName.Location, tokenName.Value, AVisibilityType);
 
-    Sym := CurrentScope.DefineClassMethod(tokenName.Value, stClass, Method, ATypeClass);  // or skFieldWithInit
+    Sym := CurrentScope.DefineClassMethod(tokenName.Location, tokenName.Value, stClass, Method, ATypeClass);  // or skFieldWithInit
     Sym.ProcDecl := TNPC_ASTStatementProcedure(ProcDecl);
 
     if ATypeClass.Methods = Nil then
@@ -2590,7 +2597,7 @@ begin
     Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
 
     // declare symbol immediately in current scope
-    sym := CurrentScope.DefineVar(varName.Value, stLiteral, -1, varType, CurrentBlock);
+    sym := CurrentScope.DefineVar(varName.Location, varName.Value, stLiteral, -1, varType, CurrentBlock);
 
     // add declaration
     stmt := TNPC_ASTStatementVariableDeclaration.Create(varName.Location, varName.Value, varType, initExpr);
@@ -2679,146 +2686,202 @@ begin
   SkipComments;
   Proc := TNPC_ASTStatementProcedure.Create(AToken.Location, CurrentBlock, AToken.Value, False, []);
 
-  // collect parameters, if any available
-  token := Texer.PeekToken;
-  if Texer.IsNotEmpty and not TokenIsReservedSymbol(token, rs_CParen) then begin // ')'
-    while not TokenIsReservedSymbol(token, rs_CParen) do begin
-      SkipComments;
-      param := ParseProcedureParameter(token);
-      if Assigned(param) then
-        Proc.Parameters.Add(param);
-
-      token := Texer.PeekToken;
-      if TokenIsReservedSymbol(token, rs_Comma) then begin
-        Texer.SkipToken;
-        token := Texer.PeekToken;
-      end
-      else
-        Break;
-    end;
-  end;
-  Texer.ExpectReservedSymbol(rs_CParen); // ')'
-  SkipComments;
-
-  // collect returns, if any available
-  token := Texer.PeekToken;
-  if Texer.IsNotEmpty and TokenIsReservedSymbol(token, rs_Colon) then begin // ':'
-    Texer.SkipToken;
-    SkipComments;
-    Proc.IsFunction := True;
-    Proc.Returns := TObjectList<TNPC_ASTParameter>.Create(False);
-    //
-    Texer.ExpectReservedSymbol(rs_OParen); // '('
-    SkipComments;
+  EnterScope(CurrentScope); // new lexical scope for this block
+  oldBlock := CurrentBlock;
+  CurrentBlock := TNPC_ASTStatementBlock(Proc);
+  try
+    // collect parameters, if any available
     token := Texer.PeekToken;
-    while not TokenIsReservedSymbol(token, rs_CParen) do begin
-      param := ParseProcedureParameter(token);
-      if Assigned(param) then
-        Proc.Returns.Add(param);
-
-      token := Texer.PeekToken;
-      if TokenIsReservedSymbol(token, rs_Comma) then begin
-        Texer.SkipToken;
+    if Texer.IsNotEmpty and not TokenIsReservedSymbol(token, rs_CParen) then begin // ')'
+      while not TokenIsReservedSymbol(token, rs_CParen) do begin
         SkipComments;
+        param := ParseProcedureParameter(token, Proc, pcParam, [decfParamMayContainModifier]);
+        if Assigned(param) then
+          Proc.Parameters.Add(param);
+
         token := Texer.PeekToken;
-      end
-      else
-        Break;
+        if TokenIsReservedSymbol(token, rs_Comma) then begin
+          Texer.SkipToken;
+          token := Texer.PeekToken;
+        end
+        else
+          Break;
+      end;
     end;
     Texer.ExpectReservedSymbol(rs_CParen); // ')'
     SkipComments;
+
+    // collect returns, if any available
     token := Texer.PeekToken;
-  end;
+    if Texer.IsNotEmpty and TokenIsReservedSymbol(token, rs_Colon) then begin // ':'
+      Texer.SkipToken;
+      SkipComments;
+      Proc.IsFunction := True;
+      Proc.Returns := TObjectList<TNPC_ASTParameter>.Create(False);
+      //
+      token := Texer.PeekToken;
+      if TokenIsReservedSymbol(token, rs_OParen) then begin // '(' - tuple
+        Texer.ExpectReservedSymbol(rs_OParen);
+        SkipComments;
+        token := Texer.PeekToken;
+        while not TokenIsReservedSymbol(token, rs_CParen) do begin
+          param := ParseProcedureParameter(token, Proc, pcReturn, [decfParamDeclarationAsTuple]);
+          if Assigned(param) then
+            Proc.Returns.Add(param);
 
-  // body
-  if TokenIsReservedSymbol(token, rs_Semicolon) and (decfBodyMayBeSkipped in AFlags) and (decfInlineSymbolDeclaration in AFlags) then begin // ';' - no body
-    // declaration only
-    Texer.SkipToken;
-  end
-  else begin
-    if not TokenIsReservedIdent(token, ri_begin) and not TokenIsReservedSymbol(token, rs_OCurly) then
-      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenTypeIn, [token.TokenToString, token.Value, '', sStatement]));
-    EnterScope(CurrentScope); // new lexical scope for this block
-    try
-      oldBlock := CurrentBlock;
-      CurrentBlock := TNPC_ASTStatementBlock(Proc);
-  //    token := Texer.PeekToken;
-  //    while not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) do begin
-  //      if TokenIsOfType(token, [tokEOF]) then
-  //        raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedElementsButGot, ['statement', 'EOF', 'block ', sDeclaration]));
-  //      stmt := ParseStatement([stafEmptyStatementIsAcceptable]);
-  //      if Assigned(stmt) then
-  //        Proc.AddStatement(stmt);
-  //      token := Texer.PeekToken;
-  //    end;
-  //    //token := Texer.PeekToken;
-  //    if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
-  //      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
-  //    Texer.SkipToken;
-  //    //Texer.ExpectToken([tokSemicolon]);
-      Proc.Body := ParseBlock(token);
-    finally
-      CurrentBlock := oldBlock;
-      LeaveScope;
+          token := Texer.PeekToken;
+          if TokenIsReservedSymbol(token, rs_Comma) then begin
+            Texer.SkipToken;
+            SkipComments;
+            token := Texer.PeekToken;
+          end
+          else
+            Break;
+        end;
+        SkipComments;
+        Texer.ExpectReservedSymbol(rs_CParen); // ')'
+      end
+      else begin
+        SkipComments;
+        param := ParseProcedureParameter(token, Proc, pcReturn, []);
+        if Assigned(param) then
+          Proc.Returns.Add(param);
+      end;
+      SkipComments;
+      token := Texer.PeekToken;
     end;
-  //  token := Texer.PeekToken;
-  //  if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
-  //    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
-    Texer.ExpectReservedSymbol(rs_Semicolon);
-  end;
 
-  if not (decfDoNotAddSymbol in AFlags) then
-    CurrentScope.DefineProcedure(Proc.Name, Proc);
-  Result := Proc;
+    // body
+    if TokenIsReservedSymbol(token, rs_Semicolon) and (decfBodyMayBeSkipped in AFlags) and (decfInlineSymbolDeclaration in AFlags) then begin // ';' - no body
+      // declaration only
+      Texer.SkipToken;
+    end
+    else begin
+      if not TokenIsReservedIdent(token, ri_begin) and not TokenIsReservedSymbol(token, rs_OCurly) then
+        raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenTypeIn, [token.TokenToString, token.Value, '', sStatement]));
+
+    //    token := Texer.PeekToken;
+    //    while not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) do begin
+    //      if TokenIsOfType(token, [tokEOF]) then
+    //        raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedElementsButGot, ['statement', 'EOF', 'block ', sDeclaration]));
+    //      stmt := ParseStatement([stafEmptyStatementIsAcceptable]);
+    //      if Assigned(stmt) then
+    //        Proc.AddStatement(stmt);
+    //      token := Texer.PeekToken;
+    //    end;
+    //    //token := Texer.PeekToken;
+    //    if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
+    //      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
+    //    Texer.SkipToken;
+    //    //Texer.ExpectToken([tokSemicolon]);
+        Proc.Body := ParseBlock(token);
+
+    //  token := Texer.PeekToken;
+    //  if not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) then
+    //    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedTokenIn, [token.Value, '', sStatement]));
+      Texer.ExpectReservedSymbol(rs_Semicolon);
+    end;
+  finally
+    CurrentBlock := oldBlock;
+    LeaveScope;
+
+    if not (decfDoNotAddSymbol in AFlags) then
+      CurrentScope.DefineProcedure(Proc.Location, Proc.Name, Proc);
+    Result := Proc;
+  end;
 end;
 
-function TNPCSourceParser.ParseProcedureParameter(const AToken: TNPCToken): TNPC_ASTParameter;
+function TNPCSourceParser.ParseProcedureParameter(const AToken: TNPCToken; const AProcedureDecl: TNPC_ASTStatementProcedure; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
+const
+  sContext: Array[TNPC_ASTParamContext] of String = ('', 'return ');
 var
   token, next_token: TNPCToken;
   Modifier: TNPC_ASTParamModifier;
   Name: UTF8String;
   VarSym, TypeSym: TNPCSymbol;
-  Init: TNPC_ASTExpression;
+  Expr, Init: TNPC_ASTExpression;
   Value: Integer;
 begin
   Modifier := pmNone;
+  Name := '';
 
-  // const / var / out
-  if TokenIsReservedIdent(AToken, ri_const) then begin
-    Modifier := pmConst;
-    Texer.SkipToken;
-    SkipComments;
-    Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function', ' parameter definition'])).Value;
-  end
-  else if TokenIsReservedIdent(AToken, ri_var) then begin
-    Modifier := pmVar;
-    Texer.SkipToken;
-    SkipComments;
-    Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function', ' parameter definition'])).Value;
-  end
-  else if TokenIsReservedIdent(AToken, ri_out) then begin
-    Modifier := pmOut;
-    Texer.SkipToken;
-    SkipComments;
-    Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function', ' parameter definition'])).Value;
-  end
-  else if TokenIsIdent(AToken) then begin // no const / var / out, just param name
-    Name := AToken.Value;
-    Texer.SkipToken;
-    SkipComments;
-  end
-  else
-    raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserExpectedElementsButGot, ['const/var/out or param name', AToken.Value, 'procedure/function', ' parameter definition']));
+  if decfParamMayContainModifier in AFlags then begin // const / var / out
+    if TokenIsReservedIdent(AToken, ri_const) then begin
+      Modifier := pmConst;
+      Texer.SkipToken;
+      SkipComments;
+      Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function ', sContext[AContext] + 'parameter definition'])).Value;
+    end
+    else if TokenIsReservedIdent(AToken, ri_var) then begin
+      Modifier := pmVar;
+      Texer.SkipToken;
+      SkipComments;
+      Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function ', sContext[AContext] + 'parameter definition'])).Value;
+    end
+    else if TokenIsReservedIdent(AToken, ri_out) then begin
+      Modifier := pmOut;
+      Texer.SkipToken;
+      SkipComments;
+      Name := Texer.ExpectToken(tokIdent, Format(sParserExpectedElementsButGot, ['param name', AToken.Value, 'procedure/function ', sContext[AContext] + 'parameter definition'])).Value;
+    end
+    else if TokenIsIdent(AToken) then begin // no const / var / out, just param name
+      Name := AToken.Value;
+      Texer.SkipToken;
+      //SkipComments;
+    end
+    else
+      raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserExpectedElementsButGot, ['const/var/out or param name', AToken.Value, 'procedure/function ', sContext[AContext] + 'parameter definition']));
 
-  Texer.ExpectReservedSymbol(rs_Colon); // ':'
+    SkipComments;
+    Texer.ExpectReservedSymbol(rs_Colon); // ':'
+  end
+  else if decfParamDeclarationAsTuple in AFlags then begin
+    if TokenIsIdent(AToken) then begin // no const / var / out, just param name
+      Name := AToken.Value;
+      Texer.SkipToken;
+      //SkipComments;
+    end
+    else
+      raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserExpectedElementsButGot, ['const/var/out or param name', AToken.Value, 'procedure/function ', sContext[AContext] + 'parameter definition']));
+
+    SkipComments;
+    Texer.ExpectReservedSymbol(rs_Colon); // ':'
+  end;
+
   SkipComments;
 
   // get type
-  token := Texer.GetToken;
-  if (not TokenIsIdent(token) and not TokenIsReservedIdent(token)) or TokenIsLiteral(token) then
-    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownTypeFor, [token.Value, 'procedure/function', ' parameter definition']));
+  token := Texer.PeekToken;
+//  token := Texer.GetToken;
+//  if (not TokenIsIdent(token) and not TokenIsReservedIdent(token)) or TokenIsLiteral(token) then
+//    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownTypeFor, [token.Value, 'procedure/function ', sContext[AContext] + 'parameter definition']));
+  Expr := ParseExpression(token, 0);
+  if Expr = Nil then
+    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownTypeFor, [token.Value, 'procedure/function ', sContext[AContext] + 'parameter definition']));
 
-  TypeSym := CurrentScope.Resolve(token.Value);
+  if Expr is TNPC_ASTExpressionIdent then begin
+    if TNPC_ASTExpressionIdent(Expr).ResolvedSymbol <> Nil then
+      TypeSym := TNPC_ASTExpressionIdent(Expr).ResolvedSymbol
+    else begin
+      TypeSym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionIdent(Expr).Name);
+      if not Assigned(TypeSym) then
+        raise NPCSyntaxError.ParserError(Expr.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionIdent(Expr).Name, sContext[AContext], 'parameter definition']));
+      TNPC_ASTExpressionIdent(Expr).ResolvedSymbol := TypeSym;
+    end;
+    //ElemType := Sym.TypeRef;
+  end
+  else if expr is TNPC_ASTExpressionVariable then begin
+    TypeSym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionVariable(Expr).Name);
+    if not Assigned(TypeSym) then
+      raise NPCSyntaxError.ParserError(Expr.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(expr).Name, sContext[AContext], 'parameter definition']));
+    //ElemType := Sym.TypeRef;
+  end
+  else
+    raise NPCSyntaxError.ParserError(Expr.Location, Format(sParserTypeMismatchInLiteral, [sContext[AContext] + 'parameter definition', '<type>', Expr.ToString]));
+
+//  TypeSym := CurrentScope.ResolveSymbol(token.Value);
+//  if not Assigned(TypeSym) then
+//    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownIdentIn, [token.Value, sContext[AContext], 'parameter definition']));
 
   // get init value
   Init := Nil;
@@ -2831,27 +2894,53 @@ begin
   end;
 
   AToken.Location.SetEndRowCol(token.Location.EndRow, token.Location.EndCol);
+
   Value := -1;
-  case Modifier of
-    //pmNone: ;
-    pmConst: begin
-      if Init <> Nil then begin
-        if Init is TNPC_ASTExpressionNumber then begin
-          case TNPC_ASTExpressionNumber(Init).LiteralType.&Type of
-            AST_UNKNOWN: Value := StrToIntDef(TNPC_ASTExpressionNumber(Init).Value, -1);
-          end;
+  VarSym := nil;
+
+  if AContext = pcParam then begin
+    case Modifier of
+      //pmNone: ;
+      pmConst: begin
+        if Init <> Nil then begin
+          if Init is TNPC_ASTExpressionNumber then begin
+            case TNPC_ASTExpressionNumber(Init).LiteralType.&Type of
+              AST_UNKNOWN: Value := StrToIntDef(TNPC_ASTExpressionNumber(Init).Value, -1);
+            end;
+          end
+          else
+            raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserExpectedElementsButGot, ['number or string', token.Value, 'function', ' return variable']));
+
+          //VarSym := CurrentScope.DefineConst(TypeSym.Location, Name, TypeSym.&Type, TypeSym.Size, TypeSym.TypeRef, CurrentBlock, Value);
+          VarSym := TNPCSymbol.Create(AToken.Location, Name, skParam, TypeSym.&Type, True, TypeSym.TypeRef, CurrentBlock);
+          VarSym.ConstValue := Value;
         end
         else
-          raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserExpectedElementsButGot, ['number or string', token.Value, 'function', ' return variable']));
-        VarSym := CurrentScope.DefineConst(Name, TypeSym.&Type, TypeSym.Size, TypeSym.TypeRef, CurrentBlock, Value);
-      end
-      else
-        VarSym := CurrentScope.DefineConst(Name, TypeSym.&Type, TypeSym.Size, TypeSym.TypeRef, CurrentBlock, Value);
+          //VarSym := CurrentScope.DefineConst(TypeSym.Location, Name, TypeSym.&Type, TypeSym.Size, TypeSym.TypeRef, CurrentBlock, Value);
+          VarSym := TNPCSymbol.Create(AToken.Location, Name, skParam, TypeSym.&Type, True, TypeSym.TypeRef, CurrentBlock);
+      end;
+      //pmVar: ;
+      //pmOut: ;
+    else
+      //VarSym := CurrentScope.DefineVar(TypeSym.Location, Name, TypeSym.&Type, TypeSym.Size, TypeSym.TypeRef, CurrentBlock);
+      VarSym := TNPCSymbol.Create(AToken.Location, Name, skParam, TypeSym.&Type, False, TypeSym.TypeRef, CurrentBlock);
     end;
-    //pmVar: ;
-    //pmOut: ;
-  else
-    VarSym := CurrentScope.DefineVar(Name, TypeSym.&Type, TypeSym.Size, TypeSym.TypeRef, CurrentBlock);
+
+    if VarSym <> Nil then begin
+      CurrentScope.DefineSymbol(VarSym);
+      VarSym.Size := TypeSym.Size;
+    end;
+  end
+  else begin // RETURN VALUES - DO NOT DEFINE IN CURRENT SCOPE
+    // Instead, just create symbol WITHOUT registering
+    if Length(Name) = 0 then
+      Name := AProcedureDecl.Name;
+
+    VarSym := TNPCSymbol.Create(TypeSym.Location, Name, skReturn, TypeSym.&Type, False, TypeSym.TypeRef, CurrentBlock);
+    VarSym.Size := TypeSym.Size;
+
+    // optional: attach to function scope later
+    CurrentScope.DefineSymbol(VarSym);
   end;
 
   Result := TNPC_ASTParameter.Create(AToken.Location, Name, TypeSym.TypeRef, Modifier, Init);
@@ -2914,7 +3003,7 @@ begin
   if not (Left is TNPC_ASTExpressionVariable) then
     raise NPCSyntaxError.ParserError(ALeftToken.Location, Format(sParserLeftSideOfMustBe, ['assignment', 'variable']));
 
-  Sym := CurrentScope.Resolve(TNPC_ASTExpressionVariable(Left).Name);
+  Sym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionVariable(Left).Name);
   if not Assigned(Sym) then
 //    raise Exception.Create('Unknown variable: ' + TExprVariable(Left).Name);
     raise NPCSyntaxError.ParserError(TNPC_ASTExpressionVariable(Left).Location, Format(sParserUnknown, ['variable', TNPC_ASTExpressionVariable(Left).Name]));
@@ -3058,7 +3147,7 @@ begin
   end
   else begin
 //    Result := inheritedParseIdentifier(Name); // your old handling
-    Sym := CurrentScope.Resolve(Name);
+    Sym := CurrentScope.ResolveSymbol(Name);
     if Assigned(Sym) then begin
       case Sym.Kind of
         //skConst:
@@ -3089,11 +3178,11 @@ begin
     tokIdent: begin
       Texer.SkipToken;
       // an identifier may be followed by '(' (call) or '[' (index) and will be handled in infix
-      Sym := CurrentScope.Resolve(AToken.Value);
+      Sym := CurrentScope.ResolveSymbol(AToken.Value);
       if not Assigned(Sym) then begin
         token := Texer.PeekToken;
         if TokenIsReservedSymbol(token, rs_Assign) then
-          Sym := CurrentScope.DefineVar(AToken.Value, stUnresolved, -1, Nil, CurrentBlock) // we don't know what we are declaring for now
+          Sym := CurrentScope.DefineVar(AToken.Location, AToken.Value, stUnresolved, -1, Nil, CurrentBlock) // we don't know what we are declaring for now
         else
           raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnknown, ['identifier', AToken.Value]));
       end;
@@ -3105,7 +3194,7 @@ begin
     end;
     tokNumber: begin
       Texer.SkipToken;
-      Sym := CurrentScope.Resolve(AToken.Value);
+      Sym := CurrentScope.ResolveSymbol(AToken.Value);
       if not Assigned(Sym) then
         raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnknown, ['variable', AToken.Value]));
       Result := TNPC_ASTExpressionNumber.Create(AToken.Location, AToken.Value, Sym.TypeRef);
@@ -3160,7 +3249,7 @@ begin
         else if Elem is TNPC_ASTExpressionLiteral then
           ThisType := TNPC_ASTExpressionLiteral(Elem).LiteralType
         else if Elem is TNPC_ASTExpressionVariable then begin
-          Sym := CurrentScope.Resolve(TNPC_ASTExpressionVariable(Elem).Name);
+          Sym := CurrentScope.ResolveSymbol(TNPC_ASTExpressionVariable(Elem).Name);
           if not Assigned(Sym) then
             raise NPCSyntaxError.ParserError(Elem.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(Elem).Name, 'set declaration ', sStatement]));
           ThisType := Sym.TypeRef;
@@ -3217,7 +3306,7 @@ begin
 
   array_ident := TNPC_ASTExpressionVariable(ALeft).Name;
 
-  VarSym := CurrentScope.Resolve(array_ident);
+  VarSym := CurrentScope.ResolveSymbol(array_ident);
   if not Assigned(VarSym) or not (VarSym.TypeRef is TNPC_ASTTypeArray) then
     raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserTypeRequiredForIdent, ['array', array_ident, TNPC_ASTExpressionVariable(ALeft).ToString]));
 
@@ -3246,7 +3335,7 @@ begin
 
   record_ident := TNPC_ASTExpressionVariable(ALeft).Name;
 
-  VarSym := CurrentScope.Resolve(record_ident);
+  VarSym := CurrentScope.ResolveSymbol(record_ident);
   if not Assigned(VarSym) or not (VarSym.TypeRef is TNPC_ASTTypeRecord) then
     raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserTypeRequiredForIdent, ['record', record_ident, TNPC_ASTExpressionVariable(ALeft).ToString]));
 

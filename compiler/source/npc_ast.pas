@@ -31,7 +31,10 @@ type
     skType,
     skTypeAlias, // type alias
     skVar, // const
+    skParam,
+    skReturn,
     skTuple,
+    //skReturnTuple,
     skRecord,
     skProc,
     // class
@@ -59,6 +62,7 @@ type
 
   TNPCSymbol = class
   public
+    Location: TNPCLocation;
     Name: UTF8String;
     Kind: TNPCSymbolKind;
     &Type: TNPCSymbolType;
@@ -74,7 +78,7 @@ type
     // for declared procedures
     ProcDecl: TNPC_ASTStatementProcedure;
     //
-    constructor Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject);
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject);
     destructor Destroy; override;
   end;
 
@@ -96,6 +100,7 @@ type
     Parent: TNPCScope;
     //
 //    procedure Init;
+    procedure DuplicateSymbolError(const ASymbol, AExisting: TNPCSymbol);
   public
     constructor Create(AParent: TNPCScope);
     destructor Destroy; override;
@@ -105,22 +110,27 @@ type
 //    procedure Add(const AName: UTF8String; const ASymbol: TNPCSymbol);
 //    function TryGetValue(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
     //
-    procedure AddOrSetValue(const AName: UTF8String; ASymbol: TNPCSymbol);
-    function TryGetValue(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
-    function Resolve(const AName: UTF8String): TNPCSymbol;
+    procedure AddSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
+    procedure AddOrSetSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
     //
-    function DefineBuiltinType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
-    function DefineBuiltinTypeAlias(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
-    function DefineType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
-    function DefineTypeAlias(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
-    function DefineConst(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject; AValue: Integer): TNPCSymbol;
-    function DefineVar(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
-    function DefineTupleItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
-    function DefineRecordItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
-    function DefineProcedure(const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
-    function DefineClassField(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
-    function DefineClassMethod(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
-    function DefineClassProperty(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function FindLocal(const AName: UTF8String): TNPCSymbol;
+    function TryGetSymbol(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
+    function ResolveSymbol(const AName: UTF8String): TNPCSymbol;
+    //
+    //
+    function DefineBuiltinType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
+    function DefineBuiltinTypeAlias(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
+    function DefineType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineTypeAlias(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineConst(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject; AValue: Integer): TNPCSymbol;
+    function DefineVar(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineSymbol(const ASymbol: TNPCSymbol): TNPCSymbol;
+    function DefineTupleItem(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineRecordItem(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineProcedure(const ALocation: TNPCLocation; const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
+    function DefineClassField(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineClassMethod(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+    function DefineClassProperty(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
   end;
 
   TNPC_ASTTypes = (
@@ -760,6 +770,7 @@ type
     destructor Destroy; override;
   end;
 
+  TNPC_ASTParamContext = (pcParam, pcReturn);
   TNPC_ASTParamModifier = (pmNone, pmConst, pmVar, pmOut);
 
   TNPC_ASTParameter = class(TNPC_ASTStatementVariableDeclaration)
@@ -875,13 +886,31 @@ type
     destructor Destroy; override;
   end;
 
+function SymbolKindToString(Kind: TNPCSymbolKind): String;
+
 implementation
+
+uses
+  npc_error;
+
+function SymbolKindToString(Kind: TNPCSymbolKind): String;
+begin
+  case Kind of
+    skParam : Result := 'parameter';
+    skReturn: Result := 'return value';
+    skField : Result := 'field';
+    skMethod: Result := 'method';
+  else
+    Result := 'symbol';
+  end;
+end;
 
 { TNPCSymbol }
 
-constructor TNPCSymbol.Create(const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject);
+constructor TNPCSymbol.Create(const ALocation: TNPCLocation; const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject);
 begin
   inherited Create;
+  Location := ALocation;
   Name := AName;
   Kind := AKind;
   &Type := AType;
@@ -897,6 +926,7 @@ end;
 
 destructor TNPCSymbol.Destroy;
 begin
+  Location := Nil;
   Name := '';
   TypeRef := Nil;
 //  if TypeRef <> Nil then
@@ -931,105 +961,168 @@ begin
   inherited;
 end;
 
-procedure TNPCScope.AddOrSetValue(const AName: UTF8String; ASymbol: TNPCSymbol);
+procedure TNPCScope.DuplicateSymbolError(const ASymbol, AExisting: TNPCSymbol);
+var
+  Msg: String;
+begin
+  if AExisting <> Nil then begin
+    Msg := Format('Duplicate identifier "%s". Previously declared at line %d, col %d', [ASymbol.Name, AExisting.Location.StartRow, AExisting.Location.StartCol]);
+  end
+  else begin
+    Msg := Format('Duplicate identifier "%s"', [ASymbol.Name]);
+  end;
+
+  raise TNPCError.SemanticError(ASymbol.Location, Msg) at ReturnAddress;
+end;
+
+procedure TNPCScope.AddSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
+begin
+  Table.Add(AName, ASymbol);
+end;
+
+procedure TNPCScope.AddOrSetSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
 begin
   Table.AddOrSetValue(AName, ASymbol);
 end;
 
-function TNPCScope.TryGetValue(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
+function TNPCScope.FindLocal(const AName: UTF8String): TNPCSymbol;
+var
+  i: Integer;
+  Keys: TArray<UTF8String>;
+  Key: UTF8String;
+  Symbols: TArray<TNPCSymbol>;
+//  Symbol: TNPCSymbol;
+begin
+  Keys := Table.Keys.ToArray;
+  Symbols := Table.Values.ToArray;
+  try
+    for i := Length(Keys) - 1 downto 0 do begin
+      Key := Keys[i];
+      // Case sensitivity depends on your language
+      if SameText(Key, AName) then
+        Exit(Symbols[i]);
+    end;
+  finally
+    SetLength(Keys, 0);
+    SetLength(Symbols, 0);
+  end;
+
+  Result := Nil;
+
+// Other version - possibly faster
+//  if not Table.TryGetValue(AName, Result) then
+//    Result := Nil;
+end;
+
+function TNPCScope.TryGetSymbol(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
 begin
   Result := Table.TryGetValue(AName, ASymbol);
 end;
 
-function TNPCScope.Resolve(const AName: UTF8String): TNPCSymbol;
+function TNPCScope.ResolveSymbol(const AName: UTF8String): TNPCSymbol;
 begin
   if Table.TryGetValue(AName, Result) then
     Exit;
   if Assigned(Parent) then
-    Exit(Parent.Resolve(AName));
+    Exit(Parent.ResolveSymbol(AName));
   Result := Nil;
 end;
 
-function TNPCScope.DefineBuiltinType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
+function TNPCScope.DefineBuiltinType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skBuiltinType, AType, False, ATypeRef, Nil);
+  Result := TNPCSymbol.Create(ALocation, AName, skBuiltinType, AType, False, ATypeRef, Nil);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineBuiltinTypeAlias(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
+function TNPCScope.DefineBuiltinTypeAlias(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skBuiltinTypeAlias, AType, False, ATypeRef, Nil);
+  Result := TNPCSymbol.Create(ALocation, AName, skBuiltinTypeAlias, AType, False, ATypeRef, Nil);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineType(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skType, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skType, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineTypeAlias(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineTypeAlias(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skTypeAlias, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skTypeAlias, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineConst(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject; AValue: Integer): TNPCSymbol;
+function TNPCScope.DefineConst(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject; AValue: Integer): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skVar, AType, True, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skVar, AType, True, ATypeRef, ADecl);
   Result.Size := ASize;
   Result.ConstValue := AValue;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineVar(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineVar(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skVar, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skVar, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineTupleItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineSymbol(const ASymbol: TNPCSymbol): TNPCSymbol;
+var
+  Existing: TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skTuple, AType, False, ATypeRef, ADecl);
+  Existing := FindLocal(ASymbol.Name);
+
+  if Existing <> Nil then begin
+    if not ((Existing.Kind = skParam) and (ASymbol.Kind = skReturn)) or ((Existing.Kind = skReturn) and (ASymbol.Kind = skParam)) then
+      DuplicateSymbolError(ASymbol, Existing);
+  end;
+
+  AddSymbol(ASymbol.Name, ASymbol);
+  Result := ASymbol;
+end;
+
+function TNPCScope.DefineTupleItem(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+begin
+  Result := TNPCSymbol.Create(ALocation, AName, skTuple, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineRecordItem(const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineRecordItem(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skRecord, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skRecord, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineProcedure(const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
+function TNPCScope.DefineProcedure(const ALocation: TNPCLocation; const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skProc, stProcedure, False, Nil, AProcedure);
+  Result := TNPCSymbol.Create(ALocation, AName, skProc, stProcedure, False, Nil, AProcedure);
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineClassField(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineClassField(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skField, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skField, AType, False, ATypeRef, ADecl);
 //  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineClassMethod(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineClassMethod(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skMethod, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skMethod, AType, False, ATypeRef, ADecl);
 //  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
-function TNPCScope.DefineClassProperty(const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
+function TNPCScope.DefineClassProperty(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(AName, skProperty, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, skProperty, AType, False, ATypeRef, ADecl);
 //  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
@@ -1502,7 +1595,7 @@ end;
 function TNPC_ASTExpressionVariable.Eval(Scope: TNPCScope): TNPC_ASTValue;
 begin
   if not Assigned(Symbol) then
-    Symbol := Scope.Resolve(Name);
+    Symbol := Scope.ResolveSymbol(Name);
   Result := Symbol.ConstValue;
 end;
 
@@ -2018,8 +2111,9 @@ end;
 destructor TNPC_ASTStatementVariableDeclaration.Destroy;
 begin
   Name := '';
-  if DeclaredType <> Nil then
-    DeclaredType.Free;
+  DeclaredType := Nil;
+//  if DeclaredType <> Nil then
+//    DeclaredType.Free;
   if Init <> Nil then
     Init.Free;
   SymbolRef := Nil;

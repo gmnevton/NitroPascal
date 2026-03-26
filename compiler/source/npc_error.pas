@@ -15,6 +15,8 @@ uses
 
 type
   TNPCError = class(Exception)
+  private
+    procedure AddSourceLines(var ALines: String);
   public
     Location: TNPCLocation;
 //    constructor Create(const ALocation: TNPCLocation; const AError: String); reintroduce;
@@ -22,8 +24,10 @@ type
     constructor CompilerError(const AError: String);
     constructor LexerError(const ALocation: TNPCLocation; const AError: String);
     constructor ParserError(const ALocation: TNPCLocation; const AError: String);
+    constructor SemanticError(const ALocation: TNPCLocation; const AError: String);
     constructor NotSupportedError(const ALocation: TNPCLocation; const AError: String);
     constructor ProjectError(const AError: String);
+    //
     destructor Destroy; override;
   end;
 
@@ -429,6 +433,11 @@ end;
 //  Create(ALocation, Format(Msg, Args));
 //end;
 
+procedure TNPCError.AddSourceLines(var ALines: String);
+begin
+  ALines := ALines + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
+end;
+
 constructor TNPCError.CompilerError(const AError: String);
 begin
   inherited CreateFmt(sErrorBase, ['CompilerError', AError]);
@@ -440,7 +449,7 @@ var
 begin
   Location := ALocation;
   temp := Format(sErrorBaseEx, [Location.ToString, 'LexerError', AError]);
-  temp := temp + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
+  AddSourceLines(temp);
   inherited Create(temp);
 end;
 
@@ -450,7 +459,17 @@ var
 begin
   Location := ALocation;
   temp := Format(sErrorBaseEx, [Location.ToString, 'ParserError', AError]);
-  temp := temp + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
+  AddSourceLines(temp);
+  inherited Create(temp);
+end;
+
+constructor TNPCError.SemanticError(const ALocation: TNPCLocation; const AError: String);
+var
+  temp: String;
+begin
+  Location := ALocation;
+  temp := Format(sErrorBaseEx, [Location.ToString, 'SemanticError', AError]);
+  AddSourceLines(temp);
   inherited Create(temp);
 end;
 
@@ -460,7 +479,7 @@ var
 begin
   Location := ALocation;
   temp := Format(sErrorBaseEx, [Location.ToString, 'NotSupportedError', AError]);
-  temp := temp + #13#10#13#10 + GetSourceCodeLines(Location, iShowSourceCodeLines);
+  AddSourceLines(temp);
   inherited Create(temp);
 end;
 
