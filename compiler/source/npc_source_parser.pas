@@ -195,6 +195,7 @@ type
     function  ParseTypeDefinition(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
     //function  ParseTypeReference: TNPC_ASTType;
     function  ParseTypeReference: TNPC_ASTTypeReference;
+    function  IsFunctionTypeAhead(const AToken: TNPCToken): Boolean;
     function  ParseTypeReference_NamedType(const AToken: TNPCToken): TNPC_ASTTypeReference;
     function  ParseTypeReference_ArrayType(const AToken: TNPCToken): TNPC_ASTTypeReference;
     function  ParseTypeReference_RecordType(const AToken: TNPCToken): TNPC_ASTTypeReference;
@@ -1938,7 +1939,7 @@ end;
 *)
 function TNPCSourceParser.ParseTypeReference: TNPC_ASTTypeReference;
 var
-  token, next_token: TNPCToken;
+  token: TNPCToken;
   TypeSym: TNPCSymbol;
   TypeRef: TNPC_ASTTypeReference;
 begin
@@ -1949,12 +1950,59 @@ begin
   if TokenIsReservedIdent(token, ri_record) then
     Exit(ParseTypeReference_RecordType(token));
 
-  next_token := Texer.NextToken;
-  if (TokenIsIdent(token) and TokenIsReservedSymbol(next_token, rs_OParen)) or TokenIsIdent(token) then
+  if IsFunctionTypeAhead(token) then
     Exit(ParseTypeReference_FunctionType(token));
 
   Result := ParseTypeReference_NamedType(token); // fallback
 end;
+
+function TNPCSourceParser.IsFunctionTypeAhead(const AToken: TNPCToken): Boolean;
+var
+  token, next_token: TNPCToken;
+  Depth: Integer;
+  i: Integer;
+begin
+  Result := False;
+
+  if not TokenIsIdent(AToken) then
+    Exit;
+
+  next_token := Texer.NextToken;
+
+  // must be IDENT '('
+  if not TokenIsReservedSymbol(next_token, rs_OParen) then
+    Exit;
+
+  // scan (...) safely
+  Depth := 0;
+  i := 1;
+  repeat
+    token := Texer.PeekToken(i);
+
+    if TokenIsReservedSymbol(token, rs_OParen) then
+      Inc(Depth)
+    else if TokenIsReservedSymbol(token, rs_CParen) then begin
+      Dec(Depth);
+      if Depth = 0 then begin // after ')' we may have ':' (for function) or not (for procedure)
+        token := Texer.PeekToken(i + 1);
+
+        if TokenIsReservedSymbol(token, rs_Colon) or
+           TokenIsReservedSymbol(token, rs_Semicolon) or
+           TokenIsReservedSymbol(token, rs_Comma) then
+          Exit(True)
+        else
+          Exit(True); // still valid procedure type
+      end;
+    end;
+
+    Inc(i);
+  until Texer.IsEmpty;
+
+//  Result := True;
+end;
+
+//  next_token := Texer.NextToken;
+//  if (TokenIsIdent(token) and TokenIsReservedSymbol(next_token, rs_OParen)) or TokenIsIdent(token) then
 
 //  token := Texer.ExpectToken(tokIdent, 'type name expected');
 //
