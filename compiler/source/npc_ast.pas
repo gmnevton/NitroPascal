@@ -22,44 +22,49 @@ type
 
   TNPC_ASTType = class;
   TNPC_ASTTypeClassProperty = class;
-  TNPC_ASTStatementProcedure = class;
 
   TNPC_ASTExpression = class;
 
+  TNPC_ASTParameter = class;
+  TNPC_ASTStatementProcedure = class;
+
   TNPCSymbolKind = (
-    skBuiltinType,
-    skBuiltinTypeAlias, // builtin-type alias
-    skType,
-    skTypeAlias, // type alias
-    skVar, // const
-    skParam,
-    skReturn,
-    skTuple,
-    //skReturnTuple,
-    skRecord,
-    skRecordField,
-    skProc,
+    KIND_BuiltinType,
+    KIND_BuiltinTypeAlias, // builtin-type alias
+    KIND_Type,
+    KIND_TypeAlias, // type alias
+    KIND_Var, // const
+    KIND_Param,
+    KIND_Return,
+    KIND_Tuple,
+    //KIND_ReturnTuple,
+    KIND_Record,
+    KIND_RecordField,
+    KIND_Proc,
     // class
-    skField,
-    skMethod,
-    skProperty
+    KIND_Field,
+    KIND_Method,
+    KIND_Property
   );
 
   TNPCSymbolType = (
-    stUnresolved,
-    stEnum, // ( e1, e2, ... )
-    stEnumConst, // e1, e2, ...
-    stSet, // [ s1, s2, s3..s4, ... ]
-    stSetConst, // s1, s2, ...
-    stBitSet, // 64 bit int
-    stArray, // array[] of ...
-    stRecord, // record ... end
-    stRecordField, // ident: ident
-    stClass, // class ... end
-    stPointer, // 32 / 64 bit value
-    stLiteral, // ident / number / string / char
-    stProcedure, // pointer
-    stForeignFunction // pointer
+    TYPE_Unresolved,
+    TYPE_Enum, // ( e1, e2, ... )
+    TYPE_EnumConst, // e1, e2, ...
+    TYPE_Set, // [ s1, s2, s3..s4, ... ]
+    TYPE_SetConst, // s1, s2, ...
+    TYPE_BitSet, // 64 bit int
+    TYPE_Array, // array[] of ...
+    TYPE_Record, // record ... end
+    TYPE_RecordField, // ident: ident
+    TYPE_Class, // class ... end
+//    TYPE_ClassField, // class.field
+//    TYPE_ClassMethod, // class.method
+//    TYPE_ClassProperty, // class.property
+    TYPE_Pointer, // 32 / 64 bit value
+    TYPE_Literal, // ident / number / string / char
+    TYPE_Procedure, // pointer
+    TYPE_ForeignFunction // pointer
   );
 
   TNPCSymbol = class
@@ -72,6 +77,7 @@ type
     PropInfo: TNPC_ASTTypeClassProperty;
     DeclNode: TObject; // pointer/reference to the declaration AST node (optional)
     Size: Integer;
+    Offset: Integer; // class/record field offset
     IsConst: Boolean;
     ConstValue: TNPC_ASTValue; // used if Kind=skDecl and IsConst=True
     //
@@ -80,7 +86,8 @@ type
     // for declared procedures
     ProcDecl: TNPC_ASTStatementProcedure;
     //
-    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject);
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; AKind: TNPCSymbolKind; AType: TNPCSymbolType; AConst: Boolean; ATypeRef: TNPC_ASTType; ADecl: TObject); overload;
+    constructor Create(AParam: TNPC_ASTParameter; const AKind: TNPCSymbolKind; AType: TNPCSymbolType; ADecl: TObject); overload;
     destructor Destroy; override;
   end;
 
@@ -222,8 +229,8 @@ type
   TNPC_ByteCode = TBytes;
 
   TNPC_AstFlags = (
-    AST_Parenthesized = $1,
-    AST_ForEachBinaryOperation = $2
+    FLAG_Parenthesized = $1,
+    FLAG_ForEachBinaryOperation = $2
   );
 
   TNPC_AST = class
@@ -454,13 +461,14 @@ type
   TNPC_ASTTypeClass = class(TNPC_ASTType)
   public
     // &Type = AST_TYPE_CLASS
+    Name: UTF8String;
     Fields: TDictionary<UTF8String, TNPC_ASTType>; // TClassField
     Methods: TObjectList<TNPC_ASTTypeClassMethod>; // TClassMethod     TNPC_ASTExpressionCall = class(TNPC_ASTExpression)
     //Methods: TDictionary<UTF8String, TNPC_ASTExpression>;
     Properties: TObjectList<TNPC_ASTTypeClassProperty>;
     //
-    constructor Create(const ALocation: TNPCLocation); overload; override;
-    constructor Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTTypeClassMethod>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>); reintroduce; overload;
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String); reintroduce; overload;
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTTypeClassMethod>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>); reintroduce; overload;
     //constructor Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TDictionary<UTF8String, TNPC_ASTExpression>; TObjectList<TNPC_ASTTypeClassProperty>); reintroduce; overload;
     destructor Destroy; override;
     //
@@ -748,6 +756,7 @@ type
   end;
 
   TNPC_BlockFlag = (
+    BLOCK_DescribesOnlyProcedureSignature,
     BLOCK_ConsistsOfOrderedStatements,
     BLOCK_DoesNotHaveResult,
     BLOCK_BelongsToLoop,
@@ -932,10 +941,10 @@ uses
 function SymbolKindToString(Kind: TNPCSymbolKind): String;
 begin
   case Kind of
-    skParam : Result := 'parameter';
-    skReturn: Result := 'return value';
-    skField : Result := 'field';
-    skMethod: Result := 'method';
+    KIND_Param : Result := 'parameter';
+    KIND_Return: Result := 'return value';
+    KIND_Field : Result := 'field';
+    KIND_Method: Result := 'method';
   else
     Result := 'symbol';
   end;
@@ -960,22 +969,27 @@ begin
   ProcDecl := Nil;
 end;
 
+constructor TNPCSymbol.Create(AParam: TNPC_ASTParameter; const AKind: TNPCSymbolKind; AType: TNPCSymbolType; ADecl: TObject);
+begin
+  Create(AParam.Location, AParam.Name, AKind, AType, AParam.Modifier = pmConst, AParam.DeclaredType, ADecl);
+end;
+
 destructor TNPCSymbol.Destroy;
 begin
   Location := Nil;
   Name := '';
   TypeRef := Nil;
 //  if TypeRef <> Nil then
-//    TypeRef.Free;
+//    FreeAndNil(TypeRef);
   PropInfo := Nil;
 //  if PropInfo <> Nil then
-//    PropInfo.Free;
+//    FreeAndNil(PropInfo);
   DeclNode := Nil;
   ConstValue := Unassigned;
   if ValueExpr <> Nil then
-    ValueExpr.Free;
+    FreeAndNil(ValueExpr);
   if ProcDecl <> Nil then
-    ProcDecl.Free;
+    FreeAndNil(ProcDecl);
   inherited;
 end;
 
@@ -993,7 +1007,7 @@ var
 begin
   for Symbol in Table.Values do
     Symbol.Free;
-  Table.Free;
+  FreeAndNil(Table);
   inherited;
 end;
 
@@ -1066,35 +1080,35 @@ end;
 
 function TNPCScope.DefineBuiltinType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skBuiltinType, AType, False, ATypeRef, Nil);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_BuiltinType, AType, False, ATypeRef, Nil);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineBuiltinTypeAlias(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skBuiltinTypeAlias, AType, False, ATypeRef, Nil);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_BuiltinTypeAlias, AType, False, ATypeRef, Nil);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skType, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Type, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineTypeAlias(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skTypeAlias, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_TypeAlias, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineConst(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject; AValue: Integer): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skVar, AType, True, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Var, AType, True, ATypeRef, ADecl);
   Result.Size := ASize;
   Result.ConstValue := AValue;
   Table.Add(AName, Result);
@@ -1102,7 +1116,7 @@ end;
 
 function TNPCScope.DefineVar(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skVar, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Var, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
@@ -1114,7 +1128,7 @@ begin
   Existing := FindLocal(ASymbol.Name);
 
   if Existing <> Nil then begin
-    if not ((Existing.Kind = skParam) and (ASymbol.Kind = skReturn)) or ((Existing.Kind = skReturn) and (ASymbol.Kind = skParam)) then
+    if not ((Existing.Kind = KIND_Param) and (ASymbol.Kind = KIND_Return)) or ((Existing.Kind = KIND_Return) and (ASymbol.Kind = KIND_Param)) then
       DuplicateSymbolError(ASymbol, Existing);
   end;
 
@@ -1124,41 +1138,41 @@ end;
 
 function TNPCScope.DefineTupleItem(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skTuple, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Tuple, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineRecordItem(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skRecord, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Record, AType, False, ATypeRef, ADecl);
   Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineProcedure(const ALocation: TNPCLocation; const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skProc, stProcedure, False, Nil, AProcedure);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Proc, TYPE_Procedure, False, Nil, AProcedure);
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineClassField(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skField, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Field, AType, False, ATypeRef, ADecl);
 //  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineClassMethod(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skMethod, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Method, AType, False, ATypeRef, ADecl);
 //  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
 
 function TNPCScope.DefineClassProperty(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ATypeRef: TNPC_ASTType; ADecl: TObject): TNPCSymbol;
 begin
-  Result := TNPCSymbol.Create(ALocation, AName, skProperty, AType, False, ATypeRef, ADecl);
+  Result := TNPCSymbol.Create(ALocation, AName, KIND_Property, AType, False, ATypeRef, ADecl);
 //  Result.Size := ASize;
   Table.Add(AName, Result);
 end;
@@ -1198,7 +1212,7 @@ end;
 destructor TNPC_ASTExpression.Destroy;
 begin
   EndToken := Nil;
-  InferredType.Free;
+  FreeAndNil(InferredType);
   inherited;
 end;
 
@@ -1250,16 +1264,16 @@ destructor TNPC_ASTTypeReference.Destroy;
 begin
   BaseSymbol := Nil;
   if GenericArgs <> Nil then
-    GenericArgs.Free;
+    FreeAndNil(GenericArgs);
   ElementType := Nil;
   // REF_Record
   if Fields <> Nil then
-    Fields.Free;
+    FreeAndNil(Fields);
   // REF_Function
   if Params <> Nil then
-    Params.Free;
+    FreeAndNil(Params);
   if ReturnType <> Nil then
-    ReturnType.Free;
+    FreeAndNil(ReturnType);
   inherited;
 end;
 
@@ -1286,13 +1300,13 @@ destructor TNPC_ASTTypeDefinition.Destroy;
 begin
   Name := '';
   if EnumDescription <> Nil then
-    EnumDescription.Free;
+    FreeAndNil(EnumDescription);
   if SetDescription <> Nil then
-    SetDescription.Free;
+    FreeAndNil(SetDescription);
   if ArrayDescription <> Nil then
-    ArrayDescription.Free;
+    FreeAndNil(ArrayDescription);
   if RecordDescription <> Nil then
-    RecordDescription.Free;
+    FreeAndNil(RecordDescription);
   inherited;
 end;
 
@@ -1335,8 +1349,8 @@ destructor TNPC_ASTTypeEnum.Destroy;
 //  Member: Integer;
 begin
 //  for Member in Members.Values do
-//    Member.Free;
-  Members.Free;
+//    FreeAndNil(Member);
+  FreeAndNil(Members);
   inherited;
 end;
 
@@ -1360,10 +1374,10 @@ var
   i: Integer;
 begin
   if ElementType <> Nil then
-    ElementType.Free;
+    FreeAndNil(ElementType);
   for i := 0 to Elements.Count - 1 do
     Elements.Items[i].Free;
-  Elements.Free;
+  FreeAndNil(Elements);
   inherited;
 end;
 
@@ -1409,7 +1423,7 @@ var
 begin
   for Element in Elements.Values do
     Element.Free;
-  Elements.Free;
+  FreeAndNil(Elements);
   inherited;
 end;
 
@@ -1433,7 +1447,7 @@ var
 begin
   for Field in Fields.Values do
     Field.Free;
-  Fields.Free;
+  FreeAndNil(Fields);
   inherited;
 end;
 
@@ -1465,7 +1479,7 @@ destructor TNPC_ASTTypeClassMethod.Destroy;
 begin
   Name := '';
   if Expr <> Nil then
-    Expr.Free;
+    FreeAndNil(Expr);
   inherited;
 end;
 
@@ -1510,13 +1524,13 @@ destructor TNPC_ASTTypeClassProperty.Destroy;
 begin
   Name := '';
   if PropertyType <> Nil then
-    PropertyType.Free;
+    FreeAndNil(PropertyType);
   //
   ReadField := Nil;;
   WriteField := Nil;
   //
-  InitExpr.Free;    // unified representation
-  DefaultExpr.Free; // optional
+  FreeAndNil(InitExpr);    // unified representation
+  FreeAndNil(DefaultExpr); // optional
   inherited;
 end;
 
@@ -1527,19 +1541,19 @@ end;
 
 { TNPC_ASTTypeClass }
 
-constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation);
+constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation; const AName: UTF8String);
 begin
   inherited Create(ALocation);
   &Type := AST_TYPE_CLASS;
+  Name := AName;
   Fields := Nil;
   Methods := Nil;
   Properties := Nil;
 end;
 
-constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTTypeClassMethod>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>);
-//constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TDictionary<UTF8String, TNPC_ASTExpression>; AProperties: TDictionary<UTF8String, TNPC_ASTTypeClassProperty>);
+constructor TNPC_ASTTypeClass.Create(const ALocation: TNPCLocation; const AName: UTF8String; AFields: TDictionary<UTF8String, TNPC_ASTType>; AMethods: TObjectList<TNPC_ASTTypeClassMethod>; AProperties: TObjectList<TNPC_ASTTypeClassProperty>);
 begin
-  Create(ALocation);
+  Create(ALocation, AName);
   Fields := AFields;
   Methods := AMethods;
   Properties := AProperties;
@@ -1547,9 +1561,9 @@ end;
 
 destructor TNPC_ASTTypeClass.Destroy;
 begin
-  Fields.Free;
-  Methods.Free;
-  Properties.Free;
+  FreeAndNil(Fields);
+  FreeAndNil(Methods);
+  FreeAndNil(Properties);
   inherited;
 end;
 
@@ -1573,7 +1587,7 @@ begin
   Value := '';
   LiteralType := Nil;
 //  if (LiteralType <> Nil) and (TNPC_ASTTypeDefinition(LiteralType). = ) then
-//    LiteralType.Free;
+//    FreeAndNil(LiteralType);
   inherited;
 end;
 
@@ -1597,7 +1611,7 @@ destructor TNPC_ASTExpressionEnumConst.Destroy;
 begin
   Name := '';
   if EnumType <> Nil then
-    EnumType.Free;
+    FreeAndNil(EnumType);
   inherited;
 end;
 
@@ -1621,10 +1635,10 @@ var
   i: Integer;
 begin
   if ElementType <> Nil then
-    ElementType.Free;
+    FreeAndNil(ElementType);
   for i := 0 to Elements.Count - 1 do
     Elements.Items[i].Free;
-  Elements.Free;
+  FreeAndNil(Elements);
   inherited;
 end;
 
@@ -1643,10 +1657,10 @@ var
   i: Integer;
 begin
   if SetType <> Nil then
-    SetType.Free;
+    FreeAndNil(SetType);
   for i := 0 to Elements.Count - 1 do
     Elements.Items[i].Free;
-  Elements.Free;
+  FreeAndNil(Elements);
   inherited;
 end;
 
@@ -1669,7 +1683,7 @@ destructor TNPC_ASTExpressionVariable.Destroy;
 begin
   Name := '';
   if Symbol <> Nil then
-    Symbol.Free;
+    FreeAndNil(Symbol);
   inherited;
 end;
 
@@ -1699,7 +1713,7 @@ destructor TNPC_ASTExpressionIdent.Destroy;
 begin
   Name := '';
   if ResolvedSymbol <> Nil then
-    ResolvedSymbol.Free;
+    FreeAndNil(ResolvedSymbol);
   inherited;
 end;
 
@@ -1722,7 +1736,7 @@ destructor TNPC_ASTExpressionNumber.Destroy;
 begin
   Value := '';
   if LiteralType <> Nil then
-    LiteralType.Free;
+    FreeAndNil(LiteralType);
   inherited;
 end;
 
@@ -1765,7 +1779,7 @@ destructor TNPC_ASTExpressionUnary.Destroy;
 begin
   Op := '';
   if Right <> Nil then
-    Right.Free;
+    FreeAndNil(Right);
   inherited;
 end;
 
@@ -1789,9 +1803,9 @@ destructor TNPC_ASTExpressionBinary.Destroy;
 begin
   Op := '';
   if Left <> Nil then
-    Left.Free;
+    FreeAndNil(Left);
   if Right <> Nil then
-    Right.Free;
+    FreeAndNil(Right);
   inherited;
 end;
 
@@ -1813,9 +1827,9 @@ end;
 destructor TNPC_ASTExpressionAssign.Destroy;
 begin
   if Target <> Nil then
-    Target.Free;
+    FreeAndNil(Target);
   if ValueExpr <> Nil then
-    ValueExpr.Free;
+    FreeAndNil(ValueExpr);
   inherited;
 end;
 
@@ -1844,11 +1858,11 @@ end;
 destructor TNPC_ASTExpressionIf.Destroy;
 begin
   if Cond <> Nil then
-    Cond.Free;
+    FreeAndNil(Cond);
   if ThenExpr <> Nil then
-    ThenExpr.Free;
+    FreeAndNil(ThenExpr);
   if ElseExpr <> Nil then
-    ElseExpr.Free;
+    FreeAndNil(ElseExpr);
   inherited;
 end;
 
@@ -1881,9 +1895,9 @@ var
 begin
   for i := 0 to IfValues.Count - 1 do
     IfValues.Items[i].Free;
-  IfValues.Free;
+  FreeAndNil(IfValues);
   if ResultExpr <> Nil then
-    ResultExpr.Free;
+    FreeAndNil(ResultExpr);
   inherited;
 end;
 
@@ -1901,11 +1915,11 @@ end;
 destructor TNPC_ASTExpressionCase.Destroy;
 begin
   if Selector <> Nil then
-    Selector.Free;
+    FreeAndNil(Selector);
   if Branches <> Nil then
-    Branches.Free;
+    FreeAndNil(Branches);
   if DefaultExpr <> Nil then
-    DefaultExpr.Free;
+    FreeAndNil(DefaultExpr);
   inherited;
 end;
 
@@ -1954,9 +1968,9 @@ end;
 destructor TNPC_ASTExpressionInOp.Destroy;
 begin
   if Left <> Nil then
-    Left.Free;
+    FreeAndNil(Left);
   if Right <> Nil then
-    Right.Free;
+    FreeAndNil(Right);
   inherited;
 end;
 
@@ -1979,11 +1993,11 @@ end;
 destructor TNPC_ASTExpressionArray.Destroy;
 begin
   if Base <> Nil then
-    Base.Free;
+    FreeAndNil(Base);
   if Index <> Nil then
-    Index.Free;
+    FreeAndNil(Index);
   if ElemType <> Nil then
-    ElemType.Free;
+    FreeAndNil(ElemType);
   inherited;
 end;
 
@@ -2006,10 +2020,10 @@ end;
 destructor TNPC_ASTExpressionRecord.Destroy;
 begin
   if Base <> Nil then
-    Base.Free;
+    FreeAndNil(Base);
   FieldName := '';
   if FieldType <> Nil then
-    FieldType.Free;
+    FreeAndNil(FieldType);
   inherited;
 end;
 
@@ -2033,10 +2047,10 @@ var
   i: Integer;
 begin
   if Callee <> Nil then
-    Callee.Free;
+    FreeAndNil(Callee);
   for i := 0 to Args.Count - 1 do
     Args.Items[i].Free;
-  Args.Free;
+  FreeAndNil(Args);
   inherited;
 end;
 
@@ -2059,10 +2073,10 @@ end;
 destructor TNPC_ASTExpressionMember.Destroy;
 begin
   if Owner <> Nil then
-    Owner.Free;
+    FreeAndNil(Owner);
   Member := '';
   if MemberType <> Nil then
-    MemberType.Free;
+    FreeAndNil(MemberType);
   inherited;
 end;
 
@@ -2084,9 +2098,9 @@ end;
 destructor TNPC_ASTExpressionIndex.Destroy;
 begin
   if Target <> Nil then
-    Target.Free;
+    FreeAndNil(Target);
   if Index <> Nil then
-    Index.Free;
+    FreeAndNil(Index);
   inherited;
 end;
 
@@ -2132,7 +2146,7 @@ begin
   ParentBlock := Nil;
   for i := 0 to Statements.Count - 1 do
     Statements.Items[i].Free;
-  Statements.Free;
+  FreeAndNil(Statements);
   inherited;
 end;
 
@@ -2155,7 +2169,7 @@ end;
 destructor TNPC_ASTStatementExpression.Destroy;
 begin
   if Expression <> Nil then
-    Expression.Free;
+    FreeAndNil(Expression);
   inherited;
 end;
 
@@ -2173,7 +2187,7 @@ destructor TNPC_ASTStatementTypeDeclaration.Destroy;
 begin
   Name := '';
   if DeclaredType <> Nil then
-    DeclaredType.Free;
+    FreeAndNil(DeclaredType);
   inherited;
 end;
 
@@ -2194,12 +2208,12 @@ begin
   Name := '';
   DeclaredType := Nil;
 //  if DeclaredType <> Nil then
-//    DeclaredType.Free;
+//    FreeAndNil(DeclaredType);
   if Init <> Nil then
-    Init.Free;
+    FreeAndNil(Init);
   SymbolRef := Nil;
 //  if SymbolRef <> Nil then
-//    SymbolRef.Free;
+//    FreeAndNil(SymbolRef);
   inherited;
 end;
 
@@ -2234,15 +2248,15 @@ begin
   Name := '';
   for i := 0 to Parameters.Count - 1 do
     Parameters.Items[i].Free;
-  Parameters.Free;
+  FreeAndNil(Parameters);
   if Returns <> Nil then begin
     for i := 0 to Returns.Count - 1 do
       Returns.Items[i].Free;
-    Returns.Free;
+    FreeAndNil(Returns);
   end;
-//  Body := Nil;
-  if Body <> Nil then
-    Body.Free;
+  Body := Nil;
+//  if Body <> Nil then
+//    FreeAndNil(Body);
   inherited;
 end;
 
@@ -2260,7 +2274,7 @@ destructor TNPC_ASTStatementLabel.Destroy;
 begin
   Ident := '';
   if Statement <> Nil then
-    Statement.Free;
+    FreeAndNil(Statement);
   inherited;
 end;
 
@@ -2277,9 +2291,9 @@ end;
 destructor TNPC_ASTStatementAssign.Destroy;
 begin
   if Target <> Nil then
-    Target.Free;
+    FreeAndNil(Target);
   if Value <> Nil then
-    Value.Free;
+    FreeAndNil(Value);
   inherited;
 end;
 
@@ -2296,9 +2310,9 @@ end;
 destructor TNPC_ASTStatementMultiAssign.Destroy;
 begin
   if Targets <> Nil then
-    Targets.Free;
+    FreeAndNil(Targets);
   if Value <> Nil then
-    Value.Free;
+    FreeAndNil(Value);
   inherited;
 end;
 
@@ -2316,11 +2330,11 @@ end;
 destructor TNPC_ASTStatementIf.Destroy;
 begin
   if Cond <> Nil then
-    Cond.Free;
+    FreeAndNil(Cond);
   if ThenStmt <> Nil then
-    ThenStmt.Free;
+    FreeAndNil(ThenStmt);
   if ElseStmt <> Nil then
-    ElseStmt.Free;
+    FreeAndNil(ElseStmt);
   inherited;
 end;
 
@@ -2338,9 +2352,9 @@ var
 begin
   for i := 0 to IfValues.Count - 1 do
     IfValues.Items[i].Free;
-  IfValues.Free;
+  FreeAndNil(IfValues);
   if Stmt <> Nil then
-    Stmt.Free;
+    FreeAndNil(Stmt);
   inherited;
 end;
 
@@ -2358,11 +2372,11 @@ end;
 destructor TNPC_ASTStatementCase.Destroy;
 begin
   if Selector <> Nil then
-    Selector.Free;
+    FreeAndNil(Selector);
   if Branches <> Nil then
-    Branches.Free;
+    FreeAndNil(Branches);
   if DefaultStmt <> Nil then
-    DefaultStmt.Free;
+    FreeAndNil(DefaultStmt);
   inherited;
 end;
 
@@ -2384,13 +2398,13 @@ destructor TNPC_ASTStatementFor.Destroy;
 begin
 //  VarName := '';
   if InitStmt <> Nil then
-    InitStmt.Free;
+    FreeAndNil(InitStmt);
   if CondExpr <> Nil then
-    CondExpr.Free;
+    FreeAndNil(CondExpr);
   if EndExpr <> Nil then
-    EndExpr.Free;
+    FreeAndNil(EndExpr);
   if Body <> Nil then
-    Body.Free;
+    FreeAndNil(Body);
   inherited;
 end;
 
@@ -2407,9 +2421,9 @@ end;
 destructor TNPC_ASTStatementWhile.Destroy;
 begin
   if Cond <> Nil then
-    Cond.Free;
+    FreeAndNil(Cond);
   if Body <> Nil then
-    Body.Free;
+    FreeAndNil(Body);
   inherited;
 end;
 

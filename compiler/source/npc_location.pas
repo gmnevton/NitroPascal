@@ -26,8 +26,11 @@ type
     constructor Create(const AFileName: String; const ARow, ACol: Integer);
     destructor Destroy; override;
     //
-    procedure SetEndRowCol(const AEndRow, AEndCol: Integer); inline;
-    procedure SetEndAsStart;
+    procedure SetEndRowCol(const AEndRow, AEndCol: Integer); overload; inline;
+    procedure SetEndRowCol(const AOtherLoc: TNPCLocation); overload; inline;
+    procedure IncEndCol(const ASize: Integer); inline;
+    procedure SetEndAsStart; inline;
+    function GetLocationSize: Integer; inline;
     function Copy: TNPCLocation; inline;
     function After: TNPCLocation; inline;
     function ToString: String; inline;
@@ -62,10 +65,31 @@ begin
   EndCol := AEndCol;
 end;
 
+procedure TNPCLocation.SetEndRowCol(const AOtherLoc: TNPCLocation);
+begin
+  if not Assigned(AOtherLoc) then
+    Exit;
+  //
+  EndRow := AOtherLoc.EndRow;
+  EndCol := AOtherLoc.EndCol;
+end;
+
+procedure TNPCLocation.IncEndCol(const ASize: Integer);
+begin
+  EndCol := EndCol + ASize + IfThen(EndCol = -1, 1);
+end;
+
 procedure TNPCLocation.SetEndAsStart;
 begin
   StartRow := EndRow;
   StartCol := EndCol;
+end;
+
+function TNPCLocation.GetLocationSize: Integer;
+begin
+  Result := 1;
+  if EndCol > -1 then
+    Result := EndCol - StartCol;
 end;
 
 function TNPCLocation.Copy: TNPCLocation;

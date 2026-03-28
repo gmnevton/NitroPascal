@@ -67,7 +67,8 @@ type
     function GetToken: TNPCToken; inline; // grabs token and moves index forward
     function GetTokenWithMinus: TNPCToken; // combine tokens if there is minus between them
     function LastToken: TNPCToken; // grabs last token
-    function PeekToken: TNPCToken; inline; // grabs current token and preserves actual index
+    function PeekToken: TNPCToken; overload; inline; // grabs current token and preserves actual index
+    function PeekToken(const AIndex: Integer): TNPCToken; overload; inline; // grabs current token and preserves actual index
     function NextToken: TNPCToken; inline; // grabs next token and preserves actual index
     procedure SkipToken; inline; // increase index to next position
     //
@@ -293,7 +294,7 @@ begin
   if FIndex >= FCount then
     Exit;
   //
-  Result := TokensArray[FIndex].Value[1] = AValue;
+  Result := (Length(TokensArray[FIndex].Value) > 0) and (TokensArray[FIndex].Value[1] = AValue);
 end;
 
 function TNPCTokensParser.GetToken: TNPCToken;
@@ -347,6 +348,14 @@ begin
   if FIndex >= FCount then
     Exit;
   Result := TokensArray[FIndex];
+end;
+
+function TNPCTokensParser.PeekToken(const AIndex: Integer): TNPCToken;
+begin
+  Result := Nil;
+  if FIndex + AIndex >= FCount then
+    Exit;
+  Result := TokensArray[FIndex + AIndex];
 end;
 
 function TNPCTokensParser.NextToken: TNPCToken;
