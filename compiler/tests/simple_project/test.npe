@@ -19,7 +19,7 @@ type
 var
   ConsoleAvailable: Boolean = True;
 
-// class FileIO methods definition
+// class FileIO method definitions
 
 FileIO.OpenFile(const FileName: String, const FileOpenMode: Byte): (ok: Boolean, FileHandle: Integer) {
 // to be filled later
@@ -40,12 +40,12 @@ Writeln(const Value: String) {
 ReadAllBytes(const FileName: String, const Mode: TFileOpenModeEnum): (ok: Boolean, output: TBytes) {
   ok, file := FileIO.OpenFile(FileName, Mode);
   if !ok then
-    Return .{ok, null};
-  defer FileIO.CloseFile(File);
+    Return .{ok, null}; // just like in C, exits from function with some assigned return variables
+  defer FileIO.CloseFile(File); // close file at function exit
 
   ok, bytes := FileIO.ReadAllBytes(File);
 
-  Result .{ok, bytes};
+  Result .{ok, bytes}; // just like in Pascal, only stores values in assigned return variables
 };
 
 begin

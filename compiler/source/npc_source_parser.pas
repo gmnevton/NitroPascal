@@ -142,6 +142,8 @@ type
     function  ResolveTypeSize(const ATypeRef: TNPC_ASTTypeReference): Integer;
     function  ResolveTypeKind(const ATypeRef: TNPC_ASTTypeReference): TNPCSymbolType;
     function  FindClassMethod(const AClassSym: TNPCSymbol; const AMethodName: String; const AClassMethodDefinitionLocation: TNPCLocation): TNPCSymbol;
+    function  ClassContainsMethod(const AMethods: TObjectList<TNPC_ASTTypeClassMethod>; const AClassName, AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
+    function  ClassContainsProperty(const AProperties: TObjectList<TNPC_ASTTypeClassProperty>; const AClassName, APropertyName: UTF8String; out AProperty: TNPC_ASTType; out APropertySymbol: TNPCSymbol): Boolean;
     procedure RegisterProcedureSymbols(const AProc: TNPC_ASTStatementProcedure);
     function  CompareProcedureSignatures(Decl, Impl: TNPC_ASTStatementProcedure): Boolean;
     function  CompareTypeRef(A, B: TNPC_ASTTypeReference): Boolean;
@@ -212,14 +214,14 @@ type
     function  ParseTypeReference_FunctionType(const AToken: TNPCToken): TNPC_ASTTypeReference;
     function  ParseTypeReference_QualifiedIdent(const AToken: TNPCToken): TNPCSymbol;
 
-    function  ParseEnumType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
-    function  ParseSetType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
-    function  ParseSetOfType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
-    function  ParseArrayType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
-    function  ParseRecordType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
-    function  ParseClassType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
-    procedure ParseClassProperty(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
-    procedure ParseClassMember(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
+    function  ParseEnumTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+    function  ParseSetTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+    function  ParseSetOfTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+    function  ParseArrayTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+    function  ParseRecordTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+    function  ParseClassTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+    procedure ParseClassPropertyDeclaration(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
+    procedure ParseClassMemberDeclaration(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
     //
     procedure ParseVariableDeclaration(const AToken: TNPCToken);
     function  ParseVariableType(const AVarToken: TNPCToken; const AVarName: String): TNPC_ASTType;
@@ -242,6 +244,7 @@ type
     function  ParseSet(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseIndex(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
     function  ParseRecordMember(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
+    function  ParseClassMember(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
     function  ParseIfExpression(const AToken: TNPCToken): TNPC_ASTExpressionIf;
     function  ParseIfStatement(const AToken: TNPCToken): TNPC_ASTStatementIf;
     function  ParseCaseExpression(const AToken: TNPCToken): TNPC_ASTExpressionCase;
@@ -548,7 +551,7 @@ procedure TNPCSourceParser.InitBuiltins(const AScope: TNPCScope);
 var
   loc: TNPCLocation;
 begin
-  loc := TNPCLocation.Create(Self.UnitName, 538, 0);
+  loc := TNPCLocation.Create(Self.UnitName, 554, 0);
   // register built-in types
   Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(loc, 'Boolean', 1);
   AScope.DefineBuiltinType(loc, 'Boolean', TYPE_Literal, 1, Builtin_Type_Boolean);
@@ -1012,8 +1015,8 @@ function TNPCSourceParser.FindClassMethod(const AClassSym: TNPCSymbol; const AMe
 var
   TypeDef: TNPC_ASTTypeDefinition;
   ClsType: TNPC_ASTTypeClass;
-  Method: TNPC_ASTTypeClassMethod;
-  Sym: TNPCSymbol;
+  Method: TNPC_ASTType; // TNPC_ASTTypeClassMethod;
+  Symbol: TNPCSymbol;
   loc: TNPCLocation;
 begin
   Result := Nil;
@@ -1032,17 +1035,44 @@ begin
   if ClsType.Methods = Nil then
     Exit;
 
-  for Method in ClsType.Methods do begin
+  if not ClassContainsMethod(ClsType.Methods, ClsType.Name, AMethodName, Method, Symbol) then begin
+    Assert(Assigned(AClassMethodDefinitionLocation));
+    loc := AClassMethodDefinitionLocation.Copy;
+    loc.IncEndCol(Method.Location.GetLocationSize);
+    raise NPCSyntaxError.SemanticError(loc, Format('method "%s" declaration not found in class "%s"', [AMethodName, ClsType.Name]));
+  end;
+  Assert(Assigned(Symbol)); // symbol must exist
+  Result := Symbol;
+end;
+
+function TNPCSourceParser.ClassContainsMethod(const AMethods: TObjectList<TNPC_ASTTypeClassMethod>; const AClassName, AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
+var
+  Method: TNPC_ASTTypeClassMethod;
+begin
+  Result := False;
+  AMethod := Nil;
+  AMethodSymbol := Nil;
+  for Method in AMethods do begin
     if SameText(Method.Name, AMethodName) then begin
-      Sym := CurrentScope.ResolveSymbol(ClsType.Name + '.' + AMethodName);
-      if Assigned(Sym) then
-        Exit(Sym)
-      else begin
-        Assert(Assigned(AClassMethodDefinitionLocation));
-        loc := AClassMethodDefinitionLocation.Copy;
-        loc.IncEndCol(Method.Location.GetLocationSize);
-        raise NPCSyntaxError.SemanticError(loc, Format('method "%s" declaration not found in class "%s"', [Method.Name, ClsType.Name]));
-      end;
+      AMethod := Method;
+      AMethodSymbol := CurrentScope.ResolveSymbol(AClassName + '.' + AMethodName);
+      Exit(True);
+    end;
+  end;
+end;
+
+function TNPCSourceParser.ClassContainsProperty(const AProperties: TObjectList<TNPC_ASTTypeClassProperty>; const AClassName, APropertyName: UTF8String; out AProperty: TNPC_ASTType; out APropertySymbol: TNPCSymbol): Boolean;
+var
+  Prop: TNPC_ASTTypeClassProperty;
+begin
+  Result := False;
+  AProperty := Nil;
+  APropertySymbol := Nil;
+  for Prop in AProperties do begin
+    if SameText(Prop.Name, APropertyName) then begin
+      AProperty := Prop;
+      APropertySymbol := CurrentScope.ResolveSymbol(AClassName + '.' + APropertyName);
+      Exit(True);
     end;
   end;
 end;
@@ -2018,6 +2048,11 @@ var
   op: UTF8String;
   right: TNPC_ASTExpression;
   idx: TNPC_ASTExpressionIndex;
+  identType: TNPC_ASTTypes;
+  identName: UTF8String;
+  Sym: TNPCSymbol;
+  SymType: TNPCSymbolType;
+  SymKind: TNPCSymbolKind;
 begin
   if TokenIsReservedSymbol(AToken, [rs_Plus,       // '+'
                                     rs_Minus,      // '-'
@@ -2045,7 +2080,48 @@ begin
     Result := TNPC_ASTExpressionBinary.Create(AToken.Location, ALeft, op, right);
   end
   else if TokenIsReservedSymbol(AToken, rs_Dot) then begin // member access: ident '.' expr
-    Result := ParseRecordMember(AToken, ALeft);
+    // determine what type of handling we need to use here
+    identType := AST_UNKNOWN;
+    if ALeft <> Nil then
+      identType := ALeft.&Type;
+    Assert(identType <> AST_UNKNOWN);
+    if identType = AST_IDENTIFIER then begin
+      Sym := TNPC_ASTExpressionIdent(ALeft).ResolvedSymbol;
+      if Sym = Nil then begin
+        identName := TNPC_ASTExpressionIdent(ALeft).Name;
+        Sym := CurrentScope.ResolveSymbol(identName);
+        TNPC_ASTExpressionIdent(ALeft).ResolvedSymbol := Sym;
+      end;
+      //
+      SymKind := Sym.Kind;
+      SymType := Sym.&Type;
+      if SymKind = KIND_Type then begin
+        case SymType of
+          TYPE_Unresolved: ;
+          TYPE_Enum: ;
+          TYPE_EnumConst: ;
+          TYPE_Set: ;
+          TYPE_SetConst: ;
+          TYPE_BitSet: ;
+          TYPE_Array: ;
+          TYPE_Record: begin
+            Result := ParseRecordMember(AToken, ALeft);
+          end;
+          TYPE_RecordField: ;
+          TYPE_Class: begin
+            Result := ParseClassMember(AToken, ALeft);
+          end;
+          TYPE_Pointer: ;
+          TYPE_Literal: ;
+          TYPE_Procedure: ;
+          TYPE_ForeignFunction: ;
+        end;
+      end
+      else
+        raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnexpectedTokenTypeIn, [AToken.TokenToString, AToken.Value, '', sStatement]));
+    end
+    else
+      raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnexpectedTokenTypeIn, [AToken.TokenToString, AToken.Value, '', sStatement]));
   end
   else if TokenIsReservedSymbol(AToken, rs_OParen) then begin // call: ident '(' expr (, expr) ')'
     Result := ParseCall(AToken, ALeft);
@@ -2154,11 +2230,11 @@ begin
   token := Texer.PeekToken; // '(', '[', '[packed] record', '[packed] array', 'class [of]', 'object [of]', 'procedure', 'function', 'set of', 'interface'
   if TokenIsReservedSymbol(token, rs_OParen) then begin // '(' - enum
     Texer.SkipToken;
-    Result := ParseEnumType(ATypeToken, ATypeName);
+    Result := ParseEnumTypeDeclaration(ATypeToken, ATypeName);
   end
   else if TokenIsReservedSymbol(token, rs_OBracket) then begin // '[' - set
     Texer.SkipToken;
-    Result := ParseSetType(ATypeToken, ATypeName);
+    Result := ParseSetTypeDeclaration(ATypeToken, ATypeName);
 //    Result := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
 //    Result.DefinitionType := DEF_Set;
 //    Result.SetDescription := TNPC_ASTTypeSet(typeRef);
@@ -2170,7 +2246,7 @@ begin
 //    ElemType := ParseType(token, ATypeName);
 //    Result := TNPC_ASTTypeSet.Create(token.Location, ElemType);
 //    Texer.SkipToken;
-    Result := ParseSetOfType(ATypeToken, ATypeName);
+    Result := ParseSetOfTypeDeclaration(ATypeToken, ATypeName);
 //    Result := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
 //    Result.DefinitionType := DEF_Set;
 //    Result.SetDescription := TNPC_ASTTypeSet(typeRef);
@@ -2190,7 +2266,7 @@ begin
     _array:
     Texer.SkipToken;
     //token := Texer.PeekToken;
-    Result := ParseArrayType(ATypeToken, ATypeName);
+    Result := ParseArrayTypeDeclaration(ATypeToken, ATypeName);
 //    Result := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
 //    Result.DefinitionType := DEF_Array;
 //    Result.RecordDescription := TNPC_ASTTypeRecord(typeRef);
@@ -2199,14 +2275,14 @@ begin
     _record:
     Texer.SkipToken;
     token := Texer.PeekToken;
-    Result := ParseRecordType(ATypeToken, ATypeName);
+    Result := ParseRecordTypeDeclaration(ATypeToken, ATypeName);
 //    Result := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
 //    Result.DefinitionType := DEF_Record;
 //    Result.RecordDescription := TNPC_ASTTypeRecord(typeRef);
   end
   else if TokenIsReservedIdent(token, ri_class) then begin // 'class'
     Texer.SkipToken;
-    Result := ParseClassType(ATypeToken, ATypeName);
+    Result := ParseClassTypeDeclaration(ATypeToken, ATypeName);
   end
   else if TokenIsReservedIdent(token, ri_object) then begin // 'object'
     NotImplemented;
@@ -2478,7 +2554,7 @@ begin
 end;
 
 // ident = (enum1, enum2, ... );
-function TNPCSourceParser.ParseEnumType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+function TNPCSourceParser.ParseEnumTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
 var
   token: TNPCToken;
   Enum: TNPC_ASTTypeEnum;
@@ -2527,7 +2603,7 @@ begin
   Result := TNPC_ASTStatementTypeDeclaration.Create(ATypeToken.Location, ATypeName, TypeDef);
 end;
 
-function TNPCSourceParser.ParseSetType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+function TNPCSourceParser.ParseSetTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
 var
   token: TNPCToken;
   SetType: TNPC_ASTTypeSet;
@@ -2609,12 +2685,12 @@ begin
   Result := TNPC_ASTStatementTypeDeclaration.Create(ATypeToken.Location, ATypeName, TypeDef);
 end;
 
-function TNPCSourceParser.ParseSetOfType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+function TNPCSourceParser.ParseSetOfTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
 begin
   NotImplemented;
 end;
 
-function TNPCSourceParser.ParseArrayType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+function TNPCSourceParser.ParseArrayTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
 var
   token: TNPCToken;
   expr: TNPC_ASTExpression;
@@ -2753,7 +2829,7 @@ end;
 //  ExpectKind(tkEnd); // 'end'
 //  ExpectKind(tkSemicolon); // final ';' after type
 
-function TNPCSourceParser.ParseRecordType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+function TNPCSourceParser.ParseRecordTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
 var
   token: TNPCToken;
   expr: TNPC_ASTExpression;
@@ -2893,7 +2969,7 @@ end;
 //               | block_expr
 //               | expression
 
-function TNPCSourceParser.ParseClassType(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+function TNPCSourceParser.ParseClassTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
 var
   token: TNPCToken;
   TypeClass: TNPC_ASTTypeClass;
@@ -2962,9 +3038,9 @@ begin
         //
         while not TokenIsReservedIdent(token, [ri_private, ri_protected, ri_public, ri_end]) do begin
           if IsPropertySection then
-            ParseClassProperty(TypeClass, VisibilityType)
+            ParseClassPropertyDeclaration(TypeClass, VisibilityType)
           else
-            ParseClassMember(TypeClass, VisibilityType);
+            ParseClassMemberDeclaration(TypeClass, VisibilityType);
           token := Texer.PeekToken;
         end;
       end
@@ -2988,7 +3064,7 @@ begin
   Result := TNPC_ASTStatementTypeDeclaration.Create(ATypeToken.Location, ATypeName, TypeDef);
 end;
 
-procedure TNPCSourceParser.ParseClassProperty(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
+procedure TNPCSourceParser.ParseClassPropertyDeclaration(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
 var
   token: TNPCToken;
   Prop: TNPC_ASTTypeClassProperty;
@@ -3044,7 +3120,7 @@ begin
   ATypeClass.Properties.Add(Prop);
 end;
 
-procedure TNPCSourceParser.ParseClassMember(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
+procedure TNPCSourceParser.ParseClassMemberDeclaration(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
 var
   token, tokenName: TNPCToken;
   Typ: TNPC_ASTType;
@@ -3982,7 +4058,7 @@ end;
 function TNPCSourceParser.ParseRecordMember(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
 var
   token: TNPCToken;
-  VarSym: TNPCSymbol;
+  Sym: TNPCSymbol;
   RecType: TNPC_ASTTypeRecord;
   record_ident:  UTF8String;
   Field: UTF8String;
@@ -3997,18 +4073,66 @@ begin
 
   record_ident := TNPC_ASTExpressionIdent(ALeft).Name;
 
-  VarSym := CurrentScope.ResolveSymbol(record_ident);
-  if not Assigned(VarSym) or not (VarSym.TypeRef is TNPC_ASTTypeRecord) then
+  Sym := CurrentScope.ResolveSymbol(record_ident);
+  if not Assigned(Sym) or not (Sym.TypeRef is TNPC_ASTTypeRecord) then
     raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserTypeRequiredForIdent, ['record', record_ident, TNPC_ASTExpressionVariable(ALeft).ToString]));
 
   AToken.Location.SetEndRowCol(token.Location.EndRow, token.Location.EndCol);
 
-  RecType := TNPC_ASTTypeRecord(VarSym.TypeRef);
+  RecType := TNPC_ASTTypeRecord(Sym.TypeRef);
   if not RecType.Fields.ContainsKey(Field) then
     raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserFieldNotFoundInRecord, [Field, record_ident]));
 
   FieldType := RecType.Fields[Field];
   Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Field, FieldType);
+end;
+
+function TNPCSourceParser.ParseClassMember(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
+var
+  token: TNPCToken;
+  Sym: TNPCSymbol;
+  ClassType: TNPC_ASTTypeClass;
+  class_ident:  UTF8String;
+  Member: UTF8String;
+  TypeDef: TNPC_ASTTypeDefinition;
+//  Field: TNPC_ASTType;
+//  Method: TNPC_ASTTypeClassMethod;
+//  Propert: TNPC_ASTTypeClassProperty;
+  MemberSymbol: TNPCSymbol;
+  MemberType: TNPC_ASTType;
+begin
+  Texer.SkipToken;
+  token := Texer.ExpectToken(tokIdent, Format(sParserExpectedNameAfter, ['identifier', 'class member', ''])); // expect identifier
+  Member := token.Value;
+
+  if not (ALeft is TNPC_ASTExpressionIdent) then
+    raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserCantAccessFieldOnNonVar, [Member, ALeft.ToString]));
+
+  class_ident := TNPC_ASTExpressionIdent(ALeft).Name;
+
+  Sym := CurrentScope.ResolveSymbol(class_ident);
+  if not Assigned(Sym) or not ((Sym.TypeRef is TNPC_ASTTypeDefinition) and (Sym.Kind = KIND_Type) and (Sym.&Type = TYPE_Class)) then
+    raise NPCSyntaxError.ParserError(ALeft.Location, Format(sParserTypeRequiredForIdent, ['class', class_ident, TNPC_ASTExpressionVariable(ALeft).ToString]));
+
+  AToken.Location.SetEndRowCol(token.Location.EndRow, token.Location.EndCol);
+
+  TypeDef := TNPC_ASTTypeDefinition(Sym.TypeRef);
+  Assert(TypeDef.DefinitionType = DEF_Class);
+  ClassType := TNPC_ASTTypeClass(TypeDef.ClassDescription);
+
+  // find member
+  if Assigned(ClassType.Fields) and ClassType.Fields.ContainsKey(Member) then begin
+    MemberType := ClassType.Fields[Member];
+    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
+  end
+  else if Assigned(ClassType.Methods) and ClassContainsMethod(ClassType.Methods, ClassType.Name, Member, MemberType, MemberSymbol) then begin
+    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
+  end
+  else if Assigned(ClassType.Properties) and ClassContainsProperty(ClassType.Properties, ClassType.Name, Member, MemberType, MemberSymbol) then begin
+    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
+  end
+  else
+    raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserFieldNotFoundInRecord, [Member, class_ident]));
 end;
 
 function TNPCSourceParser.ParseIfExpression(const AToken: TNPCToken): TNPC_ASTExpressionIf;
