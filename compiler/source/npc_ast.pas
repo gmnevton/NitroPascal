@@ -20,6 +20,8 @@ uses
 type
   TNPC_ASTValue = Variant; // for simplicity
 
+  TNPCScope = class;
+
   TNPC_ASTType = class;
   TNPC_ASTTypeClassProperty = class;
 
@@ -73,6 +75,7 @@ type
     Name: UTF8String;
     Kind: TNPCSymbolKind;
     &Type: TNPCSymbolType;
+    Scope: TNPCScope;
     TypeRef: TNPC_ASTType;
     PropInfo: TNPC_ASTTypeClassProperty;
     DeclNode: TObject; // pointer/reference to the declaration AST node (optional)
@@ -105,15 +108,18 @@ type
 //    List: Array of TNPCListEntry;
 //    Size: Integer;
 //    Capacity: Integer;
-    Table: TDictionary<UTF8String, TNPCSymbol>;
+    Name: UTF8String;
+    Table: TDictionary<UTF8String, TNPCSymbol>; // no overloads/polymorphism for now
+    //Table: TDictionary<UTF8String, TObjectList<TNPCSymbol>>; // enable overloads/polymorphism
     Parent: TNPCScope;
     //
 //    procedure Init;
     procedure DuplicateSymbolError(const ASymbol, AExisting: TNPCSymbol);
   public
-    constructor Create(AParent: TNPCScope);
+    constructor Create(AParent: TNPCScope; const AName: UTF8String);
     destructor Destroy; override;
     //
+    property ParentScope: TNPCScope read Parent;
 //    procedure Clear;
 //    function Exists(const AName: UTF8String): Boolean;
 //    procedure Add(const AName: UTF8String; const ASymbol: TNPCSymbol);
@@ -462,6 +468,7 @@ type
   public
     // &Type = AST_TYPE_CLASS
     Name: UTF8String;
+    //Scope: TNPCScope;
     Fields: TDictionary<UTF8String, TNPC_ASTType>; // TClassField
     Methods: TObjectList<TNPC_ASTTypeClassMethod>; // TClassMethod     TNPC_ASTExpressionCall = class(TNPC_ASTExpression)
     //Methods: TDictionary<UTF8String, TNPC_ASTExpression>;
@@ -959,6 +966,7 @@ begin
   Name := AName;
   Kind := AKind;
   &Type := AType;
+  Scope := Nil;
   TypeRef := ATypeRef;
   PropInfo := Nil;
   DeclNode := ADecl;
@@ -978,6 +986,7 @@ destructor TNPCSymbol.Destroy;
 begin
   Location := Nil;
   Name := '';
+  Scope := Nil;
   TypeRef := Nil;
 //  if TypeRef <> Nil then
 //    FreeAndNil(TypeRef);
@@ -995,9 +1004,11 @@ end;
 
 { TNPCScope }
 
-constructor TNPCScope.Create(AParent: TNPCScope);
+constructor TNPCScope.Create(AParent: TNPCScope; const AName: UTF8String);
 begin
-  Table := TDictionary<UTF8String, TNPCSymbol>.Create;
+  Name := AName;
+  Table := TDictionary<UTF8String, TNPCSymbol>.Create; // no overloads/polymorphism for now
+//  Table := TDictionary<UTF8String, TObjectList<TNPCSymbol>>.Create; // enable overloads/polymorphism
   Parent := AParent;
 end;
 
@@ -1026,7 +1037,20 @@ begin
 end;
 
 procedure TNPCScope.AddSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
+//var
+//  List: TObjectList<TNPCSymbol>;
 begin
+//  if not Table.TryGetValue(AName, List) then begin
+//    List := TObjectList<TNPCSymbol>.Create(True);
+//    Table.Add(AName, List);
+//  end;
+
+  // Optional: check signature uniqueness
+//  for Existing in List do
+//    if SameSignature(Existing, Result) then
+//      raise Exception.CreateFmt('Duplicate overload "%s"', [AName]);
+
+//  List.Add(Result);
   Table.Add(AName, ASymbol);
 end;
 
@@ -1071,6 +1095,15 @@ end;
 
 function TNPCScope.ResolveSymbol(const AName: UTF8String): TNPCSymbol;
 begin
+  // non recurent version, maybe faster one ???
+//  Scope := Self;
+//  while Scope <> nil do begin
+//    if Scope.Table.TryGetValue(Name, Result) then
+//      Exit;
+//    Scope := Scope.Parent;
+//  end;
+//  Result := Nil;
+
   if Table.TryGetValue(AName, Result) then
     Exit;
   if Assigned(Parent) then
@@ -1152,6 +1185,9 @@ end;
 
 function TNPCScope.DefineProcedure(const ALocation: TNPCLocation; const AName: UTF8String; const AProcedure: TNPC_ASTStatementProcedure): TNPCSymbol;
 begin
+  if Table.ContainsKey(AName) then
+    raise TNPCError.SemanticError(ALocation, Format('duplicate identifier "%s"', [AName]));
+
   Result := TNPCSymbol.Create(ALocation, AName, KIND_Proc, TYPE_Procedure, False, Nil, AProcedure);
   Table.Add(AName, Result);
 end;
@@ -1546,6 +1582,7 @@ begin
   inherited Create(ALocation);
   &Type := AST_TYPE_CLASS;
   Name := AName;
+  //Scope := Nil;
   Fields := Nil;
   Methods := Nil;
   Properties := Nil;
@@ -1561,6 +1598,7 @@ end;
 
 destructor TNPC_ASTTypeClass.Destroy;
 begin
+  //Scope := Nil;
   FreeAndNil(Fields);
   FreeAndNil(Methods);
   FreeAndNil(Properties);

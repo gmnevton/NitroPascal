@@ -109,7 +109,9 @@ type
     //
     function Unescape(const Value: String): String; inline;
     function  GetPrecedence(const AToken: TNPCToken): Integer;
-    procedure EnterScope(const AParentScope: TNPCScope); //inline;
+    procedure PushScope(const AParentScope: TNPCScope; const AScopeName: UTF8String); //inline;
+    procedure PopScope; //inline;
+    procedure EnterScope(const AScope: TNPCScope); //inline;
     procedure LeaveScope; //inline;
     procedure InitBuiltins(const AScope: TNPCScope);
     procedure Clear;
@@ -142,8 +144,8 @@ type
     function  ResolveTypeSize(const ATypeRef: TNPC_ASTTypeReference): Integer;
     function  ResolveTypeKind(const ATypeRef: TNPC_ASTTypeReference): TNPCSymbolType;
     function  FindClassMethod(const AClassSym: TNPCSymbol; const AMethodName: String; const AClassMethodDefinitionLocation: TNPCLocation): TNPCSymbol;
-    function  ClassContainsMethod(const AMethods: TObjectList<TNPC_ASTTypeClassMethod>; const AClassName, AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
-    function  ClassContainsProperty(const AProperties: TObjectList<TNPC_ASTTypeClassProperty>; const AClassName, APropertyName: UTF8String; out AProperty: TNPC_ASTType; out APropertySymbol: TNPCSymbol): Boolean;
+    function  ClassContainsMethod(const AClassType: TNPC_ASTTypeClass; const AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
+    function  ClassContainsProperty(const AClassType: TNPC_ASTTypeClass; const APropertyName: UTF8String; out AProperty: TNPC_ASTType; out APropertySymbol: TNPCSymbol): Boolean;
     procedure RegisterProcedureSymbols(const AProc: TNPC_ASTStatementProcedure);
     function  CompareProcedureSignatures(Decl, Impl: TNPC_ASTStatementProcedure): Boolean;
     function  CompareTypeRef(A, B: TNPC_ASTTypeReference): Boolean;
@@ -219,16 +221,17 @@ type
     function  ParseSetOfTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
     function  ParseArrayTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
     function  ParseRecordTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
+    //
     function  ParseClassTypeDeclaration(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
     procedure ParseClassPropertyDeclaration(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
     procedure ParseClassMemberDeclaration(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
+    function  ParseClassMethodDefinition(const AClassSym: TNPCSymbol; const AMethod: TNPCToken; const AClassMethodDefinitionLocation: TNPCLocation): TNPC_ASTStatementProcedure;
     //
     procedure ParseVariableDeclaration(const AToken: TNPCToken);
     function  ParseVariableType(const AVarToken: TNPCToken; const AVarName: String): TNPC_ASTType;
 
     function  ParseBlock(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseQualifiedName(const AToken: TNPCToken; out AClassSym: TNPCSymbol; out AMethod: TNPCToken; out AClassMethodDefinitionLocation: TNPCLocation): Boolean;
-    function  ParseClassMethodDefinition(const AClassSym: TNPCSymbol; const AMethod: TNPCToken; const AClassMethodDefinitionLocation: TNPCLocation): TNPC_ASTStatementProcedure;
     //
     function  ParseProcedureDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
     function  ParseProcedureDefinition(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
@@ -236,6 +239,7 @@ type
     function  ParseProcedureDefinitionBody(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
     function  ParseProcedureParameter(const AToken: TNPCToken; const AProcedureDecl: TNPC_ASTStatementProcedure; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
     function  ParseProcedureSignatureOnly(const AParent: TNPC_ASTStatementBlock; const AName: String): TNPC_ASTStatementProcedure;
+    //
     function  ParseAssignment(const ALeftToken: TNPCToken): TNPC_ASTStatement;
     function  ParseAssignmentNew(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
@@ -369,16 +373,15 @@ begin
   Texer := Nil;
   ASTree := Nil;
   FLevel := 0;
-  ScopeStack := TObjectList<TNPCScope>.Create(False);
+  ScopeStack := TObjectList<TNPCScope>.Create(True); // manage and free owned objects
   CurrentScope := Nil;
-
 end;
 
 destructor TNPCSourceParser.Destroy;
 begin
   Clear;
   // clear scopes
-  ScopeStack.Free;
+  ScopeStack.Free; // free objects, if any left
   inherited;
 end;
 
@@ -522,36 +525,57 @@ begin
     Result := 0;
 end;
 
-procedure TNPCSourceParser.EnterScope(const AParentScope: TNPCScope);
+procedure TNPCSourceParser.PushScope(const AParentScope: TNPCScope; const AScopeName: UTF8String);
 begin
-  ScopeStack.Add(TNPCScope.Create(AParentScope));
-  CurrentScope := ScopeStack.Last;
+  CurrentScope := TNPCScope.Create(AParentScope, AScopeName);
+  ScopeStack.Add(CurrentScope);
   if AParentScope = Nil then
     InitBuiltins(CurrentScope);
 end;
 
-procedure TNPCSourceParser.LeaveScope;
-var
-  s: TNPCScope;
+procedure TNPCSourceParser.PopScope;
 begin
-  if ScopeStack.Count = 0 then
-    Exit;
-  //
-  s := ScopeStack.Last;
-  ScopeStack.Delete(ScopeStack.Count - 1);
-  s.Free;
-  //
-  if ScopeStack.Count > 0 then
-    CurrentScope := ScopeStack.Last
-  else
-    CurrentScope := Nil;
+  if CurrentScope.ParentScope <> Nil then
+    CurrentScope := CurrentScope.ParentScope;
+end;
+
+procedure TNPCSourceParser.EnterScope(const AScope: TNPCScope);
+begin
+  if AScope <> Nil then
+    CurrentScope := AScope;
+end;
+
+//procedure TNPCSourceParser.LeaveScope;
+//var
+//  s: TNPCScope;
+//begin
+//  if ScopeStack.Count = 0 then
+//    Exit;
+//  //
+//  s := ScopeStack.Last;
+//  ScopeStack.Delete(ScopeStack.Count - 1);
+//  s.Free; // do not free the scope here, free it in the symbol where it may be used
+//  //
+//  if ScopeStack.Count > 0 then
+//    CurrentScope := ScopeStack.Last
+//  else
+//    CurrentScope := Nil;
+//end;
+
+procedure TNPCSourceParser.LeaveScope;
+begin
+  if CurrentScope.ParentScope <> Nil then
+    CurrentScope := CurrentScope.ParentScope;
 end;
 
 procedure TNPCSourceParser.InitBuiltins(const AScope: TNPCScope);
 var
   loc: TNPCLocation;
 begin
-  loc := TNPCLocation.Create(Self.UnitName, 554, 0);
+  if Builtin_Type_Boolean <> Nil then
+    Exit;
+  //
+  loc := TNPCLocation.Create(Self.UnitName, 578, 0);
   // register built-in types
   Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(loc, 'Boolean', 1);
   AScope.DefineBuiltinType(loc, 'Boolean', TYPE_Literal, 1, Builtin_Type_Boolean);
@@ -631,8 +655,9 @@ begin
   if ASTree <> Nil then
     FreeAndNil(ASTree);
   // clear scopes
-  while ScopeStack.Count > 0 do
-    LeaveScope;
+//  while ScopeStack.Count > 0 do
+//    LeaveScope;
+  ScopeStack.Clear; // free objects
 end;
 
 procedure TNPCSourceParser.AddImport(const AImportType: TNPCImportType; const AImportName, AImportPath: String);
@@ -1035,43 +1060,49 @@ begin
   if ClsType.Methods = Nil then
     Exit;
 
-  if not ClassContainsMethod(ClsType.Methods, ClsType.Name, AMethodName, Method, Symbol) then begin
+  if not ClassContainsMethod(ClsType, AMethodName, Method, Symbol) then begin
     Assert(Assigned(AClassMethodDefinitionLocation));
     loc := AClassMethodDefinitionLocation.Copy;
-    loc.IncEndCol(Method.Location.GetLocationSize);
+    loc.IncEndCol(Length(AMethodName)); // Method.Location.GetLocationSize
     raise NPCSyntaxError.SemanticError(loc, Format('method "%s" declaration not found in class "%s"', [AMethodName, ClsType.Name]));
   end;
   Assert(Assigned(Symbol)); // symbol must exist
   Result := Symbol;
 end;
 
-function TNPCSourceParser.ClassContainsMethod(const AMethods: TObjectList<TNPC_ASTTypeClassMethod>; const AClassName, AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
+function TNPCSourceParser.ClassContainsMethod(const AClassType: TNPC_ASTTypeClass; const AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
 var
   Method: TNPC_ASTTypeClassMethod;
 begin
   Result := False;
   AMethod := Nil;
   AMethodSymbol := Nil;
-  for Method in AMethods do begin
+  if AClassType = Nil then
+    Exit;
+  //
+  for Method in AClassType.Methods do begin
     if SameText(Method.Name, AMethodName) then begin
       AMethod := Method;
-      AMethodSymbol := CurrentScope.ResolveSymbol(AClassName + '.' + AMethodName);
+      AMethodSymbol := CurrentScope.ResolveSymbol(AMethodName);
       Exit(True);
     end;
   end;
 end;
 
-function TNPCSourceParser.ClassContainsProperty(const AProperties: TObjectList<TNPC_ASTTypeClassProperty>; const AClassName, APropertyName: UTF8String; out AProperty: TNPC_ASTType; out APropertySymbol: TNPCSymbol): Boolean;
+function TNPCSourceParser.ClassContainsProperty(const AClassType: TNPC_ASTTypeClass; const APropertyName: UTF8String; out AProperty: TNPC_ASTType; out APropertySymbol: TNPCSymbol): Boolean;
 var
   Prop: TNPC_ASTTypeClassProperty;
 begin
   Result := False;
   AProperty := Nil;
   APropertySymbol := Nil;
-  for Prop in AProperties do begin
+  if AClassType = Nil then
+    Exit;
+  //
+  for Prop in AClassType.Properties do begin
     if SameText(Prop.Name, APropertyName) then begin
       AProperty := Prop;
-      APropertySymbol := CurrentScope.ResolveSymbol(AClassName + '.' + APropertyName);
+      APropertySymbol := CurrentScope.ResolveSymbol(APropertyName);
       Exit(True);
     end;
   end;
@@ -1102,6 +1133,11 @@ begin
   end;
 end;
 
+//Compare:
+//  - parameter count
+//  - parameter types
+//  - calling convention (optional)
+//  - return type (for functions)
 function TNPCSourceParser.CompareProcedureSignatures(Decl, Impl: TNPC_ASTStatementProcedure): Boolean;
 var
   i: Integer;
@@ -1250,7 +1286,7 @@ var
 begin
   Result := False;
 
-  EnterScope(CurrentScope);
+  PushScope(CurrentScope, 'global scope'); // global scope init
 
   Tokenizer := TNPCTokenizer.Create(TNPCProjectSettings(SettingsPtr^).ProjectFormatSettings^);
   try
@@ -2545,7 +2581,7 @@ begin
   while TokenIsReservedSymbol(Texer.PeekToken, rs_Dot) do begin
     Texer.SkipToken;
     token := Texer.ExpectToken(tokIdent, 'identifier expected');
-    Name := Name + '.' + token.Value;
+    Name := Name + '.' + token.Value; // this if wrong, its not that way, we need to search in scope in order to find what we need, else report error
   end;
 
   Result := CurrentScope.ResolveSymbol(Name);
@@ -2976,6 +3012,7 @@ var
   TypeDef: TNPC_ASTTypeDefinition;
   VisibilityType: TNPC_ASTClassVisibilityTypeEnum;
   IsPropertySection: Boolean;
+  Sym: TNPCSymbol;
 
 //  expr: TNPC_ASTExpression;
 //  RecordType: TNPC_ASTTypeRecord;
@@ -2988,8 +3025,18 @@ var
 begin
   TypeClass := TNPC_ASTTypeClass.Create(ATypeToken.Location, ATypeName);
 
-//  EnterScope(CurrentScope);
+  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1);
+  TypeDef.DefinitionType := DEF_Class;
+  TypeDef.ClassDescription := TypeClass;
+
+  Sym := CurrentScope.DefineType(ATypeToken.Location, ATypeName, TYPE_Class, -1, TypeDef, CurrentBlock);
+
+  // return declaration
+  Result := TNPC_ASTStatementTypeDeclaration.Create(ATypeToken.Location, ATypeName, TypeDef);
+
+  PushScope(CurrentScope, ATypeName);
   try
+    Sym.Scope := CurrentScope;
 //    if TokenIs(tkInit) then begin
 //      NextToken;
 //      Prop.InitExpr := ParseExpression(0);
@@ -3048,20 +3095,11 @@ begin
         raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownIdentIn, [token.Value, 'class ', sDeclaration]));
     end;
   finally
-//    LeaveScope;
+    PopScope;
   end;
 
   Texer.ExpectReservedToken(ri_end); // Consume(tkEnd, 'Expected "end" to close record');
 //  Texer.ExpectReservedSymbol(rs_Semicolon); // Consume(tkSemicolon, 'Expected ";" after record type');
-
-  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1);
-  TypeDef.DefinitionType := DEF_Class;
-  TypeDef.ClassDescription := TypeClass;
-
-  CurrentScope.DefineType(ATypeToken.Location, ATypeName, TYPE_Class, -1, TypeDef, CurrentBlock);
-
-  // return declaration
-  Result := TNPC_ASTStatementTypeDeclaration.Create(ATypeToken.Location, ATypeName, TypeDef);
 end;
 
 procedure TNPCSourceParser.ParseClassPropertyDeclaration(const ATypeClass: TNPC_ASTTypeClass; const AVisibilityType: TNPC_ASTClassVisibilityTypeEnum);
@@ -3143,7 +3181,7 @@ begin
     Typ := ParseTypeReference;
     Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
 
-    CurrentScope.DefineClassField(tokenName.Location, ATypeClass.Name + '.' + tokenName.Value, TYPE_Class, Typ, ATypeClass);
+    CurrentScope.DefineClassField(tokenName.Location, tokenName.Value, TYPE_Class, Typ, ATypeClass);
 
     if ATypeClass.Fields = Nil then
       ATypeClass.Fields := TDictionary<UTF8String, TNPC_ASTType>.Create;
@@ -3159,7 +3197,7 @@ begin
 
     Method := TNPC_ASTTypeClassMethod.Create(tokenName.Location, tokenName.Value, AVisibilityType);
 
-    Sym := CurrentScope.DefineClassMethod(tokenName.Location, ATypeClass.Name + '.' + tokenName.Value, TYPE_Class, Method, ATypeClass);  // or skFieldWithInit
+    Sym := CurrentScope.DefineClassMethod(tokenName.Location, tokenName.Value, TYPE_Class, Method, ATypeClass);  // or skFieldWithInit
     Sym.ValueExpr := Expr;
 
     if ATypeClass.Methods = Nil then
@@ -3181,7 +3219,7 @@ begin
 
     Method := TNPC_ASTTypeClassMethod.Create(tokenName.Location, tokenName.Value, AVisibilityType);
 
-    Sym := CurrentScope.DefineClassMethod(tokenName.Location, ATypeClass.Name + '.' + tokenName.Value, TYPE_Class, Method, ATypeClass);  // or skFieldWithInit
+    Sym := CurrentScope.DefineClassMethod(tokenName.Location, tokenName.Value, TYPE_Class, Method, ATypeClass);  // or skFieldWithInit
     Sym.ProcDecl := TNPC_ASTStatementProcedure(ProcDecl);
 
     if ATypeClass.Methods = Nil then
@@ -3196,6 +3234,58 @@ begin
   end
   else
     raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknown, ['class member', token.Value]));
+end;
+
+//1: FileIO.OpenFile(...)
+//2: ParseQualifiedName
+//3: FindClassMethod
+//4: ParseProcedureSignatureOnly
+//5: Compare with declared signature
+//6: PushScope
+//7: RegisterProcedureSymbols (from DECLARATION)
+//8: ParseBody
+//9: Attach body
+function TNPCSourceParser.ParseClassMethodDefinition(const AClassSym: TNPCSymbol; const AMethod: TNPCToken; const AClassMethodDefinitionLocation: TNPCLocation): TNPC_ASTStatementProcedure;
+var
+  token: TNPCToken;
+  MethodSym: TNPCSymbol;
+  ProcDecl, ParsedSig: TNPC_ASTStatementProcedure;
+  oldBlock: TNPC_ASTStatementBlock;
+  Body: TNPC_ASTStatement;
+begin
+  // FIND METHOD IN CLASS
+  MethodSym := FindClassMethod(AClassSym, AMethod.Value, AClassMethodDefinitionLocation);
+  if not Assigned(MethodSym) then
+    raise NPCSyntaxError.ParserError(AMethod.Location, Format('method "%s" not declared in class "%s"', [AMethod.Value, AClassSym.Name]));
+
+  ParsedSig := ParseProcedureSignatureOnly(CurrentBlock, MethodSym.Name);
+
+  if not CompareProcedureSignatures(MethodSym.ProcDecl, ParsedSig) then
+    raise NPCSyntaxError.ParserError(Texer.LastToken.Location, 'Method signature does not match declaration');
+
+  ProcDecl := TNPC_ASTStatementProcedure.Create(AMethod.Location, CurrentBlock, AMethod.Value, False, []);
+
+  // PARSE DEFINITION
+  EnterScope(AClassSym.Scope); // new lexical scope for this block
+  try
+    oldBlock := CurrentBlock;
+    CurrentBlock := TNPC_ASTStatementBlock(ProcDecl);
+    try
+      RegisterProcedureSymbols(MethodSym.ProcDecl);
+      token := Texer.PeekToken;
+      Body := ParseProcedureDefinitionBody(token, []);
+      ProcDecl.Body := Body;
+    finally
+      CurrentBlock := oldBlock;
+    end;
+  finally
+    LeaveScope;
+  end;
+
+  // BIND BODY TO DECLARATION
+  MethodSym.ProcDecl.Body := Body;
+
+  Result := ProcDecl;
 end;
 
 procedure TNPCSourceParser.ParseVariableDeclaration(const AToken: TNPCToken);
@@ -3267,7 +3357,7 @@ begin
 
   Texer.SkipToken; // consume 'begin' / '{'
 
-  EnterScope(CurrentScope); // new lexical scope for this block
+  PushScope(CurrentScope, {CurrentBlock.} 'scope name'); // new lexical scope for this block
   stmt := TNPC_ASTStatementBlock.Create(AToken.Location, CurrentBlock, [BLOCK_ConsistsOfOrderedStatements]);
   //AddStatement(stmt);
   try
@@ -3291,7 +3381,7 @@ begin
     Result := CurrentBlock;
   finally
     CurrentBlock := oldBlock;
-    LeaveScope;
+    PopScope;
   end;
 end;
 
@@ -3311,58 +3401,6 @@ begin
   AMethod := Texer.ExpectToken(tokIdent, 'method name expected');
 
   Result := True;
-end;
-
-//1: FileIO.OpenFile(...)
-//2: ParseQualifiedName
-//3: FindClassMethod
-//4: ParseProcedureSignatureOnly
-//5: Compare with declared signature
-//6: PushScope
-//7: RegisterProcedureSymbols (from DECLARATION)
-//8: ParseBody
-//9: Attach body
-function TNPCSourceParser.ParseClassMethodDefinition(const AClassSym: TNPCSymbol; const AMethod: TNPCToken; const AClassMethodDefinitionLocation: TNPCLocation): TNPC_ASTStatementProcedure;
-var
-  token: TNPCToken;
-  MethodSym: TNPCSymbol;
-  ProcDecl, ParsedSig: TNPC_ASTStatementProcedure;
-  oldBlock: TNPC_ASTStatementBlock;
-  Body: TNPC_ASTStatement;
-begin
-  // FIND METHOD IN CLASS
-  MethodSym := FindClassMethod(AClassSym, AMethod.Value, AClassMethodDefinitionLocation);
-  if not Assigned(MethodSym) then
-    raise NPCSyntaxError.ParserError(AMethod.Location, Format('method "%s" not declared in class "%s"', [AMethod.Value, AClassSym.Name]));
-
-  ParsedSig := ParseProcedureSignatureOnly(CurrentBlock, MethodSym.Name);
-
-  if not CompareProcedureSignatures(MethodSym.ProcDecl, ParsedSig) then
-    raise NPCSyntaxError.ParserError(Texer.LastToken.Location, 'Method signature does not match declaration');
-
-  ProcDecl := TNPC_ASTStatementProcedure.Create(AMethod.Location, CurrentBlock, AMethod.Value, False, []);
-
-  // PARSE DEFINITION
-  EnterScope(CurrentScope); // new lexical scope for this block
-  try
-    oldBlock := CurrentBlock;
-    CurrentBlock := TNPC_ASTStatementBlock(ProcDecl);
-    try
-      RegisterProcedureSymbols(MethodSym.ProcDecl);
-      token := Texer.PeekToken;
-      Body := ParseProcedureDefinitionBody(token, []);
-      ProcDecl.Body := Body;
-    finally
-      CurrentBlock := oldBlock;
-    end;
-  finally
-    LeaveScope;
-  end;
-
-  // BIND BODY TO DECLARATION
-  MethodSym.ProcDecl.Body := Body;
-
-  Result := ProcDecl;
 end;
 
 // ProcedureDecl = Identifier [ "(" ParameterList ")" ] [ ":" "(" TypesList ")" ] [ Statements ] ";"
@@ -3389,7 +3427,7 @@ begin
   Texer.ExpectReservedSymbol(rs_OParen); // '('
   SkipComments;
 
-  EnterScope(CurrentScope); // new lexical scope for this block
+  PushScope(CurrentScope, AToken.Value); // new lexical scope for this block
   try
     ParseProcedureDefinitionHeader(Proc, AFlags);
     oldBlock := CurrentBlock;
@@ -3401,7 +3439,7 @@ begin
       CurrentBlock := oldBlock;
     end;
   finally
-    LeaveScope;
+    PopScope;
 
     if not (decfDoNotAddSymbol in AFlags) then
       CurrentScope.DefineProcedure(Proc.Location, Proc.Name, Proc);
@@ -4125,10 +4163,10 @@ begin
     MemberType := ClassType.Fields[Member];
     Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
   end
-  else if Assigned(ClassType.Methods) and ClassContainsMethod(ClassType.Methods, ClassType.Name, Member, MemberType, MemberSymbol) then begin
+  else if Assigned(ClassType.Methods) and ClassContainsMethod(ClassType, Member, MemberType, MemberSymbol) then begin
     Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
   end
-  else if Assigned(ClassType.Properties) and ClassContainsProperty(ClassType.Properties, ClassType.Name, Member, MemberType, MemberSymbol) then begin
+  else if Assigned(ClassType.Properties) and ClassContainsProperty(ClassType, Member, MemberType, MemberSymbol) then begin
     Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
   end
   else
