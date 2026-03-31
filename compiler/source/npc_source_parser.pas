@@ -233,8 +233,8 @@ type
     function  ParseBlock(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseQualifiedName(const AToken: TNPCToken; out AClassSym: TNPCSymbol; out AMethod: TNPCToken; out AClassMethodDefinitionLocation: TNPCLocation): Boolean;
     //
-    function  ParseProcedureDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
-    function  ParseProcedureDefinition(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
+    function  ParseProcedureDeclaration(const AToken: TNPCToken; const AMethodSymbol: TNPCSymbol; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
+    function  ParseProcedureDefinition(const AToken: TNPCToken; const AMethodSymbol: TNPCSymbol; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
     procedure ParseProcedureDefinitionHeader(const AProc: TNPC_ASTStatementProcedure; const AFlags: TNPCParseDeclarationFlags);
     function  ParseProcedureDefinitionBody(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
     function  ParseProcedureParameter(const AToken: TNPCToken; const AProcedureDecl: TNPC_ASTStatementProcedure; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
@@ -1060,14 +1060,19 @@ begin
   if ClsType.Methods = Nil then
     Exit;
 
-  if not ClassContainsMethod(ClsType, AMethodName, Method, Symbol) then begin
-    Assert(Assigned(AClassMethodDefinitionLocation));
-    loc := AClassMethodDefinitionLocation.Copy;
-    loc.IncEndCol(Length(AMethodName)); // Method.Location.GetLocationSize
-    raise NPCSyntaxError.SemanticError(loc, Format('method "%s" declaration not found in class "%s"', [AMethodName, ClsType.Name]));
+  EnterScope(AClassSym.Scope);
+  try
+    if not ClassContainsMethod(ClsType, AMethodName, Method, Symbol) then begin
+      Assert(Assigned(AClassMethodDefinitionLocation));
+      loc := AClassMethodDefinitionLocation.Copy;
+      loc.IncEndCol(Length(AMethodName)); // Method.Location.GetLocationSize
+      raise NPCSyntaxError.SemanticError(loc, Format('method "%s" declaration not found in class "%s"', [AMethodName, ClsType.Name]));
+    end;
+    Assert(Assigned(Symbol)); // symbol must exist
+    Result := Symbol;
+  finally
+    LeaveScope;
   end;
-  Assert(Assigned(Symbol)); // symbol must exist
-  Result := Symbol;
 end;
 
 function TNPCSourceParser.ClassContainsMethod(const AClassType: TNPC_ASTTypeClass; const AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
@@ -1414,7 +1419,7 @@ begin
         end;
       end
       else if TokenIsReservedSymbol(next_token, rs_OParen) then // '('
-        AddStatement(ParseProcedureDefinition(token, []));
+        AddStatement(ParseProcedureDefinition(token, Nil, []));
     end
     else if TokenIsReservedIdent(token, ri_imports) then begin
       ParseImports(ABlock);
@@ -3034,7 +3039,7 @@ begin
   // return declaration
   Result := TNPC_ASTStatementTypeDeclaration.Create(ATypeToken.Location, ATypeName, TypeDef);
 
-  PushScope(CurrentScope, ATypeName);
+  PushScope(CurrentScope, ATypeName); // new scope for class type declaration
   try
     Sym.Scope := CurrentScope;
 //    if TokenIs(tkInit) then begin
@@ -3211,26 +3216,20 @@ begin
     // MyFunc(A: Integer): String;
     // MyProc(...) { ... };
 
-    flags := [decfBodyMayBeSkipped, decfInlineSymbolDeclaration];
-//    [decfDoNotAddSymbol]
-    ProcDecl := ParseProcedureDeclaration(tokenName, flags);
-    if not (ProcDecl is TNPC_ASTStatementProcedure) then
-      raise NPCSyntaxError.ParserError(tokenName.Location, Format(sParserExpectedElementsButGot, ['method declaration', tokenName.Value, 'class ', sDeclaration]));
-
     Method := TNPC_ASTTypeClassMethod.Create(tokenName.Location, tokenName.Value, AVisibilityType);
 
+    // add method to the scope of class
     Sym := CurrentScope.DefineClassMethod(tokenName.Location, tokenName.Value, TYPE_Class, Method, ATypeClass);  // or skFieldWithInit
-    Sym.ProcDecl := TNPC_ASTStatementProcedure(ProcDecl);
 
     if ATypeClass.Methods = Nil then
       ATypeClass.Methods := TObjectList<TNPC_ASTTypeClassMethod>.Create(True);
 
     ATypeClass.Methods.Add(Method);
 
-//    Sym := TSymbol.Create(Name);
-//    Sym.Kind := skMethod;
-//    Sym.RefType := ProcDecl.ReturnType;
-//    Sym.ProcDecl := ProcDecl;
+    flags := [decfDoNotAddSymbol, decfBodyMayBeSkipped, decfInlineSymbolDeclaration];
+    ProcDecl := ParseProcedureDeclaration(tokenName, Sym, flags); // do not add symbol in this function, it is added beneath in method symbol
+    if not (ProcDecl is TNPC_ASTStatementProcedure) then
+      raise NPCSyntaxError.ParserError(tokenName.Location, Format(sParserExpectedElementsButGot, ['method declaration', tokenName.Value, 'class ', sDeclaration]));
   end
   else
     raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknown, ['class member', token.Value]));
@@ -3266,7 +3265,9 @@ begin
   ProcDecl := TNPC_ASTStatementProcedure.Create(AMethod.Location, CurrentBlock, AMethod.Value, False, []);
 
   // PARSE DEFINITION
-  EnterScope(AClassSym.Scope); // new lexical scope for this block
+//  if MethodSym.Scope = Nil then
+
+  EnterScope(MethodSym.Scope); // new lexical scope for this block
   try
     oldBlock := CurrentBlock;
     CurrentBlock := TNPC_ASTStatementBlock(ProcDecl);
@@ -3404,16 +3405,16 @@ begin
 end;
 
 // ProcedureDecl = Identifier [ "(" ParameterList ")" ] [ ":" "(" TypesList ")" ] [ Statements ] ";"
-function TNPCSourceParser.ParseProcedureDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
+function TNPCSourceParser.ParseProcedureDeclaration(const AToken: TNPCToken; const AMethodSymbol: TNPCSymbol; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
 var
   Proc: TNPC_ASTStatement;
 begin
-  Proc := ParseProcedureDefinition(AToken, AFlags);
+  Proc := ParseProcedureDefinition(AToken, AMethodSymbol, AFlags);
   Result := Proc;
 end;
 
 // ProcedureDecl = Identifier [ "(" ParameterList ")" ] [ ":" "(" TypesList ")" ] [ Statements ] ";"
-function TNPCSourceParser.ParseProcedureDefinition(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
+function TNPCSourceParser.ParseProcedureDefinition(const AToken: TNPCToken; const AMethodSymbol: TNPCSymbol; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
 var
   token: TNPCToken;
 //  param: TNPC_ASTParameter;
@@ -3423,12 +3424,17 @@ var
 begin
   Proc := TNPC_ASTStatementProcedure.Create(AToken.Location, CurrentBlock, AToken.Value, False, [BLOCK_ConsistsOfOrderedStatements]);
 
+  if AMethodSymbol <> Nil then // save procedure/function declaration in method
+    AMethodSymbol.ProcDecl := Proc;
+
   SkipComments;
   Texer.ExpectReservedSymbol(rs_OParen); // '('
   SkipComments;
 
   PushScope(CurrentScope, AToken.Value); // new lexical scope for this block
   try
+    if AMethodSymbol <> Nil then
+      AMethodSymbol.Scope := CurrentScope; // save scope in method
     ParseProcedureDefinitionHeader(Proc, AFlags);
     oldBlock := CurrentBlock;
     CurrentBlock := TNPC_ASTStatementBlock(Proc);
@@ -3550,6 +3556,7 @@ end;
 function TNPCSourceParser.ParseProcedureDefinitionBody(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
 begin
   // body
+  Result := Nil;
   if TokenIsReservedSymbol(AToken, rs_Semicolon) and (decfBodyMayBeSkipped in AFlags) and (decfInlineSymbolDeclaration in AFlags) then begin // ';' - no body
     // declaration only
     Texer.SkipToken;

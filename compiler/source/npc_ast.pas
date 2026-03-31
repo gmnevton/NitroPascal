@@ -1027,10 +1027,10 @@ var
   Msg: String;
 begin
   if AExisting <> Nil then begin
-    Msg := Format('Duplicate identifier "%s". Previously declared at line %d, col %d', [ASymbol.Name, AExisting.Location.StartRow, AExisting.Location.StartCol]);
+    Msg := Format('duplicate identifier "%s". Previously declared at line %d, col %d', [ASymbol.Name, AExisting.Location.StartRow, AExisting.Location.StartCol]);
   end
   else begin
-    Msg := Format('Duplicate identifier "%s"', [ASymbol.Name]);
+    Msg := Format('duplicate identifier "%s"', [ASymbol.Name]);
   end;
 
   raise TNPCError.SemanticError(ASymbol.Location, Msg) at ReturnAddress;
