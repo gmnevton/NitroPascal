@@ -14,6 +14,8 @@ type
     } @ensure {
       this.size = some_array.size; // 
     }
+    my_legacy_field_name: some_type;
+    @alias my_new_field_name for my_legacy_field_name;
   } @io {
     @override read(): u8 {
       field2 := read_u32(field2.offset);
