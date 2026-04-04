@@ -34,6 +34,7 @@ type
   NPCCompilerError = class(TNPCError);
   NPCProjectError = class(TNPCError);
   NPCSyntaxError = class(TNPCError);
+  NPCSemanticError = class(TNPCError);
 
 function GetExceptionStackTrace(const E: Exception): String;
 
@@ -495,7 +496,35 @@ begin
   inherited;
 end;
 
+// Chained Exceptions Always
+var
+  OldRaiseExceptObject: Pointer;
+
+type
+  EExceptionHack = class
+  public
+    FMessage: string;
+    FHelpContext: Integer;
+    FInnerException: Exception;
+    FStackInfo: Pointer;
+    FAcquireInnerException: Boolean;
+  end;
+
+procedure RaiseExceptObject(P: PExceptionRecord);
+type
+  TRaiseExceptObjectProc = procedure(P: PExceptionRecord);
+begin
+  if TObject(P^.ExceptObject) is Exception then
+    EExceptionHack(P^.ExceptObject).FAcquireInnerException := True;
+
+  if Assigned(OldRaiseExceptObject) then
+    TRaiseExceptObjectProc(OldRaiseExceptObject)(P);
+end;
+
 initialization
+  OldRaiseExceptObject := RaiseExceptObjProc;
+  RaiseExceptObjProc := @RaiseExceptObject;
+  //
   Exception.GetExceptionStackInfoProc := GetExceptionStackInfo;
   Exception.GetStackInfoStringProc := GetStackInfoString;
   Exception.CleanUpStackInfoProc := CleanUpStackInfo;

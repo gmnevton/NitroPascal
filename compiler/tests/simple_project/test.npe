@@ -1,4 +1,11 @@
-﻿project 'Test_Project';
+﻿{.
+  This is NitroPascal project file.
+  From here everything starts.
+  All project settings are defined in this place.
+  No external config files are used.
+.}
+
+project 'Test_Project';
 
 {$program-type Windows32 GUI}
 
@@ -41,9 +48,9 @@ ReadAllBytes(const FileName: String, const Mode: TFileOpenModeEnum): (ok: Boolea
   ok, file := FileIO.OpenFile(FileName, Mode);
   if !ok then
     Return .{ok, null}; // just like in C, exits from function with some assigned return variables
-  defer FileIO.CloseFile(File); // close file at function exit
+  defer FileIO.CloseFile(file); // close file at function exit
 
-  ok, bytes := FileIO.ReadAllBytes(File);
+  ok, bytes := FileIO.ReadAllBytes(file);
 
   Result .{ok, bytes}; // just like in Pascal, only stores values in assigned return variables
 };

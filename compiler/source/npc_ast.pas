@@ -23,6 +23,7 @@ type
   TNPCScope = class;
 
   TNPC_ASTType = class;
+  TNPC_ASTTypeReference = class;
   TNPC_ASTTypeClassProperty = class;
 
   TNPC_ASTExpression = class;
@@ -83,6 +84,7 @@ type
     Offset: Integer; // class/record field offset
     IsConst: Boolean;
     ConstValue: TNPC_ASTValue; // used if Kind=skDecl and IsConst=True
+    Value: TNPC_ASTValue; // used for evaluation
     //
     // for inline methods: Name = { ... }
     ValueExpr: TNPC_ASTExpression;
@@ -111,10 +113,13 @@ type
     Name: UTF8String;
     Table: TDictionary<UTF8String, TNPCSymbol>; // no overloads/polymorphism for now
     //Table: TDictionary<UTF8String, TObjectList<TNPCSymbol>>; // enable overloads/polymorphism
+    Deferred: TObjectList<TNPC_ASTExpression>;
     Parent: TNPCScope;
     //
 //    procedure Init;
     procedure DuplicateSymbolError(const ASymbol, AExisting: TNPCSymbol);
+  public
+    //Memory: PByte; // Pointer; // stack frame base
   public
     constructor Create(AParent: TNPCScope; const AName: UTF8String);
     destructor Destroy; override;
@@ -127,10 +132,18 @@ type
     //
     procedure AddSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
     procedure AddOrSetSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
+    procedure AddDefer(const Expr: TNPC_ASTExpression);
     //
-    function FindLocal(const AName: UTF8String): TNPCSymbol;
-    function TryGetSymbol(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
-    function ResolveSymbol(const AName: UTF8String): TNPCSymbol;
+    function  FindLocal(const AName: UTF8String): TNPCSymbol;
+    function  TryGetSymbol(const AName: UTF8String; out ASymbol: TNPCSymbol): Boolean;
+    function  ResolveSymbol(const AName: UTF8String): TNPCSymbol;
+    procedure ExecuteDeferred;
+    //
+    function  ResolveTypeKind(const ATypeRef: TNPC_ASTTypeReference): TNPCSymbolType;
+    function  ResolveNullValue(TypeRef: TNPC_ASTType): Variant;
+    procedure SetSymbolValue(Sym: TNPCSymbol; const Value: TNPC_ASTValue);
+    procedure WriteValueToMemory(Dest: PByte; const Value: TNPC_ASTValue; TypeRef: TNPC_ASTType; Size: Integer);
+
     //
     //
     function DefineBuiltinType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
@@ -180,10 +193,10 @@ type
     AST_TYPE_BITSET,
     AST_TYPE_ARRAY,
     AST_TYPE_ARRAY_SLICE,
-    AST_TYPE_TUPLE,
-    AST_TYPE_TUPLE_DESCRIPTION,
     AST_TYPE_RECORD,
     AST_TYPE_RECORD_DESCRIPTION,
+    AST_TYPE_TUPLE,
+    AST_TYPE_TUPLE_DESCRIPTION,
     AST_TYPE_CLASS,
     AST_TYPE_CLASS_DESCRIPTION,
     AST_TYPE_CLASS_METHOD,
@@ -194,6 +207,7 @@ type
 //    AST_IDENT, // AST_LITERAL ???
 //    AST_NUMBER, // AST_LITERAL ???
     AST_EXPRESSION_STRING, // AST_LITERAL ???
+    AST_EXPRESSION_PARAMETER,
     AST_EXPRESSION_ENUM,
     AST_EXPRESSION_ENUM_CONST,
     AST_EXPRESSION_SET,
@@ -201,7 +215,11 @@ type
     AST_EXPRESSION_ARRAY,
     AST_EXPRESSION_ARRAY_SLICE,
     AST_EXPRESSION_RECORD,
-    AST_EXPRESSION_ASSIGN,
+    AST_EXPRESSION_TUPLE,
+    AST_EXPRESSION_TUPLE_ITEM,
+    //
+    AST_EXPRESSION_ASSIGN, // a := expression returning single value
+    AST_EXPRESSION_MULTI_ASSIGN, // a, b := expression returning tuple values
     AST_EXPRESSION_IF, // ternary, eg: x := if cond then true_expr else false_expr;
     AST_EXPRESSION_CASE, // ternary, eg: x := case selector of branches_expr else default_expr end;
     AST_EXPRESSION_IN_OP,
@@ -217,6 +235,9 @@ type
     AST_STATEMENT_BITSET,
     AST_STATEMENT_ASSIGN, // a := expression returning single value
     AST_STATEMENT_MULTI_ASSIGN, // a, b := expression returning tuple values
+    AST_STATEMENT_RETURN,
+    AST_STATEMENT_RESULT,
+    AST_STATEMENT_DEFER, // at scope exit
     AST_STATEMENT_IF,
     AST_STATEMENT_CASE,
     AST_STATEMENT_BREAK,
@@ -253,7 +274,9 @@ type
   public
     // &Type = AST_EXPRESSION
     Flags: LongWord;
+    ResolvedSymbol: TNPCSymbol;
     InferredType: TNPC_ASTType; //TNPC_ASTTypeDefinition;
+    IsAssignable: Boolean; // means, if can be done like this: func() := value - no; but a := 10 - ok
     EndToken: TNPCToken;
     //
     constructor Create(const ALocation: TNPCLocation); override;
@@ -493,6 +516,7 @@ type
     constructor Create(const ALocation: TNPCLocation; const AValue: UTF8String; AType: TNPC_ASTType); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -505,6 +529,7 @@ type
 //    constructor Create(const ALocation: TNPCLocation; const AElementType: TNPC_ASTType); reintroduce;
 //    destructor Destroy; override;
 //    //
+//    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
 //    function ToString: String; override;
 //  end;
 
@@ -518,6 +543,7 @@ type
     constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; AValue: Integer; AType: TNPC_ASTType); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -530,7 +556,8 @@ type
     constructor Create(const ALocation: TNPCLocation; const AElementType: TNPC_ASTType); reintroduce;
     destructor Destroy; override;
     //
-    //function ToString: String; override;
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
   end;
 
   // set literal: [Red, Green, Blue]
@@ -543,6 +570,7 @@ type
     constructor Create(const ALocation: TNPCLocation; AType: TNPC_ASTTypeSet); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -551,6 +579,7 @@ type
     // &Type = AST_DECLARATION
     Name: UTF8String;
     Symbol: TNPCSymbol; // resolved symbol during parsing / semantic analysis
+    Base: TNPC_ASTExpression; // set by children, nil for root
     //
     constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; ASymbol: TNPCSymbol); reintroduce;
     destructor Destroy; override;
@@ -568,6 +597,7 @@ type
     constructor Create(const ALocation: TNPCLocation; const AName: UTF8String); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -580,6 +610,7 @@ type
     constructor Create(const ALocation: TNPCLocation; const AValue: UTF8String; AType: TNPC_ASTType); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -591,6 +622,30 @@ type
     constructor Create(const ALocation: TNPCLocation; const AValue: UTF8String); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
+  end;
+
+  TNPC_ASTExpressionNull = class(TNPC_ASTExpression)
+  public
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
+  end;
+
+  TNPC_ASTExpressionParameter = class(TNPC_ASTExpression) // call argument
+  public
+    // &Type = AST_EXPRESSION_PARAMETER
+    //Declaration: TNPC_ASTExpression;
+    TypeRef: TNPC_ASTTypeReference;
+    Name: UTF8String;
+    ParameterType: TNPC_ASTType;
+    ParamValue: TNPC_ASTExpression;
+    //
+    //constructor Create(const ALocation: TNPCLocation; ADeclaration: TNPC_ASTExpression; const AName: UTF8String; const AParameterType: TNPC_ASTType; const AParamValue: TNPC_ASTExpression); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; ATypeRef: TNPC_ASTTypeReference; const AName: UTF8String; const AParameterType: TNPC_ASTType; const AParamValue: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+    //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -603,6 +658,7 @@ type
     constructor Create(const ALocation: TNPCLocation; const AOp: UTF8String; ARight: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -616,6 +672,7 @@ type
     constructor Create(const ALocation: TNPCLocation; ALeft: TNPC_ASTExpression; const AOp: UTF8String; ARight: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -632,7 +689,21 @@ type
     function ToString: String; override;
   end;
 
+  TNPC_ASTExpressionMultiAssign = class(TNPC_ASTExpression)
+  public
+    // &Type = AST_EXPRESSION_MULTI_ASSIGN
+    Targets: TObjectList<TNPC_ASTExpressionVariable>;
+    ValueExpr: TNPC_ASTExpression; // usually tuple or function call
+    //
+    constructor Create(const ALocation: TNPCLocation; ATargets: TObjectList<TNPC_ASTExpressionVariable>; AValue: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+    //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
+  end;
+
   TNPC_ASTExpressionIf = class(TNPC_ASTExpression)
+  public
     // &Type = AST_EXPRESSION_IF
     Cond: TNPC_ASTExpression;
     ThenExpr,
@@ -645,13 +716,17 @@ type
     function ToString: String; override;
   end;
 
-  TNPC_ASTExpressionCaseBranch = class
+  TNPC_ASTExpressionCaseBranch = class(TNPC_ASTExpression)
   public
+    // &Type = AST_EXPRESSION_CASE
     IfValues: TObjectList<TNPC_ASTExpression>; // list of constant expressions like 1, 2, 3
     ResultExpr: TNPC_ASTExpression; // expression for this branch
     //
-    constructor Create;
+    constructor Create(const ALocation: TNPCLocation); override;
     destructor Destroy; override;
+    //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
   end;
 
   TNPC_ASTExpressionCaseBranches = TObjectList<TNPC_ASTExpressionCaseBranch>;
@@ -680,6 +755,7 @@ type
     constructor Create(const ALocation: TNPCLocation; ALeft, ARight: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -693,6 +769,7 @@ type
     constructor Create(const ALocation: TNPCLocation; ABase, AIndex: TNPC_ASTExpression; AElemType: TNPC_ASTType); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -706,6 +783,34 @@ type
     constructor Create(const ALocation: TNPCLocation; ABase: TNPC_ASTExpression; const AFieldName: UTF8String; AFieldType: TNPC_ASTType); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
+  end;
+
+  TNPC_ASTTupleItem = class(TNPC_ASTExpression)
+  public
+    // &Type = AST_EXPRESSION_TUPLE_ITEM
+    Name: UTF8String; // '' if positional
+    Expr: TNPC_ASTExpression;
+    //
+    constructor Create(const ALocation: TNPCLocation); reintroduce;
+    destructor Destroy; override;
+    //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
+    function ToString: String; override;
+  end;
+
+  TNPC_ASTExpressionTuple = class(TNPC_ASTExpression) // tuple value
+  public
+    // &Type = AST_EXPRESSION_TUPLE
+    //Values: TObjectList<TNPC_ASTExpression>;
+    //Values: TDictionary<UTF8String, TNPC_ASTExpression>;
+    Items: TObjectList<TNPC_ASTTupleItem>;
+    //
+    constructor Create(const ALocation: TNPCLocation); reintroduce;
+    destructor Destroy; override;
+    //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -718,31 +823,31 @@ type
     constructor Create(const ALocation: TNPCLocation; ACallee: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
-  TNPC_ASTExpressionMember = class(TNPC_ASTExpression) // e.g. a.b
+  TNPC_ASTExpressionMember = class(TNPC_ASTExpressionVariable) // e.g. a.b
   public
     // &Type = AST_STRUCT_MEMBER
-    Owner: TNPC_ASTExpression;
-    Member: UTF8String;
     MemberType: TNPC_ASTType;
     //
-    constructor Create(const ALocation: TNPCLocation; AOwner: TNPC_ASTExpression; const AMember: UTF8String; const AMemberType: TNPC_ASTType); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; ABase: TNPC_ASTExpression; const AMember: UTF8String; const AMemberSymbol: TNPCSymbol; const AMemberType: TNPC_ASTType); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
-  TNPC_ASTExpressionIndex = class(TNPC_ASTExpression) // e.g. a[0]
+  TNPC_ASTExpressionIndex = class(TNPC_ASTExpressionVariable) // e.g. a[0]
   public
     // &Type = AST_ARRAY_INDEX
-    Target: TNPC_ASTExpression;
     Index: TNPC_ASTExpression;
     //
-    constructor Create(const ALocation: TNPCLocation; ATarget, AIndex: TNPC_ASTExpression); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; const ABase, AIndex: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
     //
+    function Eval(Scope: TNPCScope): TNPC_ASTValue; override;
     function ToString: String; override;
   end;
 
@@ -825,7 +930,7 @@ type
   TNPC_ASTParamContext = (pcParam, pcReturn);
   TNPC_ASTParamModifier = (pmNone, pmConst, pmVar, pmOut);
 
-  TNPC_ASTParameter = class(TNPC_ASTStatementVariableDeclaration)
+  TNPC_ASTParameter = class(TNPC_ASTStatementVariableDeclaration) // declaration param
   public
     Modifier: TNPC_ASTParamModifier;
     //
@@ -877,6 +982,33 @@ type
     Value: TNPC_ASTExpression;
     //
     constructor Create(const ALocation: TNPCLocation; ATargets: TObjectList<TNPC_ASTExpression>; AValue: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTStatementReturn = class(TNPC_ASTStatement) // store function return values and exit
+  public
+    // &Type = AST_STATEMENT_RETURN
+    Expr: TNPC_ASTExpression; // tuple or single value
+    //
+    constructor Create(const ALocation: TNPCLocation; AExpression: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTStatementResult = class(TNPC_ASTStatement) // store function return values
+  public
+    // &Type = AST_STATEMENT_RESULT
+    Expr: TNPC_ASTExpression; // tuple or single value
+    //
+    constructor Create(const ALocation: TNPCLocation; AExpression: TNPC_ASTExpression); reintroduce;
+    destructor Destroy; override;
+  end;
+
+  TNPC_ASTStatementDefer = class(TNPC_ASTStatement)
+  public
+    // &Type = AST_STATEMENT_DEFER
+    Expr: TNPC_ASTExpression;
+    //
+    constructor Create(const ALocation: TNPCLocation; AExpr: TNPC_ASTExpression); reintroduce;
     destructor Destroy; override;
   end;
 
@@ -973,6 +1105,7 @@ begin
   Size := -1;
   IsConst := AConst;
   ConstValue := Unassigned; // used if Kind=skDecl and IsConst=True
+  Value := Unassigned;
   ValueExpr := Nil;
   ProcDecl := Nil;
 end;
@@ -995,6 +1128,7 @@ begin
 //    FreeAndNil(PropInfo);
   DeclNode := Nil;
   ConstValue := Unassigned;
+  Value := Unassigned;
   if ValueExpr <> Nil then
     FreeAndNil(ValueExpr);
   if ProcDecl <> Nil then
@@ -1009,6 +1143,7 @@ begin
   Name := AName;
   Table := TDictionary<UTF8String, TNPCSymbol>.Create; // no overloads/polymorphism for now
 //  Table := TDictionary<UTF8String, TObjectList<TNPCSymbol>>.Create; // enable overloads/polymorphism
+  Deferred := TObjectList<TNPC_ASTExpression>.Create(True);
   Parent := AParent;
 end;
 
@@ -1019,6 +1154,7 @@ begin
   for Symbol in Table.Values do
     Symbol.Free;
   FreeAndNil(Table);
+  FreeAndNil(Deferred);
   inherited;
 end;
 
@@ -1057,6 +1193,11 @@ end;
 procedure TNPCScope.AddOrSetSymbol(const AName: UTF8String; ASymbol: TNPCSymbol);
 begin
   Table.AddOrSetValue(AName, ASymbol);
+end;
+
+procedure TNPCScope.AddDefer(const Expr: TNPC_ASTExpression);
+begin
+  Deferred.Add(Expr);
 end;
 
 function TNPCScope.FindLocal(const AName: UTF8String): TNPCSymbol;
@@ -1109,6 +1250,139 @@ begin
   if Assigned(Parent) then
     Exit(Parent.ResolveSymbol(AName));
   Result := Nil;
+end;
+
+procedure TNPCScope.ExecuteDeferred;
+var
+  i: Integer;
+begin
+  for i := Deferred.Count - 1 downto 0 do
+    Deferred[i].Eval(Self); // LIFO execution
+end;
+
+function TNPCScope.ResolveTypeKind(const ATypeRef: TNPC_ASTTypeReference): TNPCSymbolType;
+begin
+  case ATypeRef.Kind of
+    REF_Named: begin
+      if not Assigned(ATypeRef.BaseSymbol) then
+        Exit(TYPE_Unresolved);
+
+      Result := ATypeRef.BaseSymbol.&Type;
+    end;
+
+    REF_Array: begin
+      Result := TYPE_Array;
+    end;
+
+    REF_Record: begin
+      Result := TYPE_Record;
+    end;
+
+    REF_Function: begin
+      Result := TYPE_Procedure;
+    end;
+  else
+    Result := TYPE_Unresolved;
+  end;
+end;
+
+function TNPCScope.ResolveNullValue(TypeRef: TNPC_ASTType): Variant;
+var
+  Ref: TNPC_ASTTypeReference;
+begin
+  if not (TypeRef is TNPC_ASTTypeReference) then
+    raise NPCSemanticError.SemanticError(TypeRef.Location, 'multi-assignment requires tuple');
+
+  Ref := TNPC_ASTTypeReference(TypeRef);
+
+  case ResolveTypeKind(Ref) of
+    TYPE_Literal  : begin // other simple types are stored here
+      case Ref.Kind of
+        REF_Named   : begin   // String, MyType, List<T>
+          if not Assigned(Ref.BaseSymbol) then
+            Exit(Null);
+
+          //Ref.BaseSymbol.TypeRef
+//          AST_BOOLEAN : Result := 0;
+//          AST_STRING  : Result := '';
+        end;
+
+        REF_Array   : begin // Array of T
+          Result := Null;
+        end;
+
+        REF_Record  : begin // record ... end
+//          Result := CreateEmptyRecord(TypeRef);
+        end;
+
+        REF_Function: begin // function/procedure
+          Result := Null;
+        end;
+      end;
+    end;
+
+    TYPE_Class    : begin
+      Result := Null;
+    end;
+
+    TYPE_Pointer  : begin
+      Result := Null;
+    end;
+
+    TYPE_Procedure: begin // procedure / function
+      Result := Null;
+    end;
+  else
+    Result := Null;
+  end;
+end;
+
+procedure TNPCScope.SetSymbolValue(Sym: TNPCSymbol; const Value: TNPC_ASTValue);
+var
+  Dest: PByte;
+begin
+  if Sym = Nil then
+    raise NPCCompilerError.Create('internal error: symbol not set');
+
+  if Sym.IsConst then
+    raise NPCSemanticError.SemanticError(Sym.Location, Format('cannot assign to const "%s"', [Sym.Name]));
+
+  // Resolve memory location
+  if Sym.Scope = Nil then
+    raise NPCCompilerError.CreateFmt('symbol "%s" has no scope', [Sym.Name]);
+
+//  if Sym.Scope.Memory = Nil then
+//    raise NPCCompilerError.CreateFmt('scope for "%s" has no memory', [Sym.Name]);
+
+//  Dest := Sym.Scope.Memory;
+//  Inc(Dest, Sym.Offset);
+//
+//  // Write value
+//  WriteValueToMemory(Dest, Value, Sym.TypeRef, Sym.Size);
+  Sym.Value := Value;
+end;
+
+procedure TNPCScope.WriteValueToMemory(Dest: PByte; const Value: TNPC_ASTValue; TypeRef: TNPC_ASTType; Size: Integer);
+begin
+//  case ResolveTypeKind(TypeRef) of
+//    // INTEGER / BOOLEAN
+//    AST_INT,
+//    AST_BOOLEAN : PInteger(Dest)^ := Value.AsInteger;
+//
+//    // STRING
+//    AST_STRING  : PPointer(Dest)^ := Pointer(Value.AsString);
+//
+//    // ARRAY (reference)
+//    AST_ARRAY   : PPointer(Dest)^ := Value.AsPointer;
+//
+//    // RECORD (value copy)
+//    AST_RECORD  : Move(Value.AsRecord^, Dest^, Size);
+//
+//    // FUNCTION (reference)
+//    AST_FUNCTION: PPointer(Dest)^ := Value.AsPointer;
+//  else
+//    raise NPCCompilerError.Create('unsupported type in WriteValueToMemory');
+//  end;
 end;
 
 function TNPCScope.DefineBuiltinType(const ALocation: TNPCLocation; const AName: UTF8String; AType: TNPCSymbolType; ASize: Integer; ATypeRef: TNPC_ASTType): TNPCSymbol;
@@ -1241,14 +1515,17 @@ begin
   &Type := AST_EXPRESSION;
   Flags := 0;
   //
+  ResolvedSymbol := Nil;
   InferredType := Nil;
+  IsAssignable := True; // default, not possible for: func() := value
   EndToken := Nil;
 end;
 
 destructor TNPC_ASTExpression.Destroy;
 begin
-  EndToken := Nil;
+  ResolvedSymbol := Nil;
   FreeAndNil(InferredType);
+  EndToken := Nil;
   inherited;
 end;
 
@@ -1629,6 +1906,11 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionLiteral.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := Value;
+end;
+
 function TNPC_ASTExpressionLiteral.ToString: String;
 begin
   Result := '<literal>';
@@ -1651,6 +1933,11 @@ begin
   if EnumType <> Nil then
     FreeAndNil(EnumType);
   inherited;
+end;
+
+function TNPC_ASTExpressionEnumConst.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := Value;
 end;
 
 function TNPC_ASTExpressionEnumConst.ToString: String;
@@ -1680,6 +1967,16 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionSet.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
+function TNPC_ASTExpressionSet.ToString: String;
+begin
+  Result := '<set>';
+end;
+
 { TNPC_ASTExpressionSetLiteral }
 
 constructor TNPC_ASTExpressionSetLiteral.Create(const ALocation: TNPCLocation; AType: TNPC_ASTTypeSet);
@@ -1702,6 +1999,11 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionSetLiteral.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
 function TNPC_ASTExpressionSetLiteral.ToString: String;
 begin
   Result := '<set-literal>';
@@ -1715,6 +2017,7 @@ begin
   &Type := AST_DECLARATION;
   Name := AName;
   Symbol := ASymbol; // resolved symbol during parsing / semantic analysis
+  Base := Nil;
 end;
 
 destructor TNPC_ASTExpressionVariable.Destroy;
@@ -1722,6 +2025,8 @@ begin
   Name := '';
   if Symbol <> Nil then
     FreeAndNil(Symbol);
+  if Base <> Nil then
+    FreeAndNil(Base);
   inherited;
 end;
 
@@ -1755,6 +2060,11 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionIdent.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
 function TNPC_ASTExpressionIdent.ToString: String;
 begin
   Result := '<identifier>';
@@ -1778,6 +2088,11 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionNumber.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := Value;
+end;
+
 function TNPC_ASTExpressionNumber.ToString: String;
 begin
   Result := '<number>';
@@ -1798,9 +2113,62 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionString.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := Value;
+end;
+
 function TNPC_ASTExpressionString.ToString: String;
 begin
   Result := '<string>';
+end;
+
+{ TNPC_ASTExpressionNull }
+
+function TNPC_ASTExpressionNull.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := 0;
+end;
+
+function TNPC_ASTExpressionNull.ToString: String;
+begin
+  Result := '<null>';
+end;
+
+{ TNPC_ASTExpressionParameter }
+
+//constructor TNPC_ASTExpressionParameter.Create(const ALocation: TNPCLocation; ADeclaration: TNPC_ASTExpression; const AName: UTF8String; const AParameterType: TNPC_ASTType; const AParamValue: TNPC_ASTExpression);
+constructor TNPC_ASTExpressionParameter.Create(const ALocation: TNPCLocation; ATypeRef: TNPC_ASTTypeReference; const AName: UTF8String; const AParameterType: TNPC_ASTType; const AParamValue: TNPC_ASTExpression);begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_PARAMETER;
+  //Declaration := ADeclaration;
+  TypeRef := TypeRef;
+  Name := AName;
+  ParameterType := AParameterType;
+  ParamValue := AParamValue;
+end;
+
+destructor TNPC_ASTExpressionParameter.Destroy;
+begin
+  //Declaration := Nil;
+  FreeAndNil(TypeRef);
+  Name := '';
+  ParameterType := Nil;
+  FreeAndNil(ParamValue);
+  inherited;
+end;
+
+function TNPC_ASTExpressionParameter.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  if Assigned(ParamValue) then
+    Result := ParamValue.Eval(Scope)
+  else
+    Result := '';
+end;
+
+function TNPC_ASTExpressionParameter.ToString: String;
+begin
+  Result := '<param>';
 end;
 
 { TNPC_ASTExpressionUnary }
@@ -1819,6 +2187,11 @@ begin
   if Right <> Nil then
     FreeAndNil(Right);
   inherited;
+end;
+
+function TNPC_ASTExpressionUnary.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
 end;
 
 function TNPC_ASTExpressionUnary.ToString: String;
@@ -1845,6 +2218,11 @@ begin
   if Right <> Nil then
     FreeAndNil(Right);
   inherited;
+end;
+
+function TNPC_ASTExpressionBinary.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
 end;
 
 function TNPC_ASTExpressionBinary.ToString: String;
@@ -1880,6 +2258,68 @@ end;
 function TNPC_ASTExpressionAssign.ToString: String;
 begin
   Result := '<assign-expr>';
+end;
+
+{ TNPC_ASTExpressionMultiAssign }
+
+constructor TNPC_ASTExpressionMultiAssign.Create(const ALocation: TNPCLocation; ATargets: TObjectList<TNPC_ASTExpressionVariable>; AValue: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_MULTI_ASSIGN;
+  Targets := ATargets; // TObjectList<TNPC_ASTExpressionVariable>;
+  ValueExpr := AValue; // TNPC_ASTExpression; // usually tuple or function call
+end;
+
+destructor TNPC_ASTExpressionMultiAssign.Destroy;
+begin
+  if Targets <> Nil then
+    FreeAndNil(Targets);
+  if ValueExpr <> Nil then
+    FreeAndNil(ValueExpr);
+  inherited;
+end;
+
+function TNPC_ASTExpressionMultiAssign.Eval(Scope: TNPCScope): TNPC_ASTValue;
+var
+  Tuple: TNPC_ASTExpressionTuple;
+  Values: Array of TNPC_ASTExpression;
+  i: Integer;
+  Sym: TNPCSymbol;
+  Val: TNPC_ASTValue;
+begin
+  // RHS must be tuple or function returning tuple
+  if not (ValueExpr is TNPC_ASTExpressionTuple) then
+    raise NPCSemanticError.SemanticError(Location, 'multi-assignment requires tuple');
+
+  Tuple := TNPC_ASTExpressionTuple(ValueExpr);
+
+  // bind tuple -> array
+  SetLength(Values, Targets.Count);
+  for i := 0 to Targets.Count - 1 do
+    Values[i] := Tuple.Items[i].Expr;
+
+  // assign
+  for i := 0 to Targets.Count - 1 do begin
+    Sym := Targets[i].ResolvedSymbol;
+
+    // type validation
+//    Scope.Parser.ValidateTypeCompatibility(Sym.TypeRef, Values[i]);
+
+    // evaluate value
+//    if Values[i] is TNPC_ASTExpressionNull then
+//      Val := Scope.Parser.ResolveNullValue(Sym.TypeRef)
+//    else
+//      Val := Values[i].Eval(Scope);
+//
+//    Scope.Parser.SetSymbolValue(Sym, Val);
+  end;
+
+  Result := Default(TNPC_ASTValue);
+end;
+
+function TNPC_ASTExpressionMultiAssign.ToString: String;
+begin
+  Result := '<multi-assign-expr>';
 end;
 
 { TNPC_ASTExpressionIf }
@@ -1921,8 +2361,10 @@ end;
 
 { TNPC_ASTExpressionCaseBranch }
 
-constructor TNPC_ASTExpressionCaseBranch.Create;
+constructor TNPC_ASTExpressionCaseBranch.Create(const ALocation: TNPCLocation);
 begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_CASE;
   IfValues := TObjectList<TNPC_ASTExpression>.Create(False);
   ResultExpr := Nil;
 end;
@@ -1937,6 +2379,16 @@ begin
   if ResultExpr <> Nil then
     FreeAndNil(ResultExpr);
   inherited;
+end;
+
+function TNPC_ASTExpressionCaseBranch.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
+function TNPC_ASTExpressionCaseBranch.ToString: String;
+begin
+  Result := '<case-if>';
 end;
 
 { TNPC_ASTExpressionCase }
@@ -2012,6 +2464,11 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionInOp.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
 function TNPC_ASTExpressionInOp.ToString: String;
 begin
   Result := '<in-op>';
@@ -2037,6 +2494,11 @@ begin
   if ElemType <> Nil then
     FreeAndNil(ElemType);
   inherited;
+end;
+
+function TNPC_ASTExpressionArray.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
 end;
 
 function TNPC_ASTExpressionArray.ToString: String;
@@ -2065,9 +2527,69 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionRecord.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
 function TNPC_ASTExpressionRecord.ToString: String;
 begin
   Result := '<record>';
+end;
+
+{ TNPC_ASTTupleItem }
+
+constructor TNPC_ASTTupleItem.Create(const ALocation: TNPCLocation);
+begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_TUPLE_ITEM;
+  Name := ''; // '' if positional
+  Expr := Nil;
+end;
+
+destructor TNPC_ASTTupleItem.Destroy;
+begin
+  Name := ''; // '' if positional
+  FreeAndNil(Expr);
+  inherited;
+end;
+
+function TNPC_ASTTupleItem.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
+function TNPC_ASTTupleItem.ToString: String;
+begin
+  Result := '<tuple-item>';
+end;
+
+{ TNPC_ASTExpressionTuple }
+
+constructor TNPC_ASTExpressionTuple.Create(const ALocation: TNPCLocation);
+begin
+  inherited Create(ALocation);
+  &Type := AST_EXPRESSION_TUPLE;
+  //Values := TObjectList<TNPC_ASTExpression>;
+  //Values := TDictionary<UTF8String, TNPC_ASTExpression>.Create;
+  Items := TObjectList<TNPC_ASTTupleItem>.Create(True);
+end;
+
+destructor TNPC_ASTExpressionTuple.Destroy;
+begin
+  //FreeAndNil(Values);
+  FreeAndNil(Items);
+  inherited;
+end;
+
+function TNPC_ASTExpressionTuple.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
+function TNPC_ASTExpressionTuple.ToString: String;
+begin
+  Result := '<tuple>';
 end;
 
 { TNPC_ASTExpressionCall }
@@ -2092,6 +2614,11 @@ begin
   inherited;
 end;
 
+function TNPC_ASTExpressionCall.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
+end;
+
 function TNPC_ASTExpressionCall.ToString: String;
 begin
   Result := '<call>';
@@ -2099,23 +2626,24 @@ end;
 
 { TNPC_ASTExpressionMember }
 
-constructor TNPC_ASTExpressionMember.Create(const ALocation: TNPCLocation; AOwner: TNPC_ASTExpression; const AMember: UTF8String; const AMemberType: TNPC_ASTType);
+constructor TNPC_ASTExpressionMember.Create(const ALocation: TNPCLocation; ABase: TNPC_ASTExpression; const AMember: UTF8String; const AMemberSymbol: TNPCSymbol; const AMemberType: TNPC_ASTType);
 begin
-  inherited Create(ALocation);
+  inherited Create(ALocation, AMember, AMemberSymbol);
   &Type := AST_EXPRESSION_STRUCT_MEMBER;
-  Owner := AOwner;
-  Member := AMember;
+  Base := ABase;
   MemberType := AMemberType;
 end;
 
 destructor TNPC_ASTExpressionMember.Destroy;
 begin
-  if Owner <> Nil then
-    FreeAndNil(Owner);
-  Member := '';
   if MemberType <> Nil then
     FreeAndNil(MemberType);
   inherited;
+end;
+
+function TNPC_ASTExpressionMember.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
 end;
 
 function TNPC_ASTExpressionMember.ToString: String;
@@ -2125,21 +2653,24 @@ end;
 
 { TNPC_ASTExpressionIndex }
 
-constructor TNPC_ASTExpressionIndex.Create(const ALocation: TNPCLocation; ATarget, AIndex: TNPC_ASTExpression);
+constructor TNPC_ASTExpressionIndex.Create(const ALocation: TNPCLocation; const ABase, AIndex: TNPC_ASTExpression);
 begin
-  inherited Create(ALocation);
+  inherited Create(ALocation, '', Nil);
   &Type := AST_EXPRESSION_ARRAY_INDEX;
-  Target := ATarget;
+  Base := ABase;
   Index := AIndex;
 end;
 
 destructor TNPC_ASTExpressionIndex.Destroy;
 begin
-  if Target <> Nil then
-    FreeAndNil(Target);
   if Index <> Nil then
     FreeAndNil(Index);
   inherited;
+end;
+
+function TNPC_ASTExpressionIndex.Eval(Scope: TNPCScope): TNPC_ASTValue;
+begin
+  Result := '';
 end;
 
 function TNPC_ASTExpressionIndex.ToString: String;
@@ -2173,6 +2704,7 @@ constructor TNPC_ASTStatementBlock.Create(const ALocation: TNPCLocation; AParent
 begin
   inherited Create(ALocation);
   &Type := AST_BLOCK;
+  Flags := AFlags;
   ParentBlock := AParent;
   Statements := TObjectList<TNPC_ASTStatement>.Create(False);
 end;
@@ -2272,11 +2804,11 @@ begin
   &Type := AST_PROCEDURE;
   Name := AName;
   IsFunction := AIsFunction;
-  Parameters := TObjectList<TNPC_ASTParameter>.Create(False);
+  Parameters := Nil; // TObjectList<TNPC_ASTParameter>.Create(True);
   Returns := Nil;
   Body := Nil;
-  if IsFunction then
-    Returns := TObjectList<TNPC_ASTParameter>.Create(False);
+//  if IsFunction then
+//    Returns := TObjectList<TNPC_ASTParameter>.Create(True);
 end;
 
 destructor TNPC_ASTStatementProcedure.Destroy;
@@ -2284,12 +2816,14 @@ var
   i: Integer;
 begin
   Name := '';
-  for i := 0 to Parameters.Count - 1 do
-    Parameters.Items[i].Free;
-  FreeAndNil(Parameters);
+  if Parameters <> Nil then begin
+//    for i := 0 to Parameters.Count - 1 do
+//      Parameters.Items[i].Free;
+    FreeAndNil(Parameters);
+  end;
   if Returns <> Nil then begin
-    for i := 0 to Returns.Count - 1 do
-      Returns.Items[i].Free;
+//    for i := 0 to Returns.Count - 1 do
+//      Returns.Items[i].Free;
     FreeAndNil(Returns);
   end;
   Body := Nil;
@@ -2351,6 +2885,54 @@ begin
     FreeAndNil(Targets);
   if Value <> Nil then
     FreeAndNil(Value);
+  inherited;
+end;
+
+{ TNPC_ASTStatementReturn }
+
+constructor TNPC_ASTStatementReturn.Create(const ALocation: TNPCLocation; AExpression: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_STATEMENT_RETURN;
+  Expr := AExpression; // tuple or single value
+end;
+
+destructor TNPC_ASTStatementReturn.Destroy;
+begin
+  if Expr <> Nil then
+    FreeAndNil(Expr);
+  inherited;
+end;
+
+{ TNPC_ASTStatementResult }
+
+constructor TNPC_ASTStatementResult.Create(const ALocation: TNPCLocation; AExpression: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_STATEMENT_RESULT;
+  Expr := AExpression; // tuple or single value
+end;
+
+destructor TNPC_ASTStatementResult.Destroy;
+begin
+  if Expr <> Nil then
+    FreeAndNil(Expr);
+  inherited;
+end;
+
+{ TNPC_ASTStatementDefer }
+
+constructor TNPC_ASTStatementDefer.Create(const ALocation: TNPCLocation; AExpr: TNPC_ASTExpression);
+begin
+  inherited Create(ALocation);
+  &Type := AST_STATEMENT_DEFER;
+  Expr := AExpr;
+end;
+
+destructor TNPC_ASTStatementDefer.Destroy;
+begin
+  if Expr <> Nil then
+    FreeAndNil(Expr);
   inherited;
 end;
 

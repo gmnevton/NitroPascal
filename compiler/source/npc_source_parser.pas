@@ -12,7 +12,9 @@ interface
 uses
   SysUtils,
   Classes,
+  Variants,
   Generics.Collections,
+//  Rtti,
   npc_lexer,
   npc_reserved_words,
   npc_reserved_symbols,
@@ -81,6 +83,7 @@ type
     ASTree: TNPC_AST;
     ScopeStack: TObjectList<TNPCScope>;
     CurrentScope: TNPCScope;
+    ReturnToScope: TNPCScope;
     CurrentBlock: TNPC_ASTStatementBlock;
   private
     Imports: TNPCImportArray;
@@ -95,6 +98,9 @@ type
     Builtin_Type_Extended: TNPC_ASTTypeDefinition;
     //
     Builtin_Type_String: TNPC_ASTTypeDefinition;
+    //
+    Builtin_Type_Pointer: TNPC_ASTTypeDefinition;
+    Builtin_Type_Null: TNPC_ASTTypeDefinition;
     //
     Builtin_Type_ClassSymbol: TNPC_ASTTypeDefinition;
   private
@@ -142,7 +148,6 @@ type
     function  LookupSymbol(const AName: String): TNPCSymbol;
     function  ResolveType(const ATypeName: String; out AType: TNPC_ASTType): Boolean;
     function  ResolveTypeSize(const ATypeRef: TNPC_ASTTypeReference): Integer;
-    function  ResolveTypeKind(const ATypeRef: TNPC_ASTTypeReference): TNPCSymbolType;
     function  FindClassMethod(const AClassSym: TNPCSymbol; const AMethodName: String; const AClassMethodDefinitionLocation: TNPCLocation): TNPCSymbol;
     function  ClassContainsMethod(const AClassType: TNPC_ASTTypeClass; const AMethodName: UTF8String; out AMethod: TNPC_ASTType; out AMethodSymbol: TNPCSymbol): Boolean;
     function  ClassContainsProperty(const AClassType: TNPC_ASTTypeClass; const APropertyName: UTF8String; out AProperty: TNPC_ASTType; out APropertySymbol: TNPCSymbol): Boolean;
@@ -151,6 +156,11 @@ type
     function  CompareTypeRef(A, B: TNPC_ASTTypeReference): Boolean;
     function  CompareRecordTypes(A, B: TNPC_ASTTypeReference): Boolean;
     function  CompareFunctionTypes(A, B: TNPC_ASTTypeReference): Boolean;
+    procedure BindTupleToVariables(const Targets: TObjectList<TNPCSymbol>; Tuple: TNPC_ASTExpressionTuple; Scope: TNPCScope);
+    procedure ValidateTypeCompatibility(Expected: TNPC_ASTType; Expr: TNPC_ASTExpression);
+    procedure ValidateTupleTypes(Proc: TNPC_ASTStatementProcedure; Tuple: TNPC_ASTExpressionTuple);
+    procedure AssignFieldValue(FieldSym: TNPCSymbol; const Value: TNPC_ASTValue);
+
 
 //    function  ExpressionToType(const AExpression: TNPC_ASTExpression): TNPC_ASTTypeExpression;
 
@@ -204,6 +214,7 @@ type
     function  ParsePrimaryExpression(const AToken: TNPCToken): TNPC_ASTExpression;
     //function  ParsePrimaryExpression(const ALeftToken: TNPCToken; const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseSimpleExpression(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
+    function  ParseVariableExpression: TNPC_ASTExpressionVariable;
 
     procedure ParseTypeDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags);
     function  ParseTypeDefinition(const ATypeToken: TNPCToken; const ATypeName: String): TNPC_ASTStatementTypeDeclaration;
@@ -237,14 +248,21 @@ type
     function  ParseProcedureDefinition(const AToken: TNPCToken; const AMethodSymbol: TNPCSymbol; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
     procedure ParseProcedureDefinitionHeader(const AProc: TNPC_ASTStatementProcedure; const AFlags: TNPCParseDeclarationFlags);
     function  ParseProcedureDefinitionBody(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTStatement;
-    function  ParseProcedureParameter(const AToken: TNPCToken; const AProcedureDecl: TNPC_ASTStatementProcedure; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
+    function  ParseParameterList(const AProcedureName: UTF8String; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TObjectList<TNPC_ASTParameter>;
+    function  ParseProcedureParameter(const AToken: TNPCToken; const AProcedureName: UTF8String; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
     function  ParseProcedureSignatureOnly(const AParent: TNPC_ASTStatementBlock; const AName: String): TNPC_ASTStatementProcedure;
     //
     function  ParseAssignment(const ALeftToken: TNPCToken): TNPC_ASTStatement;
     function  ParseAssignmentNew(const AToken: TNPCToken): TNPC_ASTStatement;
+    function  ParseAssignmentOrMulti: TNPC_ASTExpression;
     function  ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseLiteral(const AToken: TNPCToken): TNPC_ASTExpression;
     //function  ParseLiteral(const ALeftToken: TNPCToken; const AToken: TNPCToken): TNPC_ASTExpression;
+    function  ParseTupleExpression(const AToken: TNPCToken): TNPC_ASTExpression;
+    function  ParseReturn(const AToken: TNPCToken): TNPC_ASTStatement;
+    function  ParseResult(const AToken: TNPCToken): TNPC_ASTStatement;
+    function  ParseDefer(const AToken: TNPCToken): TNPC_ASTStatement;
+
     function  ParseSet(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseIndex(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
     function  ParseRecordMember(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
@@ -291,6 +309,10 @@ type
     property AST: TNPC_AST read ASTree;
   end;
 
+procedure BindTupleToReturns(Tuple: TNPC_ASTExpressionTuple; Proc: TNPC_ASTStatementProcedure; out Values: Array of TNPC_ASTExpression);
+
+// additional compiler entry points
+
 function  NPC_CompileImport(const ASourceFileName: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; out ASource: TNPCSourceParser): Boolean; stdcall; overload;
 function  NPC_CompileImport(const ASourceStream: TStringStream; const ASourceFileName: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; out ASource: TNPCSourceParser): Boolean; stdcall; overload;
 
@@ -303,13 +325,159 @@ implementation
 
 uses
   Math,
-  Variants,
+//  Variants,
   StrUtils,
   npc_consts,
   npc_project,
   npc_project_settings,
   npc_md5,
   npc_types;
+
+(*
+function EvalTuple(Expr: TNPC_ASTExpressionTuple): TValueArray;
+var
+  i: Integer;
+begin
+  SetLength(Result, Expr.Values.Count);
+
+  for i := 0 to Expr.Values.Count - 1 do
+    Result[i] := Evaluate(Expr.Values[i]);
+end;
+
+procedure AssignReturnValues(Proc: TNPC_ASTStatementProcedure; const Values: TValueArray);
+var
+  i: Integer;
+  RetSym: TNPCSymbol;
+begin
+  if Length(Values) <> Proc.Returns.Count then
+    raise Exception.Create('Return value count mismatch');
+
+  for i := 0 to Proc.Returns.Count - 1 do begin
+    RetSym := Proc.ReturnSymbols[i];
+    SetSymbolValue(RetSym, Values[i]);
+  end;
+end;
+
+procedure ExecuteReturn(Stmt: TNPC_ASTStatementReturn);
+var
+  Values: TValueArray;
+begin
+  if Stmt.Expr is TNPC_ASTExpressionTuple then
+    Values := EvalTuple(TNPC_ASTExpressionTuple(Stmt.Expr))
+  else
+    Values := [Evaluate(Stmt.Expr)];
+
+  AssignReturnValues(CurrentProcedure, Values);
+
+  CurrentReturnFrame.HasReturned := True;
+end;
+
+procedure ExecuteReturn(Stmt: TNPC_ASTStatementReturn);
+var
+  Values: array of TNPC_ASTExpression;
+  i: Integer;
+begin
+  BindTupleToReturns(Stmt.Expr, CurrentProcedure, Values);
+
+  // type validation
+  for i := 0 to High(Values) do
+    ValidateTypeCompatibility(CurrentProcedure.Returns[i].TypeRef, Values[i]);
+
+  // assignment
+  for i := 0 to High(Values) do
+    SetSymbolValue(CurrentProcedure.ReturnSymbols[i], Evaluate(Values[i]));
+
+  ReturnFrame.HasReturned := True;
+end;
+
+procedure ExecuteResult(Stmt: TNPC_ASTStatementResult);
+var
+  Values: TValueArray;
+begin
+  if Stmt.Expr is TNPC_ASTExpressionTuple then
+    Values := EvalTuple(TNPC_ASTExpressionTuple(Stmt.Expr))
+  else
+    Values := [Evaluate(Stmt.Expr)];
+
+  AssignReturnValues(CurrentProcedure, Values);
+
+  // IMPORTANT: no exit
+end;
+
+function Evaluate(Expr: TNPC_ASTExpression): TValue;
+begin
+  if Expr is TNPC_ASTExpressionNull then
+    Exit(ResolveNullValue(Expr.ExpectedType));
+
+  ...
+end;
+
+procedure InitializeClassInstance(Cls: TTypeClass);
+var
+  Prop: TClassProperty;
+  Value: TValue;
+begin
+  for Prop in Cls.Properties do
+  begin
+    if Prop.InitExpr <> nil then
+      Value := Evaluate(Prop.InitExpr)
+    else if Prop.DefaultExpr <> nil then
+      Value := Evaluate(Prop.DefaultExpr)
+    else
+      Continue;
+
+    AssignToSymbol(Prop.WriteSym, Value);
+  end;
+end;
+*)
+
+procedure BindTupleToReturns(Tuple: TNPC_ASTExpressionTuple; Proc: TNPC_ASTStatementProcedure; out Values: Array of TNPC_ASTExpression);
+var
+  i, PosIndex: Integer;
+  Item: TNPC_ASTTupleItem;
+  Used: Array of Boolean;
+begin
+  if not Assigned(Tuple) then
+    raise NPCCompilerError.Create('tuple object not set');
+  if not Assigned(Proc) then
+    raise NPCCompilerError.Create('procedure object not set');
+
+  if Tuple.Items.Count > Proc.Returns.Count then
+    raise NPCSemanticError.Create('too many tuple values');
+
+  SetLength(Used, Proc.Returns.Count);
+  PosIndex := 0;
+
+  for Item in Tuple.Items do begin
+    // NAMED
+    if Item.Name <> '' then begin
+      for i := 0 to Proc.Returns.Count - 1 do begin
+        if SameText(Proc.Returns[i].Name, Item.Name) then begin
+          Values[i] := Item.Expr;
+          Used[i] := True;
+          Break;
+        end;
+      end;
+    end
+    else begin // POSITIONAL
+      while (PosIndex < Length(Used)) and Used[PosIndex] do
+        Inc(PosIndex);
+
+      if PosIndex >= Proc.Returns.Count then
+        raise NPCSemanticError.Create('too many positional values');
+
+      Values[PosIndex] := Item.Expr;
+      Used[PosIndex] := True;
+      Inc(PosIndex);
+    end;
+  end;
+
+  // VALIDATION
+  for i := 0 to Proc.Returns.Count - 1 do begin
+    if not Used[i] then
+      raise NPCSemanticError.CreateFmt('missing value for "%s"', [Proc.Returns[i].Name]);
+  end;
+end;
 
 function NPC_CompileImport(const ASourceFileName: PChar; const ACompiler: TNPCCompiler; const AParentParser: TNPCSourceParser; out ASource: TNPCSourceParser): Boolean;
 //var
@@ -375,6 +543,7 @@ begin
   FLevel := 0;
   ScopeStack := TObjectList<TNPCScope>.Create(True); // manage and free owned objects
   CurrentScope := Nil;
+  ReturnToScope := Nil;
 end;
 
 destructor TNPCSourceParser.Destroy;
@@ -438,7 +607,7 @@ begin
 //  else if Typ is TNPC_ASTExpressionString then
 //    Result := TNPC_ASTExpressionString(Typ).Value
   else if Typ is TNPC_ASTExpressionMember then
-    Result := TNPC_ASTExpressionMember(Typ).Member
+    Result := TNPC_ASTExpressionMember(Typ).Name
   else
     Result := '<unknown>';
 end;
@@ -541,8 +710,10 @@ end;
 
 procedure TNPCSourceParser.EnterScope(const AScope: TNPCScope);
 begin
-  if AScope <> Nil then
+  if AScope <> Nil then begin
+    ReturnToScope := CurrentScope;
     CurrentScope := AScope;
+  end;
 end;
 
 //procedure TNPCSourceParser.LeaveScope;
@@ -564,8 +735,12 @@ end;
 
 procedure TNPCSourceParser.LeaveScope;
 begin
-  if CurrentScope.ParentScope <> Nil then
-    CurrentScope := CurrentScope.ParentScope;
+//  if CurrentScope.ParentScope <> Nil then
+//    CurrentScope := CurrentScope.ParentScope;
+
+  if ReturnToScope <> Nil then
+    CurrentScope := ReturnToScope;
+  ReturnToScope := Nil;
 end;
 
 procedure TNPCSourceParser.InitBuiltins(const AScope: TNPCScope);
@@ -575,7 +750,7 @@ begin
   if Builtin_Type_Boolean <> Nil then
     Exit;
   //
-  loc := TNPCLocation.Create(Self.UnitName, 578, 0);
+  loc := TNPCLocation.Create(Self.UnitName, 638, 0);
   // register built-in types
   Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(loc, 'Boolean', 1);
   AScope.DefineBuiltinType(loc, 'Boolean', TYPE_Literal, 1, Builtin_Type_Boolean);
@@ -613,8 +788,18 @@ begin
   Builtin_Type_String := TNPC_ASTTypeDefinition.Create(loc, 'String', 32);
   AScope.DefineBuiltinType(loc, 'String', TYPE_Literal, 32, Builtin_Type_String);
   //
+  Builtin_Type_Pointer := TNPC_ASTTypeDefinition.Create(loc, 'Pointer', -1);
+  AScope.DefineBuiltinType(loc, 'Pointer', TYPE_Pointer, -1, Builtin_Type_Pointer);
+  //
+  Builtin_Type_Null := TNPC_ASTTypeDefinition.Create(loc, 'Null', -1);
+  AScope.DefineConst(loc, 'Null', TYPE_Literal, -1, Builtin_Type_Null, Nil, 0);
+  AScope.DefineBuiltinTypeAlias(loc, 'null', TYPE_Literal, -1, Builtin_Type_Null); // alias
+  //
   Builtin_Type_ClassSymbol := TNPC_ASTTypeDefinition.Create(loc, 'Symbol', 32);
   AScope.DefineBuiltinType(loc, 'Symbol', TYPE_Procedure, 32, Builtin_Type_ClassSymbol);
+  //
+  loc.Free;
+end;
 
 //var
 //  intSym, boolSym, strSym: TNPCSymbol;
@@ -632,8 +817,6 @@ begin
 //  globalScope.AddOrSetValue('Boolean', boolSym);
 //  globalScope.AddOrSetValue('String', strSym);
 //end;
-  loc.Free;
-end;
 
 procedure TNPCSourceParser.Clear;
 var
@@ -1010,32 +1193,6 @@ begin
   end;
 end;
 
-function TNPCSourceParser.ResolveTypeKind(const ATypeRef: TNPC_ASTTypeReference): TNPCSymbolType;
-begin
-  case ATypeRef.Kind of
-    REF_Named: begin
-      if not Assigned(ATypeRef.BaseSymbol) then
-        Exit(TYPE_Unresolved);
-
-      Result := ATypeRef.BaseSymbol.&Type;
-    end;
-
-    REF_Array: begin
-      Result := TYPE_Array;
-    end;
-
-    REF_Record: begin
-      Result := TYPE_Record;
-    end;
-
-    REF_Function: begin
-      Result := TYPE_Procedure;
-    end;
-  else
-    Result := TYPE_Unresolved;
-  end;
-end;
-
 function TNPCSourceParser.FindClassMethod(const AClassSym: TNPCSymbol; const AMethodName: String; const AClassMethodDefinitionLocation: TNPCLocation): TNPCSymbol;
 var
   TypeDef: TNPC_ASTTypeDefinition;
@@ -1120,7 +1277,7 @@ var
 begin
   for Param in AProc.Parameters do begin
     Assert(Param.DeclaredType is TNPC_ASTTypeReference);
-    Sym := TNPCSymbol.Create(Param, KIND_Param, ResolveTypeKind(TNPC_ASTTypeReference(Param.DeclaredType)), CurrentBlock);
+    Sym := TNPCSymbol.Create(Param, KIND_Param, CurrentScope.ResolveTypeKind(TNPC_ASTTypeReference(Param.DeclaredType)), CurrentBlock);
     Sym.Size := ResolveTypeSize(TNPC_ASTTypeReference(Param.DeclaredType));
 
     CurrentScope.DefineSymbol(Sym);
@@ -1130,7 +1287,7 @@ begin
   if AProc.IsFunction and (AProc.Returns <> Nil) then begin
     for Param in AProc.Returns do begin
       Assert(Param.DeclaredType is TNPC_ASTTypeReference);
-      Sym := TNPCSymbol.Create(Param, KIND_Return, ResolveTypeKind(TNPC_ASTTypeReference(Param.DeclaredType)), CurrentBlock);
+      Sym := TNPCSymbol.Create(Param, KIND_Return, CurrentScope.ResolveTypeKind(TNPC_ASTTypeReference(Param.DeclaredType)), CurrentBlock);
       Sym.Size := ResolveTypeSize(TNPC_ASTTypeReference(Param.DeclaredType));
 
       CurrentScope.DefineSymbol(Sym);
@@ -1284,6 +1441,78 @@ begin
   Result := True;
 end;
 
+procedure TNPCSourceParser.BindTupleToVariables(const Targets: TObjectList<TNPCSymbol>; Tuple: TNPC_ASTExpressionTuple; Scope: TNPCScope);
+var
+  i: Integer;
+  Expr: TNPC_ASTExpression;
+  Val: Variant; //TNPC_ASTValue;
+begin
+  if Tuple.Items.Count <> Targets.Count then
+    raise NPCSemanticError.SemanticError(Tuple.Location, 'assignment count mismatch');
+
+  for i := 0 to Targets.Count - 1 do begin
+    Expr := Tuple.Items[i].Expr;
+
+    // type check BEFORE evaluation
+    ValidateTypeCompatibility(Targets[i].TypeRef, Expr);
+
+    // evaluate
+    if Expr is TNPC_ASTExpressionNull then
+      Val := Scope.ResolveNullValue(Targets[i].TypeRef)
+    else
+      Val := Expr.Eval(Scope);
+
+    // assign
+    Scope.SetSymbolValue(Targets[i], Val);
+  end;
+end;
+
+procedure TNPCSourceParser.ValidateTypeCompatibility(Expected: TNPC_ASTType; Expr: TNPC_ASTExpression);
+var
+  Actual: TNPC_ASTTypeReference;
+begin
+  if not (Expected is TNPC_ASTTypeReference) then
+    raise NPCSemanticError.SemanticError(Expected.Location, '?????');
+
+//  Actual := Expr.TypeRef; // assume you assign this during semantic phase
+//  Actual := Expr.InferredType; // assume you assign this during semantic phase
+
+  // null is special (handled later)
+  if Expr is TNPC_ASTExpressionNull then
+    Exit;
+
+  if not CompareTypeRef(TNPC_ASTTypeReference(Expected), Actual) then
+    raise NPCSemanticError.SemanticError(Expr.Location, Format('type mismatch, expected "%s", got "%s"', [Expected.ToString, Actual.ToString]));
+end;
+
+procedure TNPCSourceParser.ValidateTupleTypes(Proc: TNPC_ASTStatementProcedure; Tuple: TNPC_ASTExpressionTuple);
+var
+  Values: Array of TNPC_ASTExpression;
+  i: Integer;
+begin
+  BindTupleToReturns(Tuple, Proc, Values);
+
+  for i := 0 to High(Values) do
+    ValidateTypeCompatibility(Proc.Returns[i].DeclaredType, Values[i]);
+end;
+
+procedure TNPCSourceParser.AssignFieldValue(FieldSym: TNPCSymbol; const Value: TNPC_ASTValue);
+//var
+//  Instance: Pointer;
+begin
+//  // depends on your runtime model
+//  Instance := FieldSym.OwnerInstance; // you must store this
+
+//  if Instance = Nil then
+//    raise Exception.Create('field has no instance');
+
+//  // write into memory using offset
+//  Move(Value, PByte(Instance)[FieldSym.Offset], FieldSym.Size);
+  FieldSym.Value := Value;
+end;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 function TNPCSourceParser.Parse(const ASource: TStringStream; const ASourceFile: String; const ParsingImport: Boolean = False): Boolean;
 var
   token: TNPCToken;
@@ -1310,7 +1539,8 @@ begin
       Texer := TNPCTokensParser.Create(TNPCProjectSettings(SettingsPtr^).InputPath, Tokenizer.Tokens);
     try
       if ParsingType = PROJECT then begin
-        token := Texer.ExpectToken(tokIdent, '');
+        SkipComments;
+        token := Texer.ExpectToken(tokIdent, 'expected "project" keyword');
         if not TokenIsReservedIdent(token, ri_project) then begin
           token.Free;
           raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnexpectedType, [token.TokenToString, NPCReservedIdentifiers[ri_project].Ident]));
@@ -1883,6 +2113,8 @@ begin
     end
     else if TokenIsReservedSymbol(next_token, rs_Assign) or TokenIsReservedSymbol(next_token, rs_Comma) then begin // ':=' - assignment or ',' - multi-assignment
       Result := ParseAssignmentNew(token);
+//      Result := ParseAssignmentOrMulti;
+
 //      Texer.SkipToken;
 //      Texer.SkipToken;
 //      Result := ParseAssignment(token);
@@ -1909,6 +2141,15 @@ begin
 //    ParseBlock(token);
 //    Result := Nil;
     Result := ParseBlock(token);
+  end
+  else if TokenIsReservedIdent(token, ri_defer) then begin
+    Result := ParseDefer(token);
+  end
+  else if TokenIsReservedIdent(token, ri_return) then begin
+    Result := ParseReturn(token);
+  end
+  else if TokenIsReservedIdent(token, ri_result) then begin
+    Result := ParseResult(token);
   end
   else if TokenIsReservedIdent(token, ri_if) then begin
     Result := ParseIfStatement(token);
@@ -2045,7 +2286,7 @@ function TNPCSourceParser.ParsePrimaryExpression(const AToken: TNPCToken): TNPC_
 //  end;
 //end;
 var
-  token: TNPCToken;
+  token, next_token: TNPCToken;
   op: UTF8String;
   inner: TNPC_ASTExpression;
 begin
@@ -2079,8 +2320,23 @@ begin
     Texer.ExpectReservedSymbol(rs_CBracket); // ']'
     Result := inner;
   end
+  else if TokenIsReservedSymbol(AToken, rs_Dot) then begin // '.'
+    next_token := Texer.NextToken;
+    if TokenIsReservedSymbol(next_token, rs_OCurly) then begin // '{'
+      Texer.SkipToken;
+      //Texer.SkipToken;
+      inner := ParseTupleExpression(AToken);
+      //Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
+      Result := inner;
+    end
+    else begin
+      NotImplemented;
+    end;
+  end
   else
     raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnexpectedTokenTypeIn, [AToken.TokenToString, AToken.Value, '', sStatement]));
+
+  SkipComments;
 end;
 
 function TNPCSourceParser.ParseSimpleExpression(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
@@ -2217,6 +2473,63 @@ begin
   end
   else
     raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnexpectedTokenTypeIn, [AToken.TokenToString, AToken.Value, '', sStatement]));
+end;
+
+function TNPCSourceParser.ParseVariableExpression: TNPC_ASTExpressionVariable;
+var
+  token: TNPCToken;
+  Expr, Index: TNPC_ASTExpression;
+  Sym: TNPCSymbol;
+begin
+  // BASE IDENTIFIER
+  token := Texer.ExpectToken(tokIdent, 'identifier expected');
+
+  Sym := CurrentScope.ResolveSymbol(token.Value);
+  if not Assigned(Sym) then // check if it is multi-assign ???
+    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownIdentIn, [token.Value, '', sStatement]));
+
+  Expr := TNPC_ASTExpressionVariable.Create(token.Location, token.Value, Sym);
+
+  // CHAIN: .field or [index]
+  while True do begin
+    token := Texer.PeekToken;
+
+    // MEMBER ACCESS: .
+    if TokenIsReservedSymbol(token, rs_Dot) then begin // '.'
+      Texer.SkipToken;
+
+      token := Texer.ExpectToken(tokIdent, 'member name expected');
+
+      Sym := CurrentScope.ResolveSymbol(token.Value);
+      if not Assigned(Sym) then // check if it is multi-assign ???
+        raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownIdentIn, [token.Value, '', sStatement]));
+
+      Expr := TNPC_ASTExpressionMember.Create(token.Location, Expr, token.Value, Sym, Sym.TypeRef);
+    end
+
+    // INDEX ACCESS: [ ... ]
+    else if TokenIsReservedSymbol(token, rs_OBracket) then begin // '['
+      Texer.SkipToken;
+
+      token := Texer.PeekToken;
+      Index := ParseExpression(token, 0);
+      if not (Index is TNPC_ASTExpressionNumber) then
+        raise NPCSyntaxError.ParserError(token.Location, Format(sParserExpectedElementsButGot, ['index number', Index.ToString, '', sStatement]));
+
+      Expr := TNPC_ASTExpressionIndex.Create(token.Location, Expr, Index);
+
+      Texer.ExpectReservedSymbol(rs_CBracket);
+    end
+
+    else
+      Break;
+  end;
+
+  // FINAL CAST
+  if not (Expr is TNPC_ASTExpressionVariable) then
+    Result := TNPC_ASTExpressionVariable(Expr) // assuming inheritance
+  else
+    Result := TNPC_ASTExpressionVariable(Expr);
 end;
 
 procedure TNPCSourceParser.ParseTypeDeclaration(const AToken: TNPCToken; const AFlags: TNPCParseDeclarationFlags);
@@ -2511,7 +2824,7 @@ begin
 
     FieldType := ParseTypeReference;
 
-    FieldSym := TNPCSymbol.Create(token.Location, FieldName, KIND_RecordField, ResolveTypeKind(FieldType), False, FieldType, CurrentBlock);
+    FieldSym := TNPCSymbol.Create(token.Location, FieldName, KIND_RecordField, CurrentScope.ResolveTypeKind(FieldType), False, FieldType, CurrentBlock);
     Result.Fields.Add(FieldSym);
 
     Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
@@ -2556,7 +2869,7 @@ begin
 
       ParamType := ParseTypeReference;
 
-      ParamSym := TNPCSymbol.Create(token.Location, ParamName, KIND_Param, ResolveTypeKind(ParamType), False, ParamType, CurrentBlock);
+      ParamSym := TNPCSymbol.Create(token.Location, ParamName, KIND_Param, CurrentScope.ResolveTypeKind(ParamType), False, ParamType, CurrentBlock);
       Result.Params.Add(ParamSym);
 
       if TokenIsReservedSymbol(Texer.PeekToken, rs_Comma) then // ','
@@ -3351,6 +3664,7 @@ var
   token: TNPCToken;
   stmt: TNPC_ASTStatement;
   oldBlock: TNPC_ASTStatementBlock;
+  scopeName: String;
 begin
   //Texer.ExpectReservedToken(ri_begin);
   if not TokenIsReservedIdent(AToken, ri_begin) and not TokenIsReservedSymbol(AToken, rs_OCurly) then
@@ -3358,7 +3672,15 @@ begin
 
   Texer.SkipToken; // consume 'begin' / '{'
 
-  PushScope(CurrentScope, {CurrentBlock.} 'scope name'); // new lexical scope for this block
+  scopeName := 'inner scope name';
+  if CurrentBlock is TNPC_ASTStatementProcedure then
+    scopeName := 'inner_' + TNPC_ASTStatementProcedure(CurrentBlock).Name
+  else if CurrentBlock is TNPC_ASTStatementBlock then begin
+    if BLOCK_IsMainProcedure in TNPC_ASTStatementBlock(CurrentBlock).Flags then
+      scopeName := 'main block';
+  end;
+
+  PushScope(CurrentScope, scopeName); // new lexical scope for this block
   stmt := TNPC_ASTStatementBlock.Create(AToken.Location, CurrentBlock, [BLOCK_ConsistsOfOrderedStatements]);
   //AddStatement(stmt);
   try
@@ -3460,28 +3782,17 @@ var
   stmt: TNPC_ASTStatement;
   flags: TNPCParseDeclarationFlags;
 begin
+  SkipComments;
+
   // collect parameters, if any available
   token := Texer.PeekToken;
   if Texer.IsNotEmpty and not TokenIsReservedSymbol(token, rs_CParen) then begin // ')'
-    while not TokenIsReservedSymbol(token, rs_CParen) do begin
-      SkipComments;
-      flags := [decfParamMayContainModifier];
-      if decfDoNotAddSymbol in AFlags then
-        flags := [decfDoNotAddSymbol, decfParamMayContainModifier];
-      param := ParseProcedureParameter(token, AProc, pcParam, flags);
-      if Assigned(param) then
-        AProc.Parameters.Add(param);
-
-      token := Texer.PeekToken;
-      if TokenIsReservedSymbol(token, rs_Comma) then begin
-        Texer.SkipToken;
-        SkipComments;
-        token := Texer.PeekToken;
-      end
-      else
-        Break;
-    end;
+    flags := [decfParamMayContainModifier];
+    if decfDoNotAddSymbol in AFlags then
+      flags := [decfDoNotAddSymbol, decfParamMayContainModifier];
+    AProc.Parameters := ParseParameterList(AProc.Name, pcParam, flags);
   end;
+
   Texer.ExpectReservedSymbol(rs_CParen); // ')'
   SkipComments;
 
@@ -3491,48 +3802,75 @@ begin
     Texer.SkipToken;
     SkipComments;
     AProc.IsFunction := True;
-    AProc.Returns := TObjectList<TNPC_ASTParameter>.Create(False);
     //
     token := Texer.PeekToken;
     if TokenIsReservedSymbol(token, rs_OParen) then begin // '(' - tuple
-      Texer.ExpectReservedSymbol(rs_OParen);
+      //Texer.ExpectReservedSymbol(rs_OParen);
+      Texer.SkipToken;
       SkipComments;
-      token := Texer.PeekToken;
-      while not TokenIsReservedSymbol(token, rs_CParen) do begin
-        flags := [decfParamDeclarationAsTuple];
-        if decfDoNotAddSymbol in AFlags then
-          flags := [decfDoNotAddSymbol, decfParamDeclarationAsTuple];
-        param := ParseProcedureParameter(token, AProc, pcReturn, flags);
-        if Assigned(param) then
-          AProc.Returns.Add(param);
 
-        token := Texer.PeekToken;
-        if TokenIsReservedSymbol(token, rs_Comma) then begin
-          Texer.SkipToken;
-          SkipComments;
-          token := Texer.PeekToken;
-        end
-        else
-          Break;
-      end;
+      flags := [decfParamDeclarationAsTuple];
+      if decfDoNotAddSymbol in AFlags then
+        flags := [decfDoNotAddSymbol, decfParamDeclarationAsTuple];
+      AProc.Returns := ParseParameterList(AProc.Name, pcReturn, flags);
+
       SkipComments;
       Texer.ExpectReservedSymbol(rs_CParen); // ')'
     end
     else begin
-      SkipComments;
+      //SkipComments;
       flags := [];
       if decfDoNotAddSymbol in AFlags then
         flags := [decfDoNotAddSymbol];
-      param := ParseProcedureParameter(token, AProc, pcReturn, flags);
+      AProc.Returns := TObjectList<TNPC_ASTParameter>.Create(True);
+      param := ParseProcedureParameter(token, AProc.Name, pcReturn, flags);
       if Assigned(param) then
         AProc.Returns.Add(param);
     end;
     SkipComments;
-    token := Texer.PeekToken;
+    //token := Texer.PeekToken;
   end
   else
     AProc.Flags := AProc.Flags + [BLOCK_DoesNotHaveResult];
 end;
+
+//    while not TokenIsReservedSymbol(token, rs_CParen) do begin
+//      param := ParseProcedureParameter(token, AProc.Name, pcParam, flags);
+//      if Assigned(param) then
+//        AProc.Parameters.Add(param);
+//
+//      token := Texer.PeekToken;
+//      if TokenIsReservedSymbol(token, rs_Comma) then begin
+//        Texer.SkipToken;
+//        SkipComments;
+//        token := Texer.PeekToken;
+//      end
+//      else
+//        Break;
+//    end;
+//  end;
+
+//      token := Texer.PeekToken;
+//      while not TokenIsReservedSymbol(token, rs_CParen) do begin
+//        flags := [decfParamDeclarationAsTuple];
+//        if decfDoNotAddSymbol in AFlags then
+//          flags := [decfDoNotAddSymbol, decfParamDeclarationAsTuple];
+//        param := ParseProcedureParameter(token, AProc.Name, pcReturn, flags);
+//        if Assigned(param) then
+//          AProc.Returns.Add(param);
+//
+//        token := Texer.PeekToken;
+//        if TokenIsReservedSymbol(token, rs_Comma) then begin
+//          Texer.SkipToken;
+//          SkipComments;
+//          token := Texer.PeekToken;
+//        end
+//        else
+//          Break;
+//      end;
+//      SkipComments;
+//      Texer.ExpectReservedSymbol(rs_CParen); // ')'
+
 
   //    token := Texer.PeekToken;
   //    while not (TokenIsReservedIdent(token, ri_end) or TokenIsReservedSymbol(token, rs_CCurly)) do begin
@@ -3571,7 +3909,36 @@ begin
   end;
 end;
 
-function TNPCSourceParser.ParseProcedureParameter(const AToken: TNPCToken; const AProcedureDecl: TNPC_ASTStatementProcedure; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
+function TNPCSourceParser.ParseParameterList(const AProcedureName: UTF8String; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TObjectList<TNPC_ASTParameter>;
+var
+  token: TNPCToken;
+  param: TNPC_ASTParameter;
+  flags: TNPCParseDeclarationFlags;
+begin
+  Result := TObjectList<TNPC_ASTParameter>.Create(True);
+
+  token := Texer.PeekToken;
+  while not TokenIsReservedSymbol(token, rs_CParen) do begin
+    SkipComments;
+
+    flags := AFlags;
+    param := ParseProcedureParameter(token, AProcedureName, AContext, flags);
+
+    if Assigned(param) then
+      Result.Add(param);
+
+    token := Texer.PeekToken;
+    if TokenIsReservedSymbol(token, rs_Comma) then begin
+      Texer.SkipToken;
+      SkipComments;
+      token := Texer.PeekToken;
+    end
+    else
+      Break;
+  end;
+end;
+
+function TNPCSourceParser.ParseProcedureParameter(const AToken: TNPCToken; const AProcedureName: UTF8String; AContext: TNPC_ASTParamContext; const AFlags: TNPCParseDeclarationFlags): TNPC_ASTParameter;
 const
   sContext: Array[TNPC_ASTParamContext] of String = ('', 'return ');
 var
@@ -3677,16 +4044,16 @@ begin
             else
               raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserExpectedElementsButGot, ['number or string', token.Value, 'function', ' return variable']));
 
-            VarSym := TNPCSymbol.Create(AToken.Location, Name, KIND_Param, ResolveTypeKind(TypeRef), True, TypeRef, CurrentBlock);
+            VarSym := TNPCSymbol.Create(AToken.Location, Name, KIND_Param, CurrentScope.ResolveTypeKind(TypeRef), True, TypeRef, CurrentBlock);
             VarSym.ConstValue := Value;
           end
           else
-            VarSym := TNPCSymbol.Create(AToken.Location, Name, KIND_Param, ResolveTypeKind(TypeRef), True, TypeRef, CurrentBlock);
+            VarSym := TNPCSymbol.Create(AToken.Location, Name, KIND_Param, CurrentScope.ResolveTypeKind(TypeRef), True, TypeRef, CurrentBlock);
         end;
         //pmVar: ;
         //pmOut: ;
       else
-        VarSym := TNPCSymbol.Create(AToken.Location, Name, KIND_Param, ResolveTypeKind(TypeRef), False, TypeRef, CurrentBlock);
+        VarSym := TNPCSymbol.Create(AToken.Location, Name, KIND_Param, CurrentScope.ResolveTypeKind(TypeRef), False, TypeRef, CurrentBlock);
       end;
 
       if VarSym <> Nil then begin
@@ -3696,9 +4063,9 @@ begin
     end
     else begin // RETURN VALUES
       if Length(Name) = 0 then
-        Name := AProcedureDecl.Name;
+        Name := AProcedureName;
 
-      VarSym := TNPCSymbol.Create(TypeRef.Location, Name, KIND_Return, ResolveTypeKind(TypeRef), False, TypeRef, CurrentBlock);
+      VarSym := TNPCSymbol.Create(TypeRef.Location, Name, KIND_Return, CurrentScope.ResolveTypeKind(TypeRef), False, TypeRef, CurrentBlock);
       VarSym.Size := ResolveTypeSize(TypeRef);
 
       // optional: attach to function scope later
@@ -3880,6 +4247,33 @@ begin
   end;
 end;
 
+function TNPCSourceParser.ParseAssignmentOrMulti: TNPC_ASTExpression;
+var
+  Targets: TObjectList<TNPC_ASTExpressionVariable>;
+  Expr: TNPC_ASTExpression;
+begin
+  Targets := TObjectList<TNPC_ASTExpressionVariable>.Create(True);
+
+  // first target
+  Targets.Add(ParseVariableExpression);
+
+  // detect multiple
+  while TokenIsReservedSymbol(Texer.PeekToken, rs_Comma) do begin
+    Texer.SkipToken;
+    Targets.Add(ParseVariableExpression);
+  end;
+
+  // must be :=
+  Texer.ExpectReservedSymbol(rs_Assign);
+
+  Expr := ParseExpression(Texer.PeekToken, 0);
+
+  if Targets.Count = 1 then
+    Result := TNPC_ASTExpressionAssign.Create(Targets[0].Location, Targets[0], Expr)
+  else
+    Result := TNPC_ASTExpressionMultiAssign.Create(Targets[0].Location, Targets, Expr);
+end;
+
 function TNPCSourceParser.ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
 var
   token: TNPCToken;
@@ -3992,6 +4386,124 @@ begin
   else
     raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnknownIdentIn, [AToken.Value, sExpression, '']));
   end;
+end;
+
+function TNPCSourceParser.ParseTupleExpression(const AToken: TNPCToken): TNPC_ASTExpression;
+var
+  token, next_token: TNPCToken;
+  Tuple: TNPC_ASTExpressionTuple;
+  Item: TNPC_ASTTupleItem;
+  Name: UTF8String;
+  Expr: TNPC_ASTExpression;
+begin
+  Texer.ExpectReservedSymbol(rs_OCurly); // {
+
+  Tuple := TNPC_ASTExpressionTuple.Create(AToken.Location);
+//  Tuple.Items := TObjectList<TNPC_ASTTupleItem>.Create(True);
+
+  if Texer.IsEmpty then
+    Exit(Tuple);
+
+  repeat
+    SkipComments;
+
+    token := Texer.PeekToken;
+    next_token := Texer.NextToken;
+
+    Item := TNPC_ASTTupleItem.Create(token.Location);
+    Name := '';
+
+    // CASE 1: named value - ok := expr
+    if TokenIsIdent(token) and TokenIsReservedSymbol(next_token, rs_Assign) then begin
+      Name := token.Value;
+      Texer.SkipToken; // ident
+      Texer.SkipToken; // :=
+
+      SkipComments;
+
+      Expr := ParseExpression(token, 0);
+
+
+      Item.Name := Name;
+      Item.Expr := Expr;
+    end
+    else begin // CASE 2: positional value
+      Expr := ParseExpression(token, 0);
+
+      Item.Name := ''; // positional
+      Item.Expr := Expr;
+    end;
+
+    Tuple.Items.Add(Item);
+
+    SkipComments;
+
+    token := Texer.PeekToken;
+    if TokenIsReservedSymbol(token, rs_Comma) then
+    begin
+      Texer.SkipToken;
+      SkipComments;
+    end
+    else
+      Break;
+
+  until Texer.IsEmpty;
+
+  Texer.ExpectReservedSymbol(rs_CCurly); // }
+  SkipComments;
+
+  Result := Tuple;
+end;
+
+function TNPCSourceParser.ParseReturn(const AToken: TNPCToken): TNPC_ASTStatement;
+var
+  token: TNPCToken;
+  Stmt: TNPC_ASTStatementReturn;
+  Expr: TNPC_ASTExpression;
+begin
+  Texer.SkipToken;
+  token := Texer.PeekToken;
+  Expr := Nil;
+  if not TokenIsReservedSymbol(token, rs_Semicolon) then // ';'
+    Expr := ParseExpression(token, 0);
+
+  Stmt := TNPC_ASTStatementReturn.Create(AToken.Location, Expr);
+
+  Result := Stmt;
+end;
+
+function TNPCSourceParser.ParseResult(const AToken: TNPCToken): TNPC_ASTStatement;
+var
+  token: TNPCToken;
+  Stmt: TNPC_ASTStatementResult;
+  Expr: TNPC_ASTExpression;
+begin
+  Texer.SkipToken;
+  token := Texer.PeekToken;
+  Expr := ParseExpression(token, 0);
+  Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
+
+  Stmt := TNPC_ASTStatementResult.Create(AToken.Location, Expr);
+
+  Result := Stmt;
+end;
+
+function TNPCSourceParser.ParseDefer(const AToken: TNPCToken): TNPC_ASTStatement;
+var
+  token: TNPCToken;
+  Expr: TNPC_ASTExpression;
+begin
+  Texer.SkipToken;
+  SkipComments;
+
+  // parse ANY expression after defer
+  token := Texer.PeekToken;
+  Expr := ParseExpression(token, 0);
+  if not (Expr is TNPC_ASTExpressionCall) then
+    raise NPCSemanticError.SemanticError(Expr.Location, 'defer expects callable expression');
+  Texer.ExpectReservedSymbol(rs_Semicolon); // ';'
+
+  Result := TNPC_ASTStatementDefer.Create(AToken.Location, Expr);
 end;
 
 function TNPCSourceParser.ParseSet(const AToken: TNPCToken): TNPC_ASTExpression;
@@ -4129,7 +4641,7 @@ begin
     raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserFieldNotFoundInRecord, [Field, record_ident]));
 
   FieldType := RecType.Fields[Field];
-  Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Field, FieldType);
+  Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Field, Sym, FieldType);
 end;
 
 function TNPCSourceParser.ParseClassMember(const AToken: TNPCToken; const ALeft: TNPC_ASTExpression): TNPC_ASTExpression;
@@ -4168,13 +4680,13 @@ begin
   // find member
   if Assigned(ClassType.Fields) and ClassType.Fields.ContainsKey(Member) then begin
     MemberType := ClassType.Fields[Member];
-    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
+    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, Sym, MemberType);
   end
   else if Assigned(ClassType.Methods) and ClassContainsMethod(ClassType, Member, MemberType, MemberSymbol) then begin
-    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
+    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, Sym, MemberType);
   end
   else if Assigned(ClassType.Properties) and ClassContainsProperty(ClassType, Member, MemberType, MemberSymbol) then begin
-    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, MemberType);
+    Result := TNPC_ASTExpressionMember.Create(ALeft.Location, ALeft, Member, Sym, MemberType);
   end
   else
     raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserFieldNotFoundInRecord, [Member, class_ident]));
@@ -4370,8 +4882,8 @@ begin
 
   token := Texer.PeekToken;
   while not (ACaseOf and TokenIsReservedIdent(token, ri_end)) and not TokenIsReservedIdent(token, ri_else) do begin
-    Branch := TNPC_ASTExpressionCaseBranch.Create;
-    Texer.ExpectReservedToken(ri_if);
+    token := Texer.ExpectReservedToken(ri_if);
+    Branch := TNPC_ASTExpressionCaseBranch.Create(token.Location);
     repeat
       token := Texer.PeekToken;
       expr := ParseExpression(token, 0);

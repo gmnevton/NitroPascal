@@ -412,18 +412,22 @@ begin
       Parser.Free;
     end;
   except
-    on E: NPCCompilerError do begin
+    on E: TNPCError do begin
       Result := False;
       GetSettings.Errors.Add(E.Message);
     end;
-    on E: NPCProjectError do begin
-      Result := False;
-      GetSettings.Errors.Add(E.Message);
-    end;
-    on E: NPCSyntaxError do begin
-      Result := False;
-      GetSettings.Errors.Add(E.Message);
-    end;
+//    on E: NPCCompilerError do begin
+//      Result := False;
+//      GetSettings.Errors.Add(E.Message);
+//    end;
+//    on E: NPCProjectError do begin
+//      Result := False;
+//      GetSettings.Errors.Add(E.Message);
+//    end;
+//    on E: NPCSyntaxError do begin
+//      Result := False;
+//      GetSettings.Errors.Add(E.Message);
+//    end;
     on E: Exception do begin
       Result := False;
       GetSettings.Errors.Add(Format(sProjectError, [ExtractFileName(GetSettings.InputPath), E.ClassName, E.Message]));
