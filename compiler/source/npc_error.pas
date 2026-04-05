@@ -44,6 +44,7 @@ uses
   Classes,
   StrUtils,
   Math,
+  Rtti,
   npc_consts,
   npc_utils,
   npc_debug_compiler;
@@ -500,22 +501,23 @@ end;
 var
   OldRaiseExceptObject: Pointer;
 
-type
-  EExceptionHack = class
-  public
-    FMessage: string;
-    FHelpContext: Integer;
-    FInnerException: Exception;
-    FStackInfo: Pointer;
-    FAcquireInnerException: Boolean;
-  end;
+//type
+//  EExceptionHack = class
+//  public
+//    FMessage: string;
+//    FHelpContext: Integer;
+//    FInnerException: Exception;
+//    FStackInfo: Pointer;
+//    FAcquireInnerException: Boolean;
+//  end;
 
 procedure RaiseExceptObject(P: PExceptionRecord);
 type
   TRaiseExceptObjectProc = procedure(P: PExceptionRecord);
 begin
   if TObject(P^.ExceptObject) is Exception then
-    EExceptionHack(P^.ExceptObject).FAcquireInnerException := True;
+    //EExceptionHack(P^.ExceptObject).FAcquireInnerException := True;
+    TRttiContext.Create.GetType(Exception).GetField('FAcquireInnerException').SetValue(P^.ExceptObject, True);
 
   if Assigned(OldRaiseExceptObject) then
     TRaiseExceptObjectProc(OldRaiseExceptObject)(P);

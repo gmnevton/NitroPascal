@@ -324,7 +324,7 @@ type
     // REF_Function
     Params: TObjectList<TNPCSymbol>;
     ReturnType: TNPC_ASTTypeReference;
-    IsProcedure: Boolean;
+    IsFunction: Boolean;
     //
     constructor Create(const ALocation: TNPCLocation); override;
     destructor Destroy; override;
@@ -343,6 +343,7 @@ type
   TNPC_TypeDefinitionType = (
     DEF_Unknown,
     DEF_Type,
+    DEF_Literal,
     DEF_Enum,
     DEF_Set,
     DEF_BitSet,
@@ -350,7 +351,6 @@ type
     DEF_Record,
     DEF_Class,
     DEF_Pointer,
-    DEF_Literal,
     DEF_Procedure,
     DEF_ProcedureArguments,
     DEF_ProcedureResult,
@@ -370,7 +370,7 @@ type
     RecordDescription: TNPC_ASTTypeRecord;
     ClassDescription: TNPC_ASTTypeClass;
     //
-    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Integer); reintroduce;
+    constructor Create(const ALocation: TNPCLocation; const AName: UTF8String; ADefinitionType: TNPC_TypeDefinitionType; ASizeInBytes: Integer); reintroduce;
     destructor Destroy; override;
     //
     function ToString: String; override;
@@ -456,6 +456,7 @@ type
     // &Type = AST_TYPE_CLASS_METHOD
     Name: UTF8String;
     VisibilityType: TNPC_ASTClassVisibilityTypeEnum;
+    IsFunction: Boolean;
     //
     Expr: TNPC_ASTExpression; // unified representation
     //
@@ -464,6 +465,7 @@ type
     destructor Destroy; override;
     //
     function ToString: String; override;
+    function VisibilityToString: String;
   end;
 
   TNPC_ASTTypeClassProperty = class(TNPC_ASTType)
@@ -1570,7 +1572,7 @@ begin
   // REF_Function
   Params := Nil;
   ReturnType := Nil;
-  IsProcedure := False;
+  IsFunction := False;
 end;
 
 destructor TNPC_ASTTypeReference.Destroy;
@@ -1597,16 +1599,20 @@ end;
 
 { TNPC_ASTTypeDefinition }
 
-constructor TNPC_ASTTypeDefinition.Create(const ALocation: TNPCLocation; const AName: UTF8String; ASizeInBytes: Integer);
+constructor TNPC_ASTTypeDefinition.Create(const ALocation: TNPCLocation; const AName: UTF8String; ADefinitionType: TNPC_TypeDefinitionType; ASizeInBytes: Integer);
 begin
   inherited Create(ALocation);
   &Type := AST_TYPE_DEFINITION;
+  Flags := 0;
+  DefinitionType := ADefinitionType;
   Name := AName;
   SizeInBytes := ASizeInBytes;
+  // descriptions depends of DefinitionType set
   EnumDescription := Nil;
   SetDescription := Nil;
   ArrayDescription := Nil;
   RecordDescription := Nil;
+  ClassDescription := Nil;
 end;
 
 destructor TNPC_ASTTypeDefinition.Destroy;
@@ -1620,6 +1626,8 @@ begin
     FreeAndNil(ArrayDescription);
   if RecordDescription <> Nil then
     FreeAndNil(RecordDescription);
+  if ClassDescription <> Nil then
+    FreeAndNil(ClassDescription);
   inherited;
 end;
 
@@ -1778,6 +1786,7 @@ begin
   //
   Name := AName;
   VisibilityType := AVisibilityType;
+  IsFunction := False;
   //
   Expr := Nil; // unified representation
 end;
@@ -1799,6 +1808,16 @@ end;
 function TNPC_ASTTypeClassMethod.ToString: String;
 begin
   Result := '<method>';
+end;
+
+function TNPC_ASTTypeClassMethod.VisibilityToString: String;
+begin
+  case VisibilityType of
+    VIS_Class    : Result := 'class';
+    VIS_Private  : Result := 'private';
+    VIS_Protected: Result := 'protected';
+    VIS_Public   : Result := 'public';
+  end;
 end;
 
 { TNPC_ASTTypeClassProperty }

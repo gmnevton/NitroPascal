@@ -752,29 +752,29 @@ begin
   //
   loc := TNPCLocation.Create(Self.UnitName, 638, 0);
   // register built-in types
-  Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(loc, 'Boolean', 1);
+  Builtin_Type_Boolean := TNPC_ASTTypeDefinition.Create(loc, 'Boolean', DEF_Literal, 1);
   AScope.DefineBuiltinType(loc, 'Boolean', TYPE_Literal, 1, Builtin_Type_Boolean);
   AScope.DefineConst(loc, 'True', TYPE_Literal, 1, Builtin_Type_Boolean, Nil, 1);
   AScope.DefineConst(loc, 'False', TYPE_Literal, 1, Builtin_Type_Boolean, Nil, 0);
   AScope.DefineConst(loc, 'Error', TYPE_Literal, 1, Builtin_Type_Boolean, Nil, -1);
   //
-  Builtin_Type_Byte := TNPC_ASTTypeDefinition.Create(loc, 'Byte', 1);
+  Builtin_Type_Byte := TNPC_ASTTypeDefinition.Create(loc, 'Byte', DEF_Literal, 1);
   AScope.DefineBuiltinType(loc, 'Byte', TYPE_Literal, 1, Builtin_Type_Byte);
   //
-  Builtin_Type_Integer := TNPC_ASTTypeDefinition.Create(loc, 'Integer', 4);
+  Builtin_Type_Integer := TNPC_ASTTypeDefinition.Create(loc, 'Integer', DEF_Literal, 4);
   AScope.DefineBuiltinType(loc, 'Integer', TYPE_Literal, 4, Builtin_Type_Integer);
   //
-  Builtin_Type_Integer64 := TNPC_ASTTypeDefinition.Create(loc, 'Integer64', 8);
+  Builtin_Type_Integer64 := TNPC_ASTTypeDefinition.Create(loc, 'Integer64', DEF_Literal, 8);
   AScope.DefineBuiltinType(loc, 'Integer64', TYPE_Literal, 8, Builtin_Type_Integer64);
   //
-  Builtin_Type_Single := TNPC_ASTTypeDefinition.Create(loc, 'Single', 4);
+  Builtin_Type_Single := TNPC_ASTTypeDefinition.Create(loc, 'Single', DEF_Literal, 4);
   AScope.DefineBuiltinType(loc, 'Single', TYPE_Literal, 4, Builtin_Type_Single);
   //
-  Builtin_Type_Double := TNPC_ASTTypeDefinition.Create(loc, 'Double', 8);
+  Builtin_Type_Double := TNPC_ASTTypeDefinition.Create(loc, 'Double', DEF_Literal, 8);
   AScope.DefineBuiltinType(loc, 'Double', TYPE_Literal, 8, Builtin_Type_Double);
   AScope.DefineBuiltinTypeAlias(loc, 'Real', TYPE_Literal, 8, Builtin_Type_Double); // alias
   //
-  Builtin_Type_Extended := TNPC_ASTTypeDefinition.Create(loc, 'Extended', 10);
+  Builtin_Type_Extended := TNPC_ASTTypeDefinition.Create(loc, 'Extended', DEF_Literal, 10);
   AScope.DefineBuiltinType(loc, 'Extended', TYPE_Literal, 10, Builtin_Type_Extended);
 
   // String type definition:
@@ -785,17 +785,17 @@ begin
   //                |    -16 | CharLength: UInt64 (8)
   //                |     -8 | ByteCount: UInt64 (8)
   // entry point -> |      0 | Data: Byte[ByteCount]
-  Builtin_Type_String := TNPC_ASTTypeDefinition.Create(loc, 'String', 32);
+  Builtin_Type_String := TNPC_ASTTypeDefinition.Create(loc, 'String', DEF_Literal, 32);
   AScope.DefineBuiltinType(loc, 'String', TYPE_Literal, 32, Builtin_Type_String);
   //
-  Builtin_Type_Pointer := TNPC_ASTTypeDefinition.Create(loc, 'Pointer', -1);
+  Builtin_Type_Pointer := TNPC_ASTTypeDefinition.Create(loc, 'Pointer', DEF_Pointer, -1);
   AScope.DefineBuiltinType(loc, 'Pointer', TYPE_Pointer, -1, Builtin_Type_Pointer);
   //
-  Builtin_Type_Null := TNPC_ASTTypeDefinition.Create(loc, 'Null', -1);
+  Builtin_Type_Null := TNPC_ASTTypeDefinition.Create(loc, 'Null', DEF_Literal, -1);
   AScope.DefineConst(loc, 'Null', TYPE_Literal, -1, Builtin_Type_Null, Nil, 0);
   AScope.DefineBuiltinTypeAlias(loc, 'null', TYPE_Literal, -1, Builtin_Type_Null); // alias
   //
-  Builtin_Type_ClassSymbol := TNPC_ASTTypeDefinition.Create(loc, 'Symbol', 32);
+  Builtin_Type_ClassSymbol := TNPC_ASTTypeDefinition.Create(loc, 'Symbol', DEF_Procedure, 32);
   AScope.DefineBuiltinType(loc, 'Symbol', TYPE_Procedure, 32, Builtin_Type_ClassSymbol);
   //
   loc.Free;
@@ -1404,7 +1404,7 @@ begin
     Exit;
 
   // PROCEDURE vs FUNCTION
-  if A.IsProcedure <> B.IsProcedure then
+  if A.IsFunction <> B.IsFunction then
     Exit;
 
   // PARAM COUNT
@@ -2845,11 +2845,11 @@ begin
   Result.Params := TObjectList<TNPCSymbol>.Create(True);
 
   if TokenIsReservedIdent(Texer.PeekToken, ri_function) then begin
-    Result.IsProcedure := False;
+    Result.IsFunction := True;
     Texer.SkipToken;
   end
   else begin
-    Result.IsProcedure := True;
+    Result.IsFunction := False;
     Texer.SkipToken;
   end;
 
@@ -2882,7 +2882,7 @@ begin
   end;
 
   // RETURN TYPE
-  if not Result.IsProcedure then begin
+  if Result.IsFunction then begin
     Texer.ExpectReservedSymbol(rs_Colon); // ':'
     Result.ReturnType := ParseTypeReference;
   end;
@@ -2950,7 +2950,7 @@ begin
   // add enum to current scope as type
   CurrentScope.DefineType(Enum.Location, ATypeName, TYPE_Enum, 4, Enum, CurrentBlock);
 
-  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
+  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, DEF_Enum, -1); // size will be determined during type & size checking phase
   TypeDef.DefinitionType := DEF_Enum;
   TypeDef.EnumDescription := Enum;
 
@@ -3032,7 +3032,7 @@ begin
   // add set to current scope as type
   CurrentScope.DefineType(ATypeToken.Location, ATypeName, TYPE_Set, 4, SetType, CurrentBlock);
 
-  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
+  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, DEF_Set, -1); // size will be determined during type & size checking phase
   TypeDef.DefinitionType := DEF_Set;
   TypeDef.SetDescription := SetType;
 
@@ -3054,9 +3054,6 @@ var
   ElemType: TNPC_ASTType;
   TypeDef: TNPC_ASTTypeDefinition;
 begin
-//    Texer.ExpectReservedToken(ri_of); // 'of'
-//    Result := TTypeArray.Create(ParseType);
-//    Texer.ExpectReservedSymbol(rs_OBracket); // '['
   IndexType := Nil;
   //Texer.SkipToken;
   token := Texer.PeekToken;
@@ -3095,6 +3092,8 @@ begin
       TNPC_ASTExpressionIdent(expr).ResolvedSymbol := Sym;
     end;
     ElemType := Sym.TypeRef;
+    if ElemType.ResolvedSymbol = Nil then
+      ElemType.ResolvedSymbol := Sym;
   end
   else if expr is TNPC_ASTExpressionEnumConst then
     ElemType := TNPC_ASTExpressionEnumConst(expr).EnumType
@@ -3105,6 +3104,8 @@ begin
     if not Assigned(Sym) then
       raise NPCSyntaxError.ParserError(expr.Location, Format(sParserUnknownIdentIn, [TNPC_ASTExpressionVariable(expr).Name, 'array declaration ', sStatement]));
     ElemType := Sym.TypeRef;
+    if ElemType.ResolvedSymbol = Nil then
+      ElemType.ResolvedSymbol := Sym;
   end
   else
     raise NPCSyntaxError.ParserError(expr.Location, Format(sParserTypeMismatchInLiteral, ['array type', '<number>', expr.ToString]));
@@ -3114,7 +3115,7 @@ begin
   // add array to current scope as type
   CurrentScope.DefineType(ATypeToken.Location, ATypeName, TYPE_Array, 4, ArrayType, CurrentBlock);
 
-  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
+  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, DEF_Array, -1); // size will be determined during type & size checking phase
   TypeDef.DefinitionType := DEF_Array;
   TypeDef.ArrayDescription := ArrayType;
 
@@ -3199,7 +3200,7 @@ begin
   RecordType := TNPC_ASTTypeRecord.Create(ATypeToken.Location);
 
   // create the type symbol and register it early (enables recursive types)
-  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1); // size will be determined during type & size checking phase
+  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, DEF_Record, -1); // size will be determined during type & size checking phase
   TypeDef.Flags := 1;
   TypeDef.DefinitionType := DEF_Record;
   TypeDef.RecordDescription := RecordType; // put record to type definition
@@ -3343,7 +3344,7 @@ var
 begin
   TypeClass := TNPC_ASTTypeClass.Create(ATypeToken.Location, ATypeName);
 
-  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, -1);
+  TypeDef := TNPC_ASTTypeDefinition.Create(ATypeToken.Location, ATypeName, DEF_Class, -1);
   TypeDef.DefinitionType := DEF_Class;
   TypeDef.ClassDescription := TypeClass;
 
@@ -3533,6 +3534,7 @@ begin
 
     // add method to the scope of class
     Sym := CurrentScope.DefineClassMethod(tokenName.Location, tokenName.Value, TYPE_Class, Method, ATypeClass);  // or skFieldWithInit
+    Method.ResolvedSymbol := Sym;
 
     if ATypeClass.Methods = Nil then
       ATypeClass.Methods := TObjectList<TNPC_ASTTypeClassMethod>.Create(True);
@@ -3543,6 +3545,7 @@ begin
     ProcDecl := ParseProcedureDeclaration(tokenName, Sym, flags); // do not add symbol in this function, it is added beneath in method symbol
     if not (ProcDecl is TNPC_ASTStatementProcedure) then
       raise NPCSyntaxError.ParserError(tokenName.Location, Format(sParserExpectedElementsButGot, ['method declaration', tokenName.Value, 'class ', sDeclaration]));
+    Method.IsFunction := TNPC_ASTStatementProcedure(ProcDecl).IsFunction;
   end
   else
     raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknown, ['class member', token.Value]));
@@ -3812,7 +3815,7 @@ begin
       flags := [decfParamDeclarationAsTuple];
       if decfDoNotAddSymbol in AFlags then
         flags := [decfDoNotAddSymbol, decfParamDeclarationAsTuple];
-      AProc.Returns := ParseParameterList(AProc.Name, pcReturn, flags);
+      AProc.Returns := ParseParameterList(AProc.Name, pcReturn, flags); // decomposition into tuple at assignment
 
       SkipComments;
       Texer.ExpectReservedSymbol(rs_CParen); // ')'
@@ -3825,7 +3828,7 @@ begin
       AProc.Returns := TObjectList<TNPC_ASTParameter>.Create(True);
       param := ParseProcedureParameter(token, AProc.Name, pcReturn, flags);
       if Assigned(param) then
-        AProc.Returns.Add(param);
+        AProc.Returns.Add(param); // only one parameter, eg: func([params]): type
     end;
     SkipComments;
     //token := Texer.PeekToken;
@@ -4529,7 +4532,7 @@ begin
         token := Texer.PeekToken;
       until not TokenIsReservedSymbol(token, rs_Comma);
     end;
-    Texer.ExpectReservedSymbol(rs_CBracket);
+    Texer.ExpectReservedSymbol(rs_CBracket); // ']'
 
     SetType := Nil;
     ElemType := Nil;
@@ -6005,7 +6008,7 @@ var
 
   procedure Indent(const Level: Integer = 0);
   begin
-    tf.Write(StringOfChar(' ', Level * 2));
+    tf.Write(StringOfChar(' ', Level * 4));
   end;
 
   function LiteralTypeToString(const Expr: TNPC_ASTExpression): String;
@@ -6025,30 +6028,288 @@ var
     end;
   end;
 
-  procedure PrintType(Typ: TNPC_ASTType; Level: Integer = 0);
+  function ElemTypeToString(const Typ: TNPC_ASTType): String;
+  var
+    EnumType: TNPC_ASTTypeEnum;
+    SetType: TNPC_ASTTypeSet;
+    ArrayType: TNPC_ASTTypeArray;
+    RecordType: TNPC_ASTTypeRecord;
+    ClassType: TNPC_ASTTypeClass;
+  begin
+    Result := '<unknown-name>';
+    if Typ is TNPC_ASTTypeDefinition then begin
+      case TNPC_ASTTypeDefinition(Typ).DefinitionType of
+        DEF_Type: begin
+          Result := '<type>';
+        end;
+
+        DEF_Literal: begin
+          Result := TNPC_ASTTypeDefinition(Typ).Name;
+        end;
+
+        DEF_Enum: begin
+          EnumType := TNPC_ASTTypeDefinition(Typ).EnumDescription;
+          Result := '<enum>';
+        end;
+
+        DEF_Set: begin
+          SetType := TNPC_ASTTypeDefinition(Typ).SetDescription;
+          Result := '<set>';
+        end;
+
+        DEF_Array: begin
+          ArrayType := TNPC_ASTTypeDefinition(Typ).ArrayDescription;
+          Result := '<array>';
+        end;
+
+        DEF_Record: begin
+          RecordType := TNPC_ASTTypeDefinition(Typ).RecordDescription;
+          Result := '<record>';
+        end;
+
+        DEF_Class: begin
+          ClassType := TNPC_ASTTypeDefinition(Typ).ClassDescription;
+          Result := '<class>';
+        end;
+      else
+        Result := '<unknown-name>';
+      end;
+    end
+    else if Typ is TNPC_ASTTypeReference then begin
+      case TNPC_ASTTypeReference(Typ).Kind of
+        REF_Named: begin
+          Result := TNPC_ASTTypeReference(Typ).BaseSymbol.Name;
+        end;
+
+        REF_Array: begin
+          Result := ElemTypeToString(TNPC_ASTTypeReference(Typ).ElementType);
+        end;
+
+        REF_Record: begin
+          Result := 'record';
+        end;
+
+        REF_Function: begin
+          Result := IfThen(TNPC_ASTTypeReference(Typ).IsFunction, 'function', 'procedure');
+        end;
+      end;
+    end
+    else if Typ is TNPC_ASTTypeName then begin
+      Result := TNPC_ASTTypeName(Typ).Name;
+    end
+    else if Typ is TNPC_ASTTypeEnum then begin
+      Result := 'enum';
+    end
+    else if Typ is TNPC_ASTTypeSet then begin
+      Result := ElemTypeToString(TNPC_ASTTypeSet(Typ).ElementType);
+    end
+    else if Typ is TNPC_ASTTypeArray then begin
+      Result := ElemTypeToString(TNPC_ASTTypeArray(Typ).ElementType);
+    end
+    else if Typ is TNPC_ASTTypeTuple then begin
+      Result := 'tuple';
+    end
+    else if Typ is TNPC_ASTTypeRecord then begin
+      Result := 'record';
+    end
+    else if Typ is TNPC_ASTTypeClass then begin
+      Result := TNPC_ASTTypeClass(Typ).Name;
+    end
+    else if Typ is TNPC_ASTTypeClassMethod then begin
+      Result := TNPC_ASTTypeClassMethod(Typ).Name;
+    end
+    else if Typ is TNPC_ASTTypeClassProperty then begin
+      Result := TNPC_ASTTypeClassProperty(Typ).Name;
+    end;
+  end;
+
+  function ElementToString(const Elem: TNPC_ASTExpression): String;
+  var
+    Sym: TNPCSymbol;
+  begin
+    Result := '<not-expanded-element>';
+
+    if Elem is TNPC_ASTExpressionLiteral then begin
+    end
+    else if Elem is TNPC_ASTExpressionEnumConst then begin
+    end
+    else if Elem is TNPC_ASTExpressionSet then begin
+    end
+    else if Elem is TNPC_ASTExpressionSetLiteral then begin
+    end
+    else if Elem is TNPC_ASTExpressionVariable then begin
+    end
+    else if Elem is TNPC_ASTExpressionIdent then begin
+    end
+    else if Elem is TNPC_ASTExpressionNumber then begin
+    end
+    else if Elem is TNPC_ASTExpressionString then begin
+    end
+    else if Elem is TNPC_ASTExpressionNull then begin
+    end
+    else if Elem is TNPC_ASTExpressionParameter then begin
+    end
+    else if Elem is TNPC_ASTExpressionUnary then begin
+    end
+    else if Elem is TNPC_ASTExpressionBinary then begin
+    end
+    else if Elem is TNPC_ASTExpressionAssign then begin
+    end
+    else if Elem is TNPC_ASTExpressionMultiAssign then begin
+    end
+    else if Elem is TNPC_ASTExpressionIf then begin
+    end
+    else if Elem is TNPC_ASTExpressionCaseBranch then begin
+    end
+    else if Elem is TNPC_ASTExpressionCase then begin
+    end
+    else if Elem is TNPC_ASTExpressionInOp then begin
+    end
+    else if Elem is TNPC_ASTExpressionArray then begin
+    end
+    else if Elem is TNPC_ASTExpressionRecord then begin
+    end
+    else if Elem is TNPC_ASTExpressionTuple then begin
+    end
+    else if Elem is TNPC_ASTExpressionCall then begin
+    end
+    else if Elem is TNPC_ASTExpressionMember then begin
+    end
+    else if Elem is TNPC_ASTExpressionIndex then begin
+    end;
+  end;
+
+  function PrintSize(const Typ: TNPC_ASTType): String;
+  begin
+    Result := '<not-determined>';
+  end;
+
+  procedure PrintExpr(const Expr: TNPC_ASTExpression; Level: Integer = 0); forward;
+
+  procedure PrintParam(const Param: TNPC_ASTParameter; Level: Integer = 0);
+  var
+    TypeDef: TNPC_ASTTypeDefinition;
+  begin
+    TypeDef := TNPC_ASTTypeDefinition(Param.DeclaredType);
+    Indent(Level);
+    tf.WriteLine('Name: ' + Param.Name);
+    Indent(Level);
+    tf.WriteLine('Type: ' + ElemTypeToString(TypeDef));
+    Indent(Level);
+    tf.Write('Modifier:');
+    case Param.Modifier of
+      pmConst: tf.WriteLine(' const');
+      pmVar  : tf.WriteLine(' var');
+      pmOut  : tf.WriteLine(' out');
+    else
+      tf.WriteLine;
+    end;
+    Indent(Level);
+    tf.WriteLine('Init:');
+    PrintExpr(Param.Init, Level+4);
+  end;
+
+  procedure PrintType(const Typ: TNPC_ASTType; Level: Integer = 0);
   var
     Pair: TPair<UTF8String, Integer>;
     Field: TPair<UTF8String, TNPC_ASTType>;
-    idx: Integer;
+    Element: TNPC_ASTExpression;
+    Param: TNPC_ASTParameter;
+    idx, idx1: Integer;
+    EnumType: TNPC_ASTTypeEnum;
+    SetType: TNPC_ASTTypeSet;
+    ArrayType: TNPC_ASTTypeArray;
+    RecordType: TNPC_ASTTypeRecord;
+    ClassType: TNPC_ASTTypeClass;
+    Method: TNPC_ASTTypeClassMethod;
   begin
     if Typ is TNPC_ASTTypeDefinition then begin
       Indent(Level);
-      tf.WriteLine('Type: ' + TNPC_ASTTypeDefinition(Typ).Name);
+      tf.Write('Type: ');
+      case TNPC_ASTTypeDefinition(Typ).DefinitionType of
+        DEF_Type: begin
+          tf.WriteLine('<type>');
+        end;
+
+        DEF_Literal: begin
+          tf.WriteLine(ElemTypeToString(TNPC_ASTTypeDefinition(Typ)));
+        end;
+
+        DEF_Enum: begin
+          EnumType := TNPC_ASTTypeDefinition(Typ).EnumDescription;
+          tf.WriteLine('Enum');
+          Indent(Level);
+          tf.WriteLine('Members(' + IntToStr(EnumType.Members.Count) + '):');
+          PrintType(EnumType, Level + 1);
+        end;
+
+        DEF_Set: begin
+          SetType := TNPC_ASTTypeDefinition(Typ).SetDescription;
+          tf.WriteLine('Set(' + IntToStr(SetType.Elements.Count) + '):');
+          PrintType(SetType, Level + 1);
+        end;
+
+        DEF_Array: begin
+          ArrayType := TNPC_ASTTypeDefinition(Typ).ArrayDescription;
+          // array of type
+          // array[index] of type
+          //tf.WriteLine('Array(' + IntToStr(ArrayType.ElementType.Count) + '):');
+          tf.WriteLine('Array'); // TODO: expand this
+          PrintType(ArrayType, Level);
+        end;
+
+        DEF_Record: begin
+          RecordType := TNPC_ASTTypeDefinition(Typ).RecordDescription;
+          tf.WriteLine('Record');
+          PrintType(RecordType, Level);
+        end;
+
+        DEF_Class: begin
+          ClassType := TNPC_ASTTypeDefinition(Typ).ClassDescription;
+          tf.WriteLine('Class');
+          PrintType(ClassType, Level);
+        end;
+      else
+        tf.WriteLine('<unknown>');
+      end;
     end
     else if Typ is TNPC_ASTTypeEnum then begin
-      Indent(Level);
-      tf.WriteLine('Enum(' + IntToStr(TNPC_ASTTypeEnum(Typ).Members.Count) + '):');
+      //Indent(Level);
+      //tf.WriteLine('Enum(' + IntToStr(TNPC_ASTTypeEnum(Typ).Members.Count) + '):');
       idx := 0;
       for Pair in TNPC_ASTTypeEnum(Typ).Members do begin
-        Indent(Level+1);
+        Indent(Level);
         tf.WriteLine('[' + IntToStr(idx) + ']: ' + Pair.Key + ' = ' + Pair.Value.ToString);
+        Inc(idx);
+      end;
+    end
+    else if Typ is TNPC_ASTTypeSet then begin
+      Indent(Level);
+      tf.WriteLine('Element type: ' + ElemTypeToString(TNPC_ASTTypeSet(Typ).ElementType));
+      Indent(Level);
+      tf.WriteLine('Elements(' + IntToStr(TNPC_ASTTypeSet(Typ).Elements.Count) + '):');
+      idx := 0;
+      for Element in TNPC_ASTTypeSet(Typ).Elements do begin
+        Indent(Level+1);
+        tf.WriteLine('[' + IntToStr(idx) + ']: ' + ElementToString(Element));
         Inc(idx);
       end;
     end
     else if Typ is TNPC_ASTTypeArray then begin
       Indent(Level);
-      tf.WriteLine('ArrayOf:');
-      PrintType(TNPC_ASTTypeArray(Typ).ElementType, Level+1);
+      tf.Write('Index: ');
+      if TNPC_ASTTypeArray(Typ).IndexType <> Nil then
+        PrintType(TNPC_ASTTypeArray(Typ).IndexType, Level)
+      else
+        tf.WriteLine('<not-set>');
+      Indent(Level);
+      tf.WriteLine('Element type: ' + ElemTypeToString(TNPC_ASTTypeArray(Typ).ElementType));
+      Indent(Level);
+      tf.Write('Size: ');
+      if TNPC_ASTTypeArray(Typ).IndexType <> Nil then
+        PrintSize(TNPC_ASTTypeArray(Typ))
+      else
+        tf.WriteLine('<not-set> - dynamic array');
     end
     else if Typ is TNPC_ASTTypeRecord then begin
       Indent(Level);
@@ -6059,6 +6320,56 @@ var
         tf.WriteLine('[' + IntToStr(idx) + ']: ' + Field.Key + ':');
         PrintType(Field.Value, Level+2);
         Inc(idx);
+      end;
+    end
+    else if Typ is TNPC_ASTTypeClass then begin
+      if TNPC_ASTTypeClass(Typ).Fields <> Nil then begin
+        Indent(Level);
+        tf.WriteLine('Fields(' + IntToStr(TNPC_ASTTypeClass(Typ).Fields.Count) + '):');
+      end;
+      if TNPC_ASTTypeClass(Typ).Methods <> Nil then begin
+        Indent(Level);
+        tf.WriteLine('Methods(' + IntToStr(TNPC_ASTTypeClass(Typ).Methods.Count) + '):');
+        idx := 0;
+        for Method in TNPC_ASTTypeClass(Typ).Methods do begin
+          Indent(Level+1);
+          tf.WriteLine('[' + IntToStr(idx) + ']: ' + Method.Name);
+          Indent(Level+2);
+          tf.WriteLine('Type: ' + IfThen(Method.IsFunction, 'function', 'procedure'));
+          Indent(Level+2);
+          tf.WriteLine('Signature:');
+          if Method.ResolvedSymbol.ProcDecl <> Nil then begin
+            if Method.ResolvedSymbol.ProcDecl.Parameters <> Nil then begin
+              Indent(Level+3);
+              tf.WriteLine('Params(' + IntToStr(Method.ResolvedSymbol.ProcDecl.Parameters.Count) + '):');
+              idx1 := 0;
+              for Param in Method.ResolvedSymbol.ProcDecl.Parameters do begin
+                Indent(Level+4);
+                tf.WriteLine('[' + IntToStr(idx1) + ']: Param:');
+                PrintParam(Param, Level + 5);
+                Inc(idx1);
+              end;
+            end;
+            if Method.ResolvedSymbol.ProcDecl.Returns <> Nil then begin
+              Indent(Level+3);
+              tf.WriteLine('Returns(' + IntToStr(Method.ResolvedSymbol.ProcDecl.Returns.Count) + '):');
+              idx1 := 0;
+              for Param in Method.ResolvedSymbol.ProcDecl.Returns do begin
+                Indent(Level+4);
+                tf.WriteLine('[' + IntToStr(idx1) + ']: Return:');
+                PrintParam(Param, Level + 5);
+                Inc(idx1);
+              end;
+            end;
+          end;
+          Indent(Level+2);
+          tf.WriteLine('Visibility: ' + Method.VisibilityToString);
+          Inc(idx);
+        end;
+      end;
+      if TNPC_ASTTypeClass(Typ).Properties <> Nil then begin
+        Indent(Level);
+        tf.WriteLine('Properties(' + IntToStr(TNPC_ASTTypeClass(Typ).Properties.Count) + '):');
       end;
     end
     else
@@ -6190,7 +6501,7 @@ var
   var
     i: Integer;
     Param: TNPC_ASTParameter;
-    TypeDef: TNPC_ASTTypeDefinition;
+    //TypeDef: TNPC_ASTTypeDefinition;
     Elem: TNPC_ASTExpression;
     Branch: TNPC_ASTStatementCaseBranch;
     idx: Integer;
@@ -6209,49 +6520,27 @@ var
       Indent(Level+1);
       tf.WriteLine('Name: ' + TNPC_ASTStatementProcedure(Stmt).Name);
       //
-      Indent(Level+1);
-      tf.WriteLine('Params(' + IntToStr(TNPC_ASTStatementProcedure(Stmt).Parameters.Count) + '):');
-      idx := 0;
-      for Param in TNPC_ASTStatementProcedure(Stmt).Parameters do begin
-        Indent(Level+2);
-        tf.WriteLine('[' + IntToStr(idx) + ']: Param:');
-        TypeDef := TNPC_ASTTypeDefinition(Param.DeclaredType);
-        Indent(Level+3);
-        tf.WriteLine('Name: ' + Param.Name);
-        Indent(Level+3);
-        tf.WriteLine('Type: ' + TypeDef.Name);
-        Indent(Level+3);
-        tf.Write('Modifier:');
-        case Param.Modifier of
-          pmConst: tf.WriteLine(' const');
-          pmVar  : tf.WriteLine(' var');
-          pmOut  : tf.WriteLine(' out');
-        else
-          tf.WriteLine;
+      if TNPC_ASTStatementProcedure(Stmt).Parameters <> Nil then begin
+        Indent(Level+1);
+        tf.WriteLine('Params(' + IntToStr(TNPC_ASTStatementProcedure(Stmt).Parameters.Count) + '):');
+        idx := 0;
+        for Param in TNPC_ASTStatementProcedure(Stmt).Parameters do begin
+          Indent(Level+2);
+          tf.WriteLine('[' + IntToStr(idx) + ']: Param:');
+          PrintParam(Param, Level + 3);
+          Inc(idx);
         end;
-        Indent(Level+3);
-        tf.WriteLine('Init:');
-        PrintExpr(Param.Init, Level+4);
       end;
       //
       if TNPC_ASTStatementProcedure(Stmt).IsFunction and (TNPC_ASTStatementProcedure(Stmt).Returns <> Nil) then begin
+        Indent(Level+1);
+        tf.WriteLine('Returns(' + IntToStr(TNPC_ASTStatementProcedure(Stmt).Returns.Count) + '):');
+        idx := 0;
         for Param in TNPC_ASTStatementProcedure(Stmt).Returns do begin
-          Indent(Level+1);
-          TypeDef := TNPC_ASTTypeDefinition(Param.DeclaredType);
-          tf.WriteLine('Return(' + Param.Name + ': ' + TypeDef.Name + ')');
-          //
           Indent(Level+2);
-          tf.Write('Modifier:');
-          case Param.Modifier of
-            pmConst: tf.WriteLine(' const');
-            pmVar  : tf.WriteLine(' var');
-            pmOut  : tf.WriteLine(' out');
-          else
-            tf.WriteLine;
-          end;
-          Indent(Level+2);
-          tf.WriteLine('Init:');
-          PrintExpr(Param.Init, Level+3);
+          tf.WriteLine('[' + IntToStr(idx) + ']: Return:');
+          PrintParam(Param, Level + 3);
+          Inc(idx);
         end;
       end;
       //
