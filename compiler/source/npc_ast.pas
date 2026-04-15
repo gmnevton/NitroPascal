@@ -2042,8 +2042,9 @@ end;
 destructor TNPC_ASTExpressionVariable.Destroy;
 begin
   Name := '';
-  if Symbol <> Nil then
-    FreeAndNil(Symbol);
+  Symbol := Nil;
+//  if Symbol <> Nil then
+//    FreeAndNil(Symbol);
   if Base <> Nil then
     FreeAndNil(Base);
   inherited;

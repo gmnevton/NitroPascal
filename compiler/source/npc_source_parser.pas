@@ -255,6 +255,8 @@ type
     function  ParseAssignment(const ALeftToken: TNPCToken): TNPC_ASTStatement;
     function  ParseAssignmentNew(const AToken: TNPCToken): TNPC_ASTStatement;
     function  ParseAssignmentOrMulti: TNPC_ASTExpression;
+    function  ParseAssignmentOrMultiOrExpr(const AToken: TNPCToken): TNPC_ASTStatement;
+    //
     function  ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
     function  ParseLiteral(const AToken: TNPCToken): TNPC_ASTExpression;
     //function  ParseLiteral(const ALeftToken: TNPCToken; const AToken: TNPCToken): TNPC_ASTExpression;
@@ -2112,8 +2114,8 @@ begin
       Exit;
     end
     else if TokenIsReservedSymbol(next_token, rs_Assign) or TokenIsReservedSymbol(next_token, rs_Comma) then begin // ':=' - assignment or ',' - multi-assignment
-      Result := ParseAssignmentNew(token);
-//      Result := ParseAssignmentOrMulti;
+      //Result := ParseAssignmentNew(token);
+      Result := ParseAssignmentOrMultiOrExpr(token);
 
 //      Texer.SkipToken;
 //      Texer.SkipToken;
@@ -2477,16 +2479,39 @@ end;
 
 function TNPCSourceParser.ParseVariableExpression: TNPC_ASTExpressionVariable;
 var
-  token: TNPCToken;
+  token, next_token: TNPCToken;
   Expr, Index: TNPC_ASTExpression;
   Sym: TNPCSymbol;
+  idx: Integer;
+  is_in_assignment: Boolean;
 begin
   // BASE IDENTIFIER
   token := Texer.ExpectToken(tokIdent, 'identifier expected');
 
   Sym := CurrentScope.ResolveSymbol(token.Value);
-  if not Assigned(Sym) then // check if it is multi-assign ???
-    raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownIdentIn, [token.Value, '', sStatement]));
+  if not Assigned(Sym) then begin // check if it is multi-assign or assign-declaration at all ???
+    // search for assignment symbol ':=' until ';'
+    is_in_assignment := False;
+    idx := 0;
+    next_token := Texer.PeekToken(idx);
+    while (next_token <> Nil) and not TokenIsReservedSymbol(next_token, rs_Semicolon) do begin
+      if TokenIsReservedSymbol(next_token, rs_Assign) then begin
+        is_in_assignment := True;
+        Break;
+      end;
+      Inc(idx);
+      next_token := Texer.PeekToken(idx);
+    end;
+    //
+    if is_in_assignment then
+      Sym := CurrentScope.DefineVar(token.Location, token.Value, TYPE_Unresolved, -1, Nil, CurrentBlock) // we don't know what we are declaring for now
+    else
+      //raise NPCSyntaxError.ParserError(AToken.Location, Format(sParserUnknown, ['identifier', AToken.Value]));
+      raise NPCSyntaxError.ParserError(token.Location, Format(sParserUnknownIdentIn, [token.Value, '', sStatement]));
+
+    Result := TNPC_ASTExpressionVariable.Create(token.Location, token.Value, Sym); //, Sym.TypeRef);
+    Exit;
+  end;
 
   Expr := TNPC_ASTExpressionVariable.Create(token.Location, token.Value, Sym);
 
@@ -4275,6 +4300,55 @@ begin
     Result := TNPC_ASTExpressionAssign.Create(Targets[0].Location, Targets[0], Expr)
   else
     Result := TNPC_ASTExpressionMultiAssign.Create(Targets[0].Location, Targets, Expr);
+end;
+
+function TNPCSourceParser.ParseAssignmentOrMultiOrExpr(const AToken: TNPCToken): TNPC_ASTStatement;
+var
+  token, next_token: TNPCToken;
+  Targets: TObjectList<TNPC_ASTExpressionVariable>;
+  Expr: TNPC_ASTExpression;
+begin
+  Targets := TObjectList<TNPC_ASTExpressionVariable>.Create(True);
+
+  // --- PARSE FIRST TARGET ---
+  Targets.Add(ParseVariableExpression);
+
+  // --- PARSE ADDITIONAL TARGETS (multi-assign) ---
+  token := Texer.PeekToken;
+  while TokenIsReservedSymbol(token, rs_Comma) do begin // ','
+    Texer.SkipToken;
+    Targets.Add(ParseVariableExpression);
+    token := Texer.PeekToken;
+  end;
+
+  // --- ASSIGNMENT CASE ---
+  token := Texer.PeekToken;
+  if TokenIsReservedSymbol(token, rs_Assign) then begin // ':='
+    Texer.SkipToken; // consume ':='
+
+    token := Texer.PeekToken;
+    Expr := ParseExpression(token, 0);
+    Texer.ExpectToken([tokSemicolon]);
+
+    if Targets.Count = 1 then
+      Result := TNPC_ASTStatementAssign.Create(AToken.Location, Targets[0], Expr)
+    else
+      Result := TNPC_ASTStatementMultiAssign.Create(AToken.Location, TObjectList<TNPC_ASTExpression>(Targets){// safe cast}, Expr);
+
+    Exit;
+  end;
+
+  // --- NOT ASSIGNMENT -> EXPRESSION STATEMENT ---
+  // fallback: treat parsed variable as expression
+  if Targets.Count = 1 then begin
+    Texer.ExpectToken([tokSemicolon]);
+
+    Result := TNPC_ASTStatementExpression.Create(AToken.Location, Targets[0]);
+  end
+  else begin
+    // invalid: multiple targets without assignment
+    raise NPCSyntaxError.ParserError(AToken.Location, 'multiple identifiers require ":=" for assignment');
+  end;
 end;
 
 function TNPCSourceParser.ParseIdentifier(const AToken: TNPCToken): TNPC_ASTExpression;
