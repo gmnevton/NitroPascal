@@ -944,6 +944,8 @@ type
     // &Type = AST_PROCEDURE
     Name: UTF8String;
     IsFunction: Boolean;
+    ClassDetachedMethod: Boolean;
+    ClassRef: TNPC_ASTType;
     Parameters: TObjectList<TNPC_ASTParameter>;
     Returns: TObjectList<TNPC_ASTParameter>;
     Body: TNPC_ASTStatement;
@@ -2824,6 +2826,8 @@ begin
   &Type := AST_PROCEDURE;
   Name := AName;
   IsFunction := AIsFunction;
+  ClassDetachedMethod := False;
+  ClassRef := Nil;
   Parameters := Nil; // TObjectList<TNPC_ASTParameter>.Create(True);
   Returns := Nil;
   Body := Nil;
@@ -2836,6 +2840,7 @@ var
   i: Integer;
 begin
   Name := '';
+  ClassRef := Nil;
   if Parameters <> Nil then begin
 //    for i := 0 to Parameters.Count - 1 do
 //      Parameters.Items[i].Free;

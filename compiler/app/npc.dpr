@@ -22,6 +22,7 @@ uses
   SysUtils,
   Windows,
   StrUtils,
+  DateUtils,
   Math,
   npc_lexer,
   npc_parser,
@@ -42,7 +43,7 @@ var
 begin
   try
     Writeln('NitroPascal compiler version 1.0');
-    Writeln('2024, Grzegorz Molenda');
+    Writeln('2024-'+ IntToStr(YearOf(Now)) +', Grzegorz Molenda');
     Writeln('All rights reserved.');
     Writeln;
     if ParamCount = 0 then begin
