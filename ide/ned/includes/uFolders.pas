@@ -259,7 +259,9 @@ type
     procedure Paint; override;
     procedure DrawBackground(const ACanvas: TCanvas; var ARect: TRect); virtual;
     procedure DrawItems(const ACanvas: TCanvas; const ARect: TRect); virtual;
-    procedure DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; const DrawState: TDrawState);
+    procedure DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; DrawState: TDrawState);
+    procedure DrawFolder(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Folder: TFolderBar);
+    procedure DrawFolderItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TFolderItem);
     procedure SelectItem(PriorIndex: Integer; NewIndex: Integer; var CanSelect: Boolean); virtual;
     procedure UpdateImages(var InternalImages: TCustomImageList; ExternalImages: TCustomImageList);
     procedure UpdateScrollRange;
@@ -345,6 +347,8 @@ uses
   UXTheme;
 
 type
+  TWinControlAccess = class(TWinControl);
+
   TDirection = (drLeft, drUp, drRight, drDown, drCenter, drFill, drWrap);
   //TDirections = set of TDirection;
   TDrawFrameState = (dfFocus, dfFramed, dfHover, dfRaised, dfFlat, dfLowered, dfSunken, dfPressed, dfPushed);
@@ -1041,7 +1045,7 @@ begin
   TopIndex := Folder.GetNearestTop;
   if (Folder = Details.Selected) and (TopIndex < Index + 1) and FVisible then begin
     Result := Folder.DisplayRect;
-    OffsetRect(Result, 0, Details.FolderHeight);
+    OffsetRect(Result, 0, Details.ItemHeight);
     VisibleIndex := 0;
     for I := Folder.GetNearestTop to Index - 1 do
       if Folder.Items[I].Visible then
@@ -1446,7 +1450,8 @@ var
   count: Integer;
 begin
   count := GetCount;
-  Result := FTopIndex + Pos.Y div FItemHeight;
+//  Result := FTopIndex + (Pos.Y div FItemHeight);
+  Result := Pos.Y div FItemHeight;
   if Result > count - 1 then
     if Existing then
       Result := -1
@@ -1564,8 +1569,10 @@ end;
 procedure TCustomFolderView.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
-  if not MouseCapture then
+  if not MouseCapture then begin
     CaptureItem := ItemFromPoint(X, Y);
+    FHotIndex := ItemAtPos(Point(X, Y), True);
+  end;
 end;
 
 procedure TCustomFolderView.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -1837,6 +1844,16 @@ end;
 //  	DeleteObject(Brush);
 //  end;
 
+
+// dsDisabled,
+// dsPressed,
+// dsSelected,
+// dsHot,
+// dsFocused,
+// dsChecked,
+// dsExpanded,
+// dsDefaulted,
+
 procedure TCustomFolderView.DrawItems(const ACanvas: TCanvas; const ARect: TRect);
 var
   Clip, Row, R: TRect;
@@ -1870,27 +1887,26 @@ begin
     end;
 //    if FMultiSelect and FSelectItems[FTopIndex + I] then
 //      Include(DrawState, dsSelected);
-    if FTopIndex + I = FHotIndex then
+//    if FTopIndex + I = FHotIndex then
+    if I = FHotIndex then
       Include(DrawState, dsHot);
+    //
     DrawItem(ACanvas, FTopIndex + I, R, DrawState);
   end;
 end;
 
-procedure TCustomFolderView.DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; const DrawState: TDrawState);
+procedure TCustomFolderView.DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; DrawState: TDrawState);
+type
+  TDrawingType = (dtNone, dtFolder, dtFolderItem);
 var
-  DC: HDC;
-  DrawRect: TRect;
-  Brush: HBRUSH;
 ////  HotBrush: HBRUSH;
-  CheckeredBrush: HBRUSH;
   Folder: TFolderBar;
   Item: TFolderItem;
 //  Point: TPoint;
   I, J, K: Integer;
+  DrawingType: TDrawingType;
 begin
-  DC := ACanvas.Handle;
-  Brush := GetSysColorBrush(Color); //  COLOR_BTNFACE);
-  CheckeredBrush := GetBrush(CheckeredBitmap);
+  DrawingType := dtNone;
   K:=-1;
   for I := 0 to FFolders.Count - 1 do begin
     Inc(K);
@@ -1898,11 +1914,13 @@ begin
     if not Folder.Visible then
       Continue;
     if K = ItemIdx then begin
+      DrawingType := dtFolder;
       Break;
     end;
     for J := 0 to Folder.FItems.Count - 1 do begin
       Item := Folder.FItems[j];
       if K = ItemIdx then begin
+        DrawingType := dtFolderItem;
         Break;
       end;
       Inc(K);
@@ -1910,14 +1928,48 @@ begin
   end;
   if (K = -1) or (K > ItemIdx) then
     Exit;
+  //
+  // ensure item selected state for children
+//  if (Folder.SelectedIndex > -1) and not (dsSelected in DrawState) then begin
+//    if Folder = Selected then
+//  end;
+//  if (FCaptureItem <> Nil) and (FCaptureItem = Item) and  then
+  //
+  case DrawingType of
+    dtFolder    : DrawFolder(ACanvas, ARect, DrawState, Folder);
+    dtFolderItem: DrawFolderItem(ACanvas, ARect, DrawState, Item);
+  end;
+end;
 
+procedure TCustomFolderView.DrawFolder(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Folder: TFolderBar);
+var
+  DC: HDC;
+  DrawRect: TRect;
+  Brush: HBRUSH;
+  CheckeredBrush: HBRUSH;
+  top: Integer;
+begin
+  if not Assigned(Folder) then
+    Exit;
+  //
+  DC := ACanvas.Handle;
+//  Brush := GetSysColorBrush(Color); //  COLOR_BTNFACE);
+  CheckeredBrush := GetBrush(CheckeredBitmap);
+  //DrawRect := Folder.DisplayRect;
+  DrawRect := ARect;
 
-  DrawRect := Folder.DisplayRect;
+  // clear item background
+  SetBkMode(DC, OPAQUE);
+  Brush := CreateSolidBrush(ColorToRGB(Color));
+  FillRect(DC, ARect, Brush);
+  DeleteObject(Brush);
+
   if StyleServices.Enabled then begin
-    SetBkMode(DC, OPAQUE);
-    FillRect(DC, DrawRect, ColorToRGB(Color));
+//    SetBkMode(DC, OPAQUE);
+//    FillRect(DC, DrawRect, ColorToRGB(Color));
+    //
     Inc(DrawRect.Right, 10);
-    if Folder = Selected then
+    if dsSelected in DrawState then
       StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
     else
       StyleServices.DrawElement(DC, GetDetails(thHeaderItemNormal), DrawRect);
@@ -1926,31 +1978,97 @@ begin
   else begin
     DrawFrame(DC, DrawRect, dfRaised);
     InflateRect(DrawRect, -1, -1);
-    if Folder = Selected then
+    if dsSelected in DrawState then
       FillRect(DC, DrawRect, CheckeredBrush)
     else
       FillRect(DC, DrawRect, Brush);
   end;
+  // draw item icon
   InflateRect(DrawRect, -6, 0);
   if FFolderImages <> Nil then begin
-    if (Folder = Selected) and (Folder.SelectedIndex > -1) then begin
-      ImageList_DrawEx(FFolderImages.Handle, Folder.SelectedIndex, DC, DrawRect.Left, DrawRect.Top + (FFolderHeight - FFolderImages.Height) div 2, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
+    top := (FItemHeight - FFolderImages.Height) div 2;
+    if (dsSelected in DrawState) and (Folder.SelectedIndex > -1) then begin
+      ImageList_DrawEx(FFolderImages.Handle, Folder.SelectedIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
     end
     else if Folder.ImageIndex > -1 then
-      ImageList_DrawEx(FFolderImages.Handle, Folder.ImageIndex, DC, DrawRect.Left, DrawRect.Top + (FFolderHeight - FFolderImages.Height) div 2, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
+      ImageList_DrawEx(FFolderImages.Handle, Folder.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
     Inc(DrawRect.Left, FFolderImages.Width + 2);
   end;
+  // draw item caption
   InflateRect(DrawRect, -1, -1);
   SetTextColor(DC, GetSysColor(COLOR_WINDOWTEXT));
   SetBkMode(DC, TRANSPARENT);
   DrawCaption(DC, Folder.Caption, DrawRect, drLeft);
-  InflateRect(DrawRect, 2, 2);
-  if FFolderImages <> Nil then
-    Dec(DrawRect.Left, FFolderImages.Width + 2);
-  DrawRect := Folder.DisplayRect;
-//    SelectClipRect(DC, DrawRect, RGN_DIFF);
-  if FOverlay <> Nil then
-    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlay.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
+  //
+//  InflateRect(DrawRect, 2, 2);
+//  if FFolderImages <> Nil then
+//    Dec(DrawRect.Left, FFolderImages.Width + 2);
+////  DrawRect := Folder.DisplayRect;
+////    SelectClipRect(DC, DrawRect, RGN_DIFF);
+//  if FOverlay <> Nil then
+//    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlay.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
+  DeleteObject(Brush);
+end;
+
+procedure TCustomFolderView.DrawFolderItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TFolderItem);
+var
+  DC: HDC;
+  DrawRect: TRect;
+  Brush: HBRUSH;
+  CheckeredBrush: HBRUSH;
+  top: Integer;
+begin
+  if not Assigned(Item) then
+    Exit;
+  //
+  DC := ACanvas.Handle;
+  //Brush := GetSysColorBrush(Color); //  COLOR_BTNFACE);
+  CheckeredBrush := GetBrush(CheckeredBitmap);
+  DrawRect := ARect;
+
+  // clear item background
+  SetBkMode(DC, OPAQUE);
+  Brush := CreateSolidBrush(ColorToRGB(Color));
+  FillRect(DC, ARect, Brush);
+  DeleteObject(Brush);
+
+  if StyleServices.Enabled then begin
+//    SetBkMode(DC, OPAQUE);
+//    FillRect(DC, DrawRect, ColorToRGB(Color));
+    //
+    Inc(DrawRect.Right, 10);
+    if dsSelected in DrawState then
+      StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
+    else if dsHot in DrawState then
+      FillRect(DC, DrawRect, CheckeredBrush);
+    Dec(DrawRect.Right, 10);
+  end
+  else begin
+    DrawFrame(DC, DrawRect, dfRaised);
+    InflateRect(DrawRect, -1, -1);
+    if dsSelected in DrawState then
+      FillRect(DC, DrawRect, CheckeredBrush)
+    else
+      FillRect(DC, DrawRect, Brush);
+  end;
+  // draw item icon
+  InflateRect(DrawRect, -6, 0);
+  if FFolderImages <> Nil then begin
+    top := (FItemHeight - FFolderImages.Height) div 2;
+    if Item.ImageIndex > -1 then
+      ImageList_DrawEx(FFolderImages.Handle, Item.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
+    Inc(DrawRect.Left, FFolderImages.Width + 2);
+  end;
+  // draw item caption
+  InflateRect(DrawRect, -1, -1);
+  SetTextColor(DC, GetSysColor(COLOR_WINDOW));
+  if dsSelected in DrawState then
+    SetTextColor(DC, GetSysColor(COLOR_WINDOWTEXT))
+  else if dsHot in DrawState then
+    SetTextColor(DC, GetSysColor(clHighlightText));
+  SetBkMode(DC, TRANSPARENT);
+  DrawCaption(DC, Item.Caption, DrawRect, drLeft);
+
   DeleteObject(Brush);
 end;
 
@@ -2420,7 +2538,7 @@ var
   p: TPoint;
 begin
 //  if Selected <> Nil then begin
-//    Delta := -Message.WheelDelta div 120;
+    Delta := -Message.WheelDelta div 120;
 //    if not IsRectEmpty(ButtonRect[fbScrollUp]) and (Delta = -1) then
 //      Selected.TopIndex := Selected.TopIndex - 1
 //    else if not IsRectEmpty(ButtonRect[fbScrollDown]) and (Delta = 1) then
@@ -2430,6 +2548,10 @@ begin
 //      CaptureItem := ItemFromPoint(p.X, p.Y);
 //    end;
 //  end;
+  if delta > 0 then
+    SetTopIndex(FTopIndex + 1)
+  else
+    SetTopIndex(FTopIndex - 1);
   inherited;
 end;
 
