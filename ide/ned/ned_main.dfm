@@ -1,6 +1,7 @@
 object NEDMainForm: TNEDMainForm
   Left = 0
   Top = 0
+  OnAlignPosition = FormAlignPosition
   Caption = 'NED'
   ClientHeight = 561
   ClientWidth = 884
@@ -60,6 +61,7 @@ object NEDMainForm: TNEDMainForm
     MenuController.ButtonWidth = 54
     MenuController.ButtonHeight = 40
     MenuController.PosX = 180
+    MenuController.Enabled = False
     MenuController.Transparent = False
     MenuController.Font.Charset = DEFAULT_CHARSET
     MenuController.Font.Color = clWindowText
@@ -239,6 +241,7 @@ object NEDMainForm: TNEDMainForm
         Top = 0
         Height = 40
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
@@ -257,6 +260,7 @@ object NEDMainForm: TNEDMainForm
         Top = 40
         Height = 40
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
@@ -275,6 +279,7 @@ object NEDMainForm: TNEDMainForm
         Top = 80
         Height = 40
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
@@ -303,6 +308,7 @@ object NEDMainForm: TNEDMainForm
         Top = 140
         Height = 40
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
@@ -321,6 +327,7 @@ object NEDMainForm: TNEDMainForm
         Top = 180
         Height = 40
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
@@ -379,6 +386,7 @@ object NEDMainForm: TNEDMainForm
         Height = 40
         Hint = 'Project'
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
@@ -398,6 +406,7 @@ object NEDMainForm: TNEDMainForm
         Height = 40
         Hint = 'Search'
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13

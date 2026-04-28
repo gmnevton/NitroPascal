@@ -51,6 +51,7 @@ type
     ClientRect: TRect;
     ItemHeight: Integer;
     FolderHeight: Integer;
+    TopIndex: Integer;
   end;
   PFolderItemDetails = ^TFolderItemDetails;
 
@@ -907,24 +908,27 @@ begin
   Result := CreateBrushIndirect(LogBrush);
 end;
 
-procedure DrawCaption(DC: HDC;  const Caption: string; Rect: TRect; Direction: TDirection; Enabled: Boolean = True);
+procedure DrawCaption(const Canvas: TCanvas; const Caption: String; Rect: TRect; Direction: TDirection; Enabled: Boolean = True);
 var
+  DC: HDC;
   DrawRect: TRect;
   PriorMode: Integer;
   PriorColor: COLORREF;
 begin
+  DC := Canvas.Handle;
   DrawRect := Rect;
   PriorMode := SetBkMode(DC, TRANSPARENT);
   if Enabled then
     DrawText(DC, PChar(Caption), -1, DrawRect, Directions[Direction])
   else begin
     OffsetRect(DrawRect, 1, 1);
-    PriorColor := SetTextColor(DC, GetSysColor(COLOR_BTNHIGHLIGHT));
+    PriorColor := Canvas.Font.Color;
+    Canvas.Font.Color := clBtnHighlight;
     DrawText(DC, PChar(Caption), -1, DrawRect, Directions[Direction]);
     OffsetRect(DrawRect, -1, -1);
-    SetTextColor(DC, GetSysColor(COLOR_GRAYTEXT));
+    Canvas.Font.Color := clGrayText;
     DrawText(DC, PChar(Caption), -1, DrawRect, Directions[Direction]);
-    SetTextColor(DC, PriorColor);
+    Canvas.Font.Color := PriorColor;
   end;
   SetBkMode(DC, PriorMode);
 end;
@@ -1037,11 +1041,11 @@ var
   I: Integer;
 begin
   Folder := (Collection as TFolderItems).Folder;
-  TopIndex := (Collection as TFolderItems).Control.Perform(CM_ITEMDETAILS, Integer(@Details), 0);
-  if TopIndex = 0 then begin
+  if (Collection as TFolderItems).Control.Perform(CM_ITEMDETAILS, Integer(@Details), 0) = 0 then begin // technically not possible
     SetRectEmpty(Result);
     Exit;
   end;
+  //
   TopIndex := Folder.GetNearestTop;
   if (Folder = Details.Selected) and (TopIndex < Index + 1) and FVisible then begin
     Result := Folder.DisplayRect;
@@ -1178,25 +1182,27 @@ end;
 function TFolderBar.GetDisplayRect: TRect;
 var
   Folders: TFolderBars;
-  Details: TFolderItemDetails;
+  ParentControlDetails: TFolderItemDetails;
   Rect: TRect;
   I: Integer;
 begin
   Folders := Collection as TFolderBars;
-  if Folders.Control.Perform(CM_ITEMDETAILS, Integer(@Details), 0) = 0 then begin
+  if Folders.Control.Perform(CM_ITEMDETAILS, Integer(@ParentControlDetails), 0) = 0 then begin // technically not possible
     SetRectEmpty(Result);
     Exit;
   end;
   if Visible then begin
-    Result := Details.ClientRect;
-    if (Details.Selected <> Nil) and (Index > Details.Selected.Index) then
-      Result.Top := Result.Bottom - Details.FolderHeight * (Folders.Count - Index)
+    // calculate absolute position
+    Result := ParentControlDetails.ClientRect;
+    if (ParentControlDetails.Selected <> Nil) and (Index > ParentControlDetails.Selected.Index) then
+      Result.Top := Result.Bottom - ParentControlDetails.FolderHeight * (Folders.Count - Index)
     else
-      Result.Top := Index * Details.FolderHeight;
-    Result.Bottom := Result.Top + Details.FolderHeight;
-    if Details.BorderStyle = bsSingle then begin
+      Result.Top := Index * ParentControlDetails.FolderHeight;
+    Result.Bottom := Result.Top + ParentControlDetails.FolderHeight;
+    // correct for borders
+    if ParentControlDetails.BorderStyle = bsSingle then begin
       InflateRect(Result, -GetBorder, 0);
-      if (Details.Selected <> Nil) and (Index > Details.Selected.Index) then
+      if (ParentControlDetails.Selected <> Nil) and (Index > ParentControlDetails.Selected.Index) then
         OffsetRect(Result, 0, -GetBorder)
       else
         OffsetRect(Result, 0, GetBorder);
@@ -1206,12 +1212,15 @@ begin
         Rect := Folders[I].DisplayRect;
         if Result.Top < Rect.Bottom then
           OffsetRect(Result, 0, Rect.Bottom - Result.Top)
-        else if (Details.Selected = Nil) or (Index <= Details.Selected.Index) then
+        else if (ParentControlDetails.Selected = Nil) or (Index <= ParentControlDetails.Selected.Index) then
           OffsetRect(Result, 0, Rect.Bottom - Result.Top);
         Break;
       end
       else if I = 0 then
         OffsetRect(Result, 0, -Result.Top);
+    // now correct for relative position
+    Result.Top := Result.Top - ParentControlDetails.FolderHeight * ParentControlDetails.TopIndex;
+    Result.Bottom := Result.Bottom - ParentControlDetails.FolderHeight * ParentControlDetails.TopIndex;
   end
   else
     SetRectEmpty(Result);
@@ -1369,15 +1378,19 @@ begin
   FTextHeight := CalculateCaptionSize(DC, ' ').cY;
   SelectObject(DC, F);
   ReleaseDC(0, DC);
-  if FFolderImages <> Nil then
-    ImageHeight := FFolderImages.Height
-  else
-    ImageHeight := 0;
-  if ImageHeight > FTextHeight then
-    FFolderHeight := ImageHeight
-  else
-    FFolderHeight := FTextHeight;
-  Inc(FFolderHeight, 10);
+  //
+  // calculate folder height
+//  if FFolderImages <> Nil then
+//    ImageHeight := FFolderImages.Height
+//  else
+//    ImageHeight := 0;
+//  if ImageHeight > FTextHeight then
+//    FFolderHeight := ImageHeight
+//  else
+//    FFolderHeight := FTextHeight;
+//  Inc(FFolderHeight, 10);
+  //
+  // calculate item height
   if FItemImages <> Nil then
     ImageHeight := FItemImages.Height
   else
@@ -1387,7 +1400,11 @@ begin
   else
     FItemHeight := FTextHeight;
   Inc(FItemHeight, Round(FTextHeight * 1.5));
-//  Inc(FItemHeight, 10);
+  //Inc(FItemHeight, 10);
+  //
+  // folder height equals item height
+  FFolderHeight := FItemHeight;
+
   Invalidate;
 end;
 
@@ -1450,8 +1467,7 @@ var
   count: Integer;
 begin
   count := GetCount;
-//  Result := FTopIndex + (Pos.Y div FItemHeight);
-  Result := Pos.Y div FItemHeight;
+  Result := FTopIndex + (Pos.Y div FItemHeight);
   if Result > count - 1 then
     if Existing then
       Result := -1
@@ -1468,7 +1484,7 @@ var
 begin
   P := Point(X, Y);
   Result := Nil;
-  if FolderFromPoint(X, Y) <> Nil then
+  if FolderFromPoint(X, Y + (FTopIndex * FItemHeight)) <> Nil then
     Exit;
   if Selected <> Nil then
     for I := 0 to Selected.Items.Count - 1 do
@@ -1866,7 +1882,7 @@ begin
   Row.Height := FItemHeight;
 //  if FScrollWidth > 0 then
 //    Row.Width := FScrollWidth;
-  for I := 0 to ARect.Height div FItemHeight + 1 do begin
+  for I := 0 to ARect.Height div (FItemHeight + 1) do begin
     if I + FTopIndex > GetCount - 1 then
       Break;
     R := Row;
@@ -1887,8 +1903,7 @@ begin
     end;
 //    if FMultiSelect and FSelectItems[FTopIndex + I] then
 //      Include(DrawState, dsSelected);
-//    if FTopIndex + I = FHotIndex then
-    if I = FHotIndex then
+    if FTopIndex + I = FHotIndex then
       Include(DrawState, dsHot);
     //
     DrawItem(ACanvas, FTopIndex + I, R, DrawState);
@@ -1945,7 +1960,6 @@ procedure TCustomFolderView.DrawFolder(const ACanvas: TCanvas; const ARect: TRec
 var
   DC: HDC;
   DrawRect: TRect;
-  Brush: HBRUSH;
   CheckeredBrush: HBRUSH;
   top: Integer;
 begin
@@ -1953,21 +1967,16 @@ begin
     Exit;
   //
   DC := ACanvas.Handle;
-//  Brush := GetSysColorBrush(Color); //  COLOR_BTNFACE);
   CheckeredBrush := GetBrush(CheckeredBitmap);
   //DrawRect := Folder.DisplayRect;
   DrawRect := ARect;
 
   // clear item background
   SetBkMode(DC, OPAQUE);
-  Brush := CreateSolidBrush(ColorToRGB(Color));
-  FillRect(DC, ARect, Brush);
-  DeleteObject(Brush);
+  ACanvas.Brush.Color := ColorToRGB(Color);
+  ACanvas.FillRect(ARect);
 
   if StyleServices.Enabled then begin
-//    SetBkMode(DC, OPAQUE);
-//    FillRect(DC, DrawRect, ColorToRGB(Color));
-    //
     Inc(DrawRect.Right, 10);
     if dsSelected in DrawState then
       StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
@@ -1981,8 +1990,9 @@ begin
     if dsSelected in DrawState then
       FillRect(DC, DrawRect, CheckeredBrush)
     else
-      FillRect(DC, DrawRect, Brush);
+      ACanvas.FillRect(DrawRect);
   end;
+  DeleteObject(CheckeredBrush);
   // draw item icon
   InflateRect(DrawRect, -6, 0);
   if FFolderImages <> Nil then begin
@@ -1996,9 +2006,10 @@ begin
   end;
   // draw item caption
   InflateRect(DrawRect, -1, -1);
-  SetTextColor(DC, GetSysColor(COLOR_WINDOWTEXT));
+
+  ACanvas.Font.Color := clWindowText;
   SetBkMode(DC, TRANSPARENT);
-  DrawCaption(DC, Folder.Caption, DrawRect, drLeft);
+  DrawCaption(ACanvas, Folder.Caption, DrawRect, drLeft);
   //
 //  InflateRect(DrawRect, 2, 2);
 //  if FFolderImages <> Nil then
@@ -2007,14 +2018,12 @@ begin
 ////    SelectClipRect(DC, DrawRect, RGN_DIFF);
 //  if FOverlay <> Nil then
 //    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlay.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
-  DeleteObject(Brush);
 end;
 
 procedure TCustomFolderView.DrawFolderItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TFolderItem);
 var
   DC: HDC;
   DrawRect: TRect;
-  Brush: HBRUSH;
   CheckeredBrush: HBRUSH;
   top: Integer;
 begin
@@ -2022,20 +2031,15 @@ begin
     Exit;
   //
   DC := ACanvas.Handle;
-  //Brush := GetSysColorBrush(Color); //  COLOR_BTNFACE);
   CheckeredBrush := GetBrush(CheckeredBitmap);
   DrawRect := ARect;
 
   // clear item background
   SetBkMode(DC, OPAQUE);
-  Brush := CreateSolidBrush(ColorToRGB(Color));
-  FillRect(DC, ARect, Brush);
-  DeleteObject(Brush);
+  ACanvas.Brush.Color := ColorToRGB(Color);
+  ACanvas.FillRect(ARect);
 
   if StyleServices.Enabled then begin
-//    SetBkMode(DC, OPAQUE);
-//    FillRect(DC, DrawRect, ColorToRGB(Color));
-    //
     Inc(DrawRect.Right, 10);
     if dsSelected in DrawState then
       StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
@@ -2049,8 +2053,9 @@ begin
     if dsSelected in DrawState then
       FillRect(DC, DrawRect, CheckeredBrush)
     else
-      FillRect(DC, DrawRect, Brush);
+      ACanvas.FillRect(DrawRect);
   end;
+  DeleteObject(CheckeredBrush);
   // draw item icon
   InflateRect(DrawRect, -6, 0);
   if FFolderImages <> Nil then begin
@@ -2061,15 +2066,13 @@ begin
   end;
   // draw item caption
   InflateRect(DrawRect, -1, -1);
-  SetTextColor(DC, GetSysColor(COLOR_WINDOW));
+  ACanvas.Font.Color := clWindow;
   if dsSelected in DrawState then
-    SetTextColor(DC, GetSysColor(COLOR_WINDOWTEXT))
+    ACanvas.Font.Color := clWindowText
   else if dsHot in DrawState then
-    SetTextColor(DC, GetSysColor(clHighlightText));
+    ACanvas.Font.Color := clCaptionText;
   SetBkMode(DC, TRANSPARENT);
-  DrawCaption(DC, Item.Caption, DrawRect, drLeft);
-
-  DeleteObject(Brush);
+  DrawCaption(ACanvas, Item.Caption, DrawRect, drLeft);
 end;
 
 procedure TCustomFolderView.Scroll(Delta: Integer);
@@ -2507,6 +2510,8 @@ begin
   Details.ClientRect := ClientRect;
   Details.ItemHeight := FItemHeight;
   Details.FolderHeight := FFolderHeight;
+  Details.TopIndex := FTopIndex;
+  //
   Message.Result := 1;
 end;
 

@@ -43,6 +43,7 @@ type
     ImageList1: TImageList;
     //
     procedure FormCreate(Sender: TObject);
+    procedure FormResize(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     //
     procedure btnCloseClick(Sender: TObject);
@@ -263,10 +264,20 @@ begin
   FFormState := FFormState - [fsVisible];
 end;
 
+procedure TNEDDialogOpen.FormResize(Sender: TObject);
+begin
+  btnCancel.Width := Self.Width div 2;
+end;
+
 procedure TNEDDialogOpen.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  //
+  if Key = VK_ESCAPE then begin
+    Key := 0; // prevent default handling
+    FExecutionResult := mrCancel;
+    FCanClose := True;
+  end;
 end;
+
 //var
 //  FocusedControl: TWinControl;
 //  NextControl: TWinControl;
@@ -286,10 +297,10 @@ end;
 
 procedure TNEDDialogOpen.MainFormResize(Sender: TObject);
 begin
-  Self.Margins.Top := Round(FMainForm.Height * 0.2);
-  Self.Margins.Left := (FMainForm.Width - 600) div 2;
-  Self.Margins.Right := Self.Margins.Left;
-  Self.Margins.Bottom := Self.Margins.Top;
+//  Self.Margins.Top := Round(FMainForm.Height * 0.2);
+//  Self.Margins.Left := (FMainForm.Width - 600) div 2;
+//  Self.Margins.Right := Self.Margins.Left;
+//  Self.Margins.Bottom := Self.Margins.Top;
   //
   if Assigned(FOldMainFormResizeEvent) then
     FOldMainFormResizeEvent(Sender);
@@ -456,6 +467,7 @@ begin
 //  FolderBar.Visible := False;
   ListDirs(FolderBar);
   ListFiles(FolderBar);
+  FilesView.ActiveIndex := 0;
 end;
 
 procedure TNEDDialogOpen.GetFolderIcon(const IDL: PItemIDList; FolderBar: TFolderBar);
@@ -593,48 +605,56 @@ begin
 end;
 
 function TNEDDialogOpen.Execute(const DefaultPath: String = ''; const DefaultFileExt: String = '.*'): Boolean;
-//var
-//  ParentFormTabStop: Boolean;
-//  ParentFormKeyPreview: Boolean;
+var
+  t, l , w, h: Integer;
 begin
   Result := False;
+  FMainForm := TUForm(Application.MainForm);
+
   Self.Hide;
   Application.ProcessMessages;
-  FMainForm := TUForm(Application.MainForm);
   FOldMainFormResizeEvent := FMainForm.OnResize;
   try
+    // center on main form
     FMainForm.OnResize := MainFormResize;
-    Self.Parent := FMainForm;
-    //Self.Top := 200;
-    //Self.Left := (main.Width - Self.Width) div 2;
-    Self.Margins.Top := Round(FMainForm.Height * 0.2);
-    Self.Margins.Left := (FMainForm.Width - 600) div 2;
-    Self.Margins.Right := Self.Margins.Left;
-    Self.Margins.Bottom := Self.Margins.Top;
-    Self.AlignWithMargins := True;
-    Self.Align := alClient;
-    GetFolders;
-    //
-    if Length(DefaultPath) > 0 then
-      FPath := IncludeTrailingPathDelimiter(DefaultPath)
-    else
-      FPath := GetDirFromSpecialFolder(CSIDL_PERSONAL); // get "My Documents" as default
-    if Length(DefaultFileExt) > 0 then
-      FFileExtension := DefaultFileExt
-    else
-      FFileExtension := '.*'; // get all files as default if none was specified
-    //
-    txtPath.Caption := FPath;
-    GetFilesList;
-    //
-    FMainForm.OverlayType := otTransparent;
-    //FMainForm.Enabled := False;
-//    ParentFormTabStop := FMainForm.TabStop;
-//    ParentFormKeyPreview := FMainForm.KeyPreview;
-//    FMainForm.TabStop := False;
-//    FMainForm.KeyPreview := False;
+
+    FMainForm.DisableAlign;
     try
+      Self.Parent := FMainForm;
+
+      t := Round(FMainForm.Height * 0.2);
+      l := Round(FMainForm.Width * 0.6) div 2;
+      w := FMainForm.Width - Self.Left * 2;
+      h := FMainForm.Height - Self.Top * 2;
+
+      Self.SetBounds(l, t, w, h);
+
+      Self.Align := alCustom;
+      //
+      //
+      GetFolders;
+      //
+      if Length(DefaultPath) > 0 then
+        FPath := IncludeTrailingPathDelimiter(DefaultPath)
+      else
+        FPath := GetDirFromSpecialFolder(CSIDL_PERSONAL); // get "My Documents" as default
+      if Length(DefaultFileExt) > 0 then
+        FFileExtension := DefaultFileExt
+      else
+        FFileExtension := '.*'; // get all files as default if none was specified
+      //
+      txtPath.Caption := FPath;
+      GetFilesList;
+      //
+      FMainForm.OverlayType := otTransparent;
+      //
       FolderView.Show;
+      Application.ProcessMessages;
+    finally
+      FMainForm.EnableAlign;
+      Application.ProcessMessages;
+    end;
+    try
       Self.Show;
       Self.BringToFront;
       Self.SetFocus;
@@ -647,9 +667,6 @@ begin
       until FCanClose or Application.Terminated;
     finally
       FMainForm.OverlayType := otNone;
-      //FMainForm.Enabled := True;
-//      FMainForm.TabStop := ParentFormTabStop;
-//      FMainForm.KeyPreview := ParentFormKeyPreview;
       Result := FExecutionResult = mrOk;
     end;
   finally

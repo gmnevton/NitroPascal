@@ -14,6 +14,7 @@ uses
   SysUtils,
   Messages,
   Classes,
+  Types,
   Controls,
   StdCtrls,
   ExtCtrls,
@@ -146,6 +147,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure FormAlignPosition(Sender: TWinControl; Control: TControl; var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect; AlignInfo: TAlignInfo);
     procedure FormCanResize(Sender: TObject; var NewWidth, NewHeight: Integer; var Resize: Boolean);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -245,6 +247,16 @@ end;
 procedure TNEDMainForm.FormShow(Sender: TObject);
 begin
   NEDHomeForm.Show;
+end;
+
+procedure TNEDMainForm.FormAlignPosition(Sender: TWinControl; Control: TControl; var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect; AlignInfo: TAlignInfo);
+begin
+  if Control = FModalForm then begin
+    NewTop := Round(Self.Height * 0.2);
+    NewLeft := Round(Self.Width * 0.6) div 2;
+    NewWidth := Self.Width - NewLeft * 2;
+    NewHeight := Self.Height - NewTop * 2;
+  end;
 end;
 
 procedure TNEDMainForm.FormCanResize(Sender: TObject; var NewWidth, NewHeight: Integer; var Resize: Boolean);

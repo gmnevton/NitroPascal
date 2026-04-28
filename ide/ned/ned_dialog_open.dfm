@@ -20,6 +20,7 @@ object NEDDialogOpen: TNEDDialogOpen
   OldCreateOrder = True
   OnCreate = FormCreate
   OnKeyDown = FormKeyDown
+  OnResize = FormResize
   DesignSize = (
     600
     448)
@@ -155,7 +156,7 @@ object NEDDialogOpen: TNEDDialogOpen
     ShowCaption = False
     TabOrder = 0
     BackColor.Enabled = False
-    BackColor.Color = clBlack
+    BackColor.Color = clBtnFace
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
   end

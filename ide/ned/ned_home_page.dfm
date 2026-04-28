@@ -14,6 +14,10 @@ object NEDHomeForm: TNEDHomeForm
   Font.Style = []
   KeyPreview = True
   OldCreateOrder = False
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnResize = FormResize
+  OnShow = FormShow
   DesignSize = (
     1178
     693)
@@ -59,6 +63,7 @@ object NEDHomeForm: TNEDHomeForm
     Font.Name = 'Tahoma'
     Font.Style = []
     ParentFont = False
+    OnClick = UHyperLink1Click
     TextColors.Enabled = False
     TextColors.LightColor = 14120960
     TextColors.LightHover = clBlue
@@ -85,6 +90,7 @@ object NEDHomeForm: TNEDHomeForm
     Font.Name = 'Tahoma'
     Font.Style = []
     ParentFont = False
+    OnClick = UHyperLink2Click
     TextColors.Enabled = False
     TextColors.LightColor = 14120960
     TextColors.LightHover = clBlue
@@ -111,6 +117,7 @@ object NEDHomeForm: TNEDHomeForm
     Font.Name = 'Tahoma'
     Font.Style = []
     ParentFont = False
+    OnClick = UHyperLink3Click
     TextColors.Enabled = False
     TextColors.LightColor = 14120960
     TextColors.LightHover = clBlue
@@ -192,6 +199,7 @@ object NEDHomeForm: TNEDHomeForm
     Width = 305
     Anchors = [akLeft, akBottom]
     TabOrder = 0
+    OnClick = UCheckBox1Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
     IconFont.Height = -20
@@ -207,6 +215,7 @@ object NEDHomeForm: TNEDHomeForm
     Width = 361
     Anchors = [akRight, akBottom]
     TabOrder = 1
+    OnClick = USymbolButton1Click
     SymbolFont.Charset = DEFAULT_CHARSET
     SymbolFont.Color = clWindowText
     SymbolFont.Height = -16
@@ -223,10 +232,11 @@ object NEDHomeForm: TNEDHomeForm
     KeepOrginalColor = False
   end
   object URadioButton1: TURadioButton
-    Left = 42
+    Left = 40
     Top = 343
     Width = 80
     TabOrder = 2
+    OnDblClick = URadioButton1DblClick
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
     IconFont.Height = -20
@@ -240,6 +250,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 343
     Width = 80
     TabOrder = 3
+    OnDblClick = URadioButton2DblClick
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
     IconFont.Height = -20
@@ -253,6 +264,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 343
     Width = 80
     TabOrder = 4
+    OnDblClick = URadioButton3DblClick
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
     IconFont.Height = -20
@@ -267,6 +279,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 387
     Width = 254
     TabOrder = 5
+    OnClick = UButton1Click
     CustomColors.BackColors.Enabled = False
     CustomColors.BackColors.LightColor = 13421772
     CustomColors.BackColors.LightHover = 13421772
@@ -309,6 +322,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 436
     Width = 254
     TabOrder = 6
+    OnClick = UButton2Click
     CustomColors.BackColors.Enabled = False
     CustomColors.BackColors.LightColor = 13421772
     CustomColors.BackColors.LightHover = 13421772
