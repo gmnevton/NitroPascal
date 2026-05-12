@@ -62,4 +62,34 @@
 
 *)
 
+// there is special kind of comment in NitroPascal, a comment that is parsable by the compiler, so that any
+// statement or variable referenced is syntactically checked for correctnes, you can declare single line comment and
+// multi-line comments using this two types of parsable comments:
+//
+// "//-" for single line comment
+// "//+" for multi-line comment begin
+// "+//" for multi-line comment end
+//
+// this types of comments are equivalent of this expression:
+
+  if 0 then statement;
+
+// or
+
+  if 0 then {
+    // statements;
+  };
+
+// now you just say this:
+
+//- statement;
+
+// or
+
+//+
+  statements;
++//
+
+// abowe examples should produce compile-time errors: unknown identifier "statement" and unknown identifier "statements"
+
 end.
