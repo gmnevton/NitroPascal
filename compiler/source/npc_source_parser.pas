@@ -3788,7 +3788,7 @@ begin
 
   Texer.ExpectReservedSymbol(rs_Dot);
 
-  AMember := Texer.ExpectToken(tokIdent, 'method name expected');
+  AMember := Texer.ExpectToken(tokIdent, 'member name expected');
 
   Result := True;
 end;
