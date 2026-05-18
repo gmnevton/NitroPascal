@@ -323,7 +323,6 @@ object NEDEditorForm: TNEDEditorForm
     RightEdge = 128
     RightEdgeColor = 33023
     SelectedColor.Alpha = 0.400000005960464500
-    ExplicitWidth = 600
   end
   object UPanel4: TUPanel
     Left = 0
@@ -343,7 +342,6 @@ object NEDEditorForm: TNEDEditorForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitWidth = 600
     object UScrollBox1: TUScrollBox
       Left = 0
       Top = 0
@@ -366,7 +364,6 @@ object NEDEditorForm: TNEDEditorForm
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
       ScrollOrientation = oHorizontal
-      ExplicitWidth = 600
       object USymbolButton1: TUSymbolButton
         Left = 0
         Top = 0

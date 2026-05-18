@@ -56,9 +56,9 @@ type
     procedure UHyperLink1Click(Sender: TObject);
     procedure UHyperLink2Click(Sender: TObject);
     procedure UHyperLink3Click(Sender: TObject);
-    procedure URadioButton1DblClick(Sender: TObject);
-    procedure URadioButton2DblClick(Sender: TObject);
-    procedure URadioButton3DblClick(Sender: TObject);
+    procedure URadioButton1Click(Sender: TObject);
+    procedure URadioButton2Click(Sender: TObject);
+    procedure URadioButton3Click(Sender: TObject);
     procedure UButton1Click(Sender: TObject);
     procedure UButton2Click(Sender: TObject);
     procedure UCheckBox1Click(Sender: TObject);
@@ -109,19 +109,22 @@ begin
 //
 end;
 
-procedure TNEDHomeForm.URadioButton1DblClick(Sender: TObject);
+procedure TNEDHomeForm.URadioButton1Click(Sender: TObject);
 begin
-  GetCommonThemeManager.Theme := ttDark;
+  if URadioButton1.Checked then
+    GetCommonThemeManager.Theme := ttDark;
 end;
 
-procedure TNEDHomeForm.URadioButton2DblClick(Sender: TObject);
+procedure TNEDHomeForm.URadioButton2Click(Sender: TObject);
 begin
-  GetCommonThemeManager.Theme := ttLight;
+  if URadioButton2.Checked then
+    GetCommonThemeManager.Theme := ttLight;
 end;
 
-procedure TNEDHomeForm.URadioButton3DblClick(Sender: TObject);
+procedure TNEDHomeForm.URadioButton3Click(Sender: TObject);
 begin
-  GetCommonThemeManager.Theme := ttSystem;
+  if URadioButton3.Checked then
+    GetCommonThemeManager.Theme := ttSystem;
 end;
 
 procedure TNEDHomeForm.UButton1Click(Sender: TObject);

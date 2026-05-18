@@ -236,7 +236,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 343
     Width = 80
     TabOrder = 2
-    OnDblClick = URadioButton1DblClick
+    OnClick = URadioButton1Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
     IconFont.Height = -20
@@ -250,7 +250,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 343
     Width = 80
     TabOrder = 3
-    OnDblClick = URadioButton2DblClick
+    OnClick = URadioButton2Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
     IconFont.Height = -20
@@ -264,7 +264,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 343
     Width = 80
     TabOrder = 4
-    OnDblClick = URadioButton3DblClick
+    OnClick = URadioButton3Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
     IconFont.Height = -20

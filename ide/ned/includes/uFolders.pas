@@ -1,4 +1,4 @@
-unit uFolders;
+﻿unit uFolders;
 
 {$WRITEABLECONST ON}
 
@@ -13,16 +13,15 @@ uses
   Controls,
   Forms,
   ImgList,
-  CommCtrl;
+  CommCtrl,
+  Generics.Collections;
 
 const
-  CM_FOLDERBASE       = $AA00;
-  CM_FOLDERIMAGES     = CM_FOLDERBASE + 1;
-  CM_ITEMIMAGES       = CM_FOLDERIMAGES + 1;
-  CM_ITEMDETAILS      = CM_ITEMIMAGES + 1;
-  CN_ITEMCLICK        = CM_ITEMDETAILS + 1;
-
-{ TFolderItem }
+  CM_FOLDERBASE  = $AA00;
+  CM_ENTRYIMAGES = CM_FOLDERBASE + 1;
+  //CM_ITEMIMAGES  = CM_ENTRYIMAGES + 1;
+  CM_ITEMDETAILS = CM_ENTRYIMAGES + 1;
+  CN_ITEMCLICK   = CM_ITEMDETAILS + 1;
 
 type
   TDrawStateItem = (
@@ -41,198 +40,246 @@ type
   );
   TDrawState = set of TDrawStateItem;
 
-  TFolderItems = class;
-  TFolderBar = class;
-  TFolderBars = class;
+  TEntryItem = class;
+  TEntryItems = class;
+  TCustomEntryView = class;
 
-  TFolderItemDetails = record
+  TEntryItemDetails = record
     BorderStyle: TborderStyle;
-    Selected: TFolderBar;
+    Selected: TEntryItem;
     ClientRect: TRect;
-    ItemHeight: Integer;
-    FolderHeight: Integer;
+    EntryHeight: Integer;
+    //FolderHeight: Integer;
     TopIndex: Integer;
   end;
-  PFolderItemDetails = ^TFolderItemDetails;
+  PEntryItemDetails = ^TEntryItemDetails;
 
   TUserFreeProc = procedure (var AData: Pointer) of object;
 
-  TFolderItem = class(TCollectionItem)
+  TEntryStateEnum = (esCollapsed, esExpanded);
+
+  TEntryItemPositionEnum = (epAbsolute, epRelative);
+
+  TEntryItem = class(TCollectionItem)
   private
+    // expand/collapse icon (left/right aligned) - entry icon - entry caption - [child entries]
+    FIndex: Integer; // absolute entry index; updated while tree state is being changed
+    FLevel: Integer; // indentation level
     FCaption: string;
     FEnabled: Boolean;
     FVisible: Boolean;
     FImageIndex: Integer;
+    FEntryState: TEntryStateEnum;
+    FItems: TEntryItems;
+    //
     FData: Pointer;
     FDataObject: Boolean;
     FUserFreeProc: TUserFreeProc;
     //
-    procedure SetCaption(const Value: string);
+    FParentEntries: TEntryItems;
+    //
+    procedure SetCaption(const Value: String);
     procedure SetEnabled(Value: Boolean);
     procedure SetVisible(Value: Boolean);
     procedure SetImageIndex(Value: Integer);
+    procedure SetEntryState(Value: TEntryStateEnum);
+    procedure SetItems(Value: TEntryItems);
     //
-    function GetDisplayRect: TRect;
+    function GetVisible: Boolean;
+    //
+    function GetDisplayRect(const AbsoluteOrRelative: TEntryItemPositionEnum): TRect;
+//  protected
+//    function GetNearestTop: Integer;
   public
     constructor Create(Collection: TCollection); override;
     destructor Destroy; override;
     //
     procedure Assign(Source: TPersistent); override;
     procedure Click;
-    property DisplayRect: TRect read GetDisplayRect;
+    procedure Collapse;
+    procedure Expand;
+    function AbsoluteDisplayRect: TRect;
+    function RelativeDisplayRect: TRect;
+    function HasChildren: Boolean;
+    function IsExpanded: Boolean;
+    function ParentIsVisible: Boolean;
+    function ParentHasChildren: Boolean;
+    function ParentIsExpanded: Boolean;
+    //
+    //property DisplayRect: TRect read GetDisplayRect;
     property Data: Pointer read FData write FData;
     property DataObject: Boolean read FDataObject write FDataObject;
+    property ParentEntries: TEntryItems read FParentEntries;
+    property TreeIndex: Integer read FIndex;
+    property TreeLevel: Integer read FLevel;
   published
     property Caption: string read FCaption write SetCaption;
     property Enabled: Boolean read FEnabled write SetEnabled default True;
-    property Visible: Boolean read FVisible write SetVisible;
+    property Visible: Boolean read GetVisible write SetVisible;
     property ImageIndex: Integer read FImageIndex write SetImageIndex;
+    property State: TEntryStateEnum read FEntryState write SetEntryState;
+    property Items: TEntryItems read FItems write SetItems;
+    //
     property UserFreeProc: TUserFreeProc read FUserFreeProc write FUserFreeProc;
   end;
 
-{ TFolderItems }
-
-  TFolderItems = class(TCollection)
+  TEntryItems = class(TCollection)
   private
-    FFolder: TFolderBar;
+    FOwnerEntry: TEntryItem;
     FControl: TControl;
   protected
     procedure Update(Item: TCollectionItem); override;
-    function Get(Index: Integer): TFolderItem;
-    procedure Put(Index: Integer; Value: TFolderItem);
+    function Get(Index: Integer): TEntryItem;
+    procedure Put(Index: Integer; Value: TEntryItem);
+    //
+    function GetTreeIndex(Entry: TEntryItem): Integer;
+    function GetTreeLevel(Entry: TEntryItem): Integer;
+    //
+    function GetFirstEntry(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetLastEntry(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetPrevEntry(Entry: TEntryItem): TEntryItem; // inline;
+    function GetNextEntry(Entry: TEntryItem): TEntryItem; // inline;
+    //
+    function GetFirstEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetLastEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetPrevEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetNextEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
+
+//    function DisplayRect(const Entry: TEntryItem): TRect;
+//    function GetNearestTop: Integer;
   public
-    constructor Create(Control: TControl; Folder: TFolderBar);
+    constructor Create(Control: TControl; OwnerEntry: TEntryItem);
     //
     procedure Assign(Source: TPersistent); override;
-    function Add: TFolderItem;
-    function Insert(Index: Integer): TFolderItem;
-    property Items[Index: Integer]: TFolderItem read Get write Put; default;
-    property Folder: TFolderBar read FFolder;
+    function Add: TEntryItem;
+    function Insert(Index: Integer): TEntryItem;
+    //
+    property Items[Index: Integer]: TEntryItem read Get write Put; default;
+    property OwnerEntry: TEntryItem read FOwnerEntry;
     property Control: TControl read FControl;
   end;
 
-{ TFolderBar }
+//  TFolderBar = class(TCollectionItem)
+//  private
+//    FCaption: string;
+//    FVisible: Boolean;
+//    FImageIndex: Integer;
+//    FData: Pointer;
+//    FDataObject: Boolean;
+//    FItems: TFolderItems;
+//    FSelectedIndex: Integer;
+//    FTopIndex: Integer;
+//    FUserFreeProc: TUserFreeProc;
+//    //
+//    procedure SetCaption(const Value: string);
+//    procedure SetVisible(Value: Boolean);
+//    procedure SetImageIndex(Value: Integer);
+//    procedure SetItems(Value: TFolderItems);
+//    procedure SetSelectedIndex(Value: Integer);
+//    procedure SetTopIndex(Value: Integer);
+//    //
+//    function GetDisplayRect: TRect;
+//  protected
+//    function GetNearestTop: Integer;
+//  public
+//    constructor Create(Collection: TCollection); override;
+//    destructor Destroy; override;
+//    //
+//    procedure Assign(Source: TPersistent); override;
+//    property Data: Pointer read FData write FData;
+//    property DataObject: Boolean read FDataObject write FDataObject;
+//    property DisplayRect: TRect read GetDisplayRect;
+//    property TopIndex: Integer read FTopIndex write SetTopIndex;
+//  published
+//    property Caption: string read FCaption write SetCaption;
+//    property Visible: Boolean read FVisible write SetVisible;
+//    property ImageIndex: Integer read FImageIndex write SetImageIndex;
+//    property Items: TFolderItems read FItems write SetItems;
+//    property SelectedIndex: Integer read FSelectedIndex write SetSelectedIndex;
+//    property UserFreeProc: TUserFreeProc read FUserFreeProc write FUserFreeProc;
+//  end;
 
-  TFolderBar = class(TCollectionItem)
-  private
-    FCaption: string;
-    FVisible: Boolean;
-    FImageIndex: Integer;
-    FData: Pointer;
-    FDataObject: Boolean;
-    FItems: TFolderItems;
-    FSelectedIndex: Integer;
-    FTopIndex: Integer;
-    FUserFreeProc: TUserFreeProc;
-    //
-    procedure SetCaption(const Value: string);
-    procedure SetVisible(Value: Boolean);
-    procedure SetImageIndex(Value: Integer);
-    procedure SetItems(Value: TFolderItems);
-    procedure SetSelectedIndex(Value: Integer);
-    procedure SetTopIndex(Value: Integer);
-    //
-    function GetDisplayRect: TRect;
-  protected
-    function GetNearestTop: Integer;
-  public
-    constructor Create(Collection: TCollection); override;
-    destructor Destroy; override;
-    //
-    procedure Assign(Source: TPersistent); override;
-    property Data: Pointer read FData write FData;
-    property DataObject: Boolean read FDataObject write FDataObject;
-    property DisplayRect: TRect read GetDisplayRect;
-    property TopIndex: Integer read FTopIndex write SetTopIndex;
-  published
-    property Caption: string read FCaption write SetCaption;
-    property Visible: Boolean read FVisible write SetVisible;
-    property ImageIndex: Integer read FImageIndex write SetImageIndex;
-    property Items: TFolderItems read FItems write SetItems;
-    property SelectedIndex: Integer read FSelectedIndex write SetSelectedIndex;
-    property UserFreeProc: TUserFreeProc read FUserFreeProc write FUserFreeProc;
-  end;
+//  TFolderBars = class(TCollection)
+//  private
+//    FControl: TControl;
+//  protected
+//    procedure Update(Item: TCollectionItem); override;
+//    function Get(Index: Integer): TFolderBar;
+//    procedure Put(Index: Integer; Value: TFolderBar);
+//  public
+//    constructor Create(Control: TControl);
+//    procedure Assign(Source: TPersistent); override;
+//    function Add: TFolderBar;
+//    function Insert(Index: Integer): TFolderBar;
+//    property Items[Index: Integer]: TFolderBar read Get write Put; default;
+//    property Control: TControl read FControl;
+//  end;
 
-{ TFolderBars }
+{ TCustomEntryView }
 
-  TFolderBars = class(TCollection)
-  private
-    FControl: TControl;
-  protected
-    procedure Update(Item: TCollectionItem); override;
-    function Get(Index: Integer): TFolderBar;
-    procedure Put(Index: Integer; Value: TFolderBar);
-  public
-    constructor Create(Control: TControl);
-    procedure Assign(Source: TPersistent); override;
-    function Add: TFolderBar;
-    function Insert(Index: Integer): TFolderBar;
-    property Items[Index: Integer]: TFolderBar read Get write Put; default;
-    property Control: TControl read FControl;
-  end;
+  TEntryItemEvent = procedure(Sender: TObject; Item: TEntryItem) of object;
 
-{ TCustomFolderView }
-
-  TFolderItemEvent = procedure(Sender: TObject; Item: TFolderItem) of object;
-
-  TFolderScrollButton = (fbScrollUp, fbScrollDown);
-  TFolderScrollButtons = set of TFolderScrollButton;
-
-  TCustomFolderView = class(TCustomControl)
-  private
+  TCustomEntryView = class(TCustomControl)
+  private // fileds that will be accesible by user
     FActiveIndex: Integer;
     FBorderStyle: TBorderStyle;
-    //FButtons: TFolderScrollButtons;
-    FCaptureItem: TFolderItem;
+    FCaptureItem: TEntryItem;
     FChangeLink: TChangeLink;
-    FFolderHeight: Integer;
-    FFolderImages: TCustomImageList;
-    FFolders: TFolderBars;
+    FEntryHeight: Integer;
+    FEntryImages: TCustomImageList;
+    FEntries: TEntryItems;
     FHotTrack: Boolean;
     FHotIndex: Integer;
-    FItemImages: TCustomImageList;
-    FItemHeight: Integer;
-    FMouseItem: TFolderItem;
+//    FItemImages: TCustomImageList;
+//    FItemHeight: Integer;
+    FMouseItem: TEntryItem;
+    //FMousePoint: TPoint;
     FMultiSelect: Boolean;
-    FSelectCount: Integer;
-    FSelectItems: Array of Integer;
+    FSelectedCount: Integer;
+    FSelected: TEntryItem;
+    FSelectedItems: TObjectList<TEntryItem>;
     FOverlay: TPicture;
-    FSelected: TFolderBar;
+    FItemIndex: Integer;
+    // events
+    FOnChange: TNotifyEvent;
+    FOnItemClick: TEntryItemEvent;
+  private // internal fields
     FTextHeight: Integer;
     FTopIndex: Integer;
-    FOnChange: TNotifyEvent;
-    FOnItemClick: TFolderItemEvent;
-    FItemIndex: Integer;
     FLocked: Boolean;
     FLockedIndex: Integer;
     FShift: TShiftState;
     FShiftIndex: Integer;
-
-    procedure ImagesChange(Sender: TObject);
-    procedure OverlayChange(Sender: TObject);
+  private // setters
     procedure SetActiveIndex(Value: Integer);
     procedure SetBorderStyle(Value: TBorderStyle);
-    procedure SetCaptureItem(Value: TFolderItem);
-    procedure SetFolderHeight(Value: Integer);
-    procedure SetFolderImages(Value: TCustomImageList);
-    procedure SetFolders(Value: TFolderBars);
-    procedure SetItemImages(Value: TCustomImageList);
+    procedure SetCaptureItem(Value: TEntryItem);
+    procedure SetEntryHeight(Value: Integer);
+    procedure SetEntryImages(Value: TCustomImageList);
+    procedure SetEntries(Value: TEntryItems);
     procedure SetItemIndex(Value: Integer);
     procedure SetMultiSelect(Value: Boolean);
     procedure SetOverlay(Value: TPicture);
     procedure SetScrollIndex(Value: Integer);
-    procedure SetSelected(Value: TFolderBar);
+    procedure SetSelected(Value: TEntryItem);
     procedure SetTopIndex(Value: Integer);
-    function GetButtonRect(Button: TFolderScrollButton): TRect;
+  private // getters
+    //function GetButtonRect(Button: TFolderScrollButton): TRect;
     function GetCount: Integer;
+    //function GetSelectedRect: TRect;
+    //function GetButtonRect(Button: TFolderScrollButton): TRect;
     function GetSelectedRect: TRect;
-
+    function GetIndentLevel(const Entry: TEntryItem): Integer; // inline;
+  private // internal methods
+    procedure ImagesChange(Sender: TObject);
+    procedure OverlayChange(Sender: TObject);
+    //
     procedure CMDesignHitTest(var Message: TCMDesignHitTest); message CM_DESIGNHITTEST;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
     procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-    procedure CMFolderImages(var Message: TMessage); message CM_FOLDERIMAGES;
-    procedure CMItemImages(var Message: TMessage); message CM_ITEMIMAGES;
+    procedure CMEntryImages(var Message: TMessage); message CM_ENTRYIMAGES;
+    //procedure CMItemImages(var Message: TMessage); message CM_ITEMIMAGES;
     procedure CMItemDetails(var Message: TMessage); message CM_ITEMDETAILS;
     procedure CNItemClick(var Message: TMessage); message CN_ITEMCLICK;
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
@@ -244,13 +291,16 @@ type
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
     procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+    //
   protected
     procedure CreateHandle; override;
-    procedure DoItemClick(Item: TFolderItem); dynamic;
+    procedure DoItemClick(Item: TEntryItem); dynamic;
     procedure EnsureItemVisible;
-    function ItemFromPoint(X, Y: Integer): TFolderItem;
+    function ItemFromPoint(X, Y: Integer): TEntryItem;
     function ItemRect(Item: Integer): TRect;
     function ItemAtPos(const Pos: TPoint; Existing: Boolean = False): Integer;
+    function ItemFromIndex(const Index: Integer): TEntryItem;
+    function ItemSelected(const Item: TEntryItem): Boolean;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure Loaded; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
@@ -258,11 +308,14 @@ type
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure Paint; override;
+    procedure DblClick; override;
     procedure DrawBackground(const ACanvas: TCanvas; var ARect: TRect); virtual;
     procedure DrawItems(const ACanvas: TCanvas; const ARect: TRect); virtual;
     procedure DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; DrawState: TDrawState);
-    procedure DrawFolder(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Folder: TFolderBar);
-    procedure DrawFolderItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TFolderItem);
+    //procedure DrawEntry(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Entry: TEntryItem);
+    //procedure DrawFolderItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TFolderItem);
+//    procedure DrawEntryItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Folder: TFolderBar);
+    procedure DrawEntryItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TEntryItem);
     procedure SelectItem(PriorIndex: Integer; NewIndex: Integer; var CanSelect: Boolean); virtual;
     procedure UpdateImages(var InternalImages: TCustomImageList; ExternalImages: TCustomImageList);
     procedure UpdateScrollRange;
@@ -273,33 +326,31 @@ type
 
     property ActiveIndex: Integer read FActiveIndex write SetActiveIndex;
     property BorderStyle: TBorderStyle read FBorderStyle write SetBorderStyle;
-    property ButtonRect[Button: TFolderScrollButton]: TRect read GetButtonRect;
-    property CaptureItem: TFolderItem read FCaptureItem write SetCaptureItem;
-    property FolderHeight: Integer read FFolderHeight write SetFolderHeight;
-    property FolderImages: TCustomImageList read FFolderImages write SetFolderImages;
+//    property ButtonRect[Button: TFolderScrollButton]: TRect read GetButtonRect;
+    property CaptureItem: TEntryItem read FCaptureItem write SetCaptureItem;
+    property EntryHeight: Integer read FEntryHeight write SetEntryHeight;
+    property EntryImages: TCustomImageList read FEntryImages write SetEntryImages;
     property Overlay: TPicture read FOverlay write SetOverlay;
-    property Folders: TFolderBars read FFolders write SetFolders;
-    property ItemImages: TCustomImageList read FItemImages write SetItemImages;
+    property Entries: TEntryItems read FEntries write SetEntries;
+//    property ItemImages: TCustomImageList read FItemImages write SetItemImages;
     property ItemIndex: Integer read FItemIndex write SetItemIndex;
     property MultiSelect: Boolean read FMultiSelect write SetMultiSelect;
-    property Selected: TFolderBar read FSelected write SetSelected;
+    property Selected: TEntryItem read FSelected write SetSelected;
     property TopIndex: Integer read FTopIndex write SetTopIndex;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    property OnItemClick: TFolderItemEvent read FOnItemClick write FOnItemClick;
+    property OnItemClick: TEntryItemEvent read FOnItemClick write FOnItemClick;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
 
     procedure Update; override;
-    function FolderFromPoint(X, Y: Integer): TFolderBar;
+    function EntryFromPoint(X, Y: Integer): TEntryItem;
   end;
 
-{ TFolderView }
-
-  TFolderView = class(TCustomFolderView)
+  TEntryView = class(TCustomEntryView)
   public
     property Selected;
-    property FolderHeight;
+    property EntryHeight;
   published
     property Align;
     property ActiveIndex;
@@ -312,9 +363,9 @@ type
     property DragMode;
     property Enabled;
     property Font;
-    property FolderImages;
-    property Folders;
-    property ItemImages;
+    property EntryImages;
+    property Entries;
+//    property ItemImages;
     property Overlay;
     property OnItemClick;
     property ParentBiDiMode;
@@ -354,7 +405,6 @@ type
   //TDirections = set of TDirection;
   TDrawFrameState = (dfFocus, dfFramed, dfHover, dfRaised, dfFlat, dfLowered, dfSunken, dfPressed, dfPushed);
 
-
   TFastBitmap = record
     DC: HDC;
     Handle: HBITMAP;
@@ -377,9 +427,28 @@ const
 const
   Directions: array[TDirection] of Integer = (DR_LEFT or DT_VCENTER, DR_TOP, DT_RIGHT or DT_VCENTER, DR_BOTTOM, DR_CENTER, DR_FILL, DR_WRAP_CENTER);
 
+var
+  CheckeredBitmap: TBitmap = Nil;
+
 //------------------------------------------------------------------------------------------------------------------------------
 
-function GetBorder: Integer;
+function RectInRect(const ARect, AInRect: TRect): Boolean; inline;
+begin
+  Result := (ARect.Top >= AInRect.Top) and
+            (ARect.Left >= AInRect.Left) and
+            (ARect.Bottom <= AInRect.Bottom) and
+            (ARect.Right <= AInRect.Right);
+end;
+
+function IfThen(const Cond: Boolean; ValueTrue, ValueFalse: Integer): Integer; inline;
+begin
+  if Cond then
+    Result := ValueTrue
+  else
+    Result := ValueFalse;
+end;
+
+function GetBorder: Integer; inline;
 begin
 	if StyleServices.Enabled then
   	Result := 1
@@ -387,7 +456,7 @@ begin
   	Result := GetSystemMetrics(SM_CXEDGE);
 end;
 
-function AverageColor(Color: TColor): Byte;
+function AverageColor(Color: TColor): Byte; inline;
 var
 	RGB: TRGBQuad absolute Color;
 begin
@@ -395,7 +464,7 @@ begin
   Result := (RGB.rgbBlue + RGB.rgbGreen + RGB.rgbRed) div 3;
 end;
 
-function GetTextColor(Background: TColor): TColor;
+function GetTextColor(Background: TColor): TColor; inline;
 var
   L, H: TColor;
 begin
@@ -413,7 +482,7 @@ begin
   	Result := H;
 end;
 
-function CalculateCaptionSize(DC: HDC; const Text: string): TSize;
+function CalculateCaptionSize(DC: HDC; const Text: string): TSize; inline;
 begin
   FillChar(Result, SizeOf(TSize), #0);
   GetTextExtentPoint32(DC, PChar(Text), Length(Text), Result);
@@ -443,7 +512,7 @@ begin
   Result := Rect.Right - Rect.Left;
 end;
 
-function CreateFastBitmap(Width, Height: Integer): TFastBitmap;
+function CreateFastBitmap(Width, Height: Integer): TFastBitmap; inline;
 var
   BitmapInfo: TBitmapinfo;
 begin
@@ -465,7 +534,7 @@ begin
     SelectObject(DC, Handle);
 end;
 
-procedure DestroyFastBitmap(const Bitmap: TFastBitmap);
+procedure DestroyFastBitmap(const Bitmap: TFastBitmap); inline;
 begin
   DeleteDC(Bitmap.DC);
   DeleteObject(Bitmap.Handle);
@@ -506,7 +575,7 @@ end;
 //  end;
 //end;
 
-function GetDetails(Widget: TThemedScrollBar): TThemedElementDetails; overload;
+function GetDetails(Widget: TThemedScrollBar): TThemedElementDetails; overload; inline;
 var
   Base: Integer;
 begin
@@ -561,7 +630,7 @@ begin
   end;
 end;
 
-function GetDetails(Widget: TThemedComboBox): TThemedElementDetails; overload;
+function GetDetails(Widget: TThemedComboBox): TThemedElementDetails; overload; inline;
 var
   Base: Integer;
 begin
@@ -580,7 +649,7 @@ begin
   end;
 end;
 
-function GetDetails(Widget: TThemedHeader): TThemedElementDetails; overload;
+function GetDetails(Widget: TThemedHeader): TThemedElementDetails; overload; inline;
 var
   Base: Integer;
 begin
@@ -611,7 +680,7 @@ begin
   end;
 end;
 
-function GetDetails(Widget: TThemedToolBar): TThemedElementDetails; overload;
+function GetDetails(Widget: TThemedToolBar): TThemedElementDetails; overload; inline;
 var
   Base: Integer;
 begin
@@ -650,7 +719,7 @@ begin
   end;
 end;
 
-procedure DrawScroll(DC: HDC; Theme: TThemedScrollBar; Rect: TRect);
+procedure DrawScroll(DC: HDC; Theme: TThemedScrollBar; Rect: TRect); inline;
 var
  W, H, X, Y: Integer;
  A: TFastBitmap;
@@ -669,7 +738,7 @@ begin
   DestroyFastBitmap(A);
 end;
 
-procedure DrawThemeScroll(DC: HDC; Direction: TDirection; const Rect: TRect; State: TDrawState);
+procedure DrawThemeScroll(DC: HDC; Direction: TDirection; const Rect: TRect; State: TDrawState); inline;
 var
 	Theme: TThemedScrollBar;
   FrameState: Cardinal;
@@ -716,12 +785,12 @@ begin
   end;
 end;
 
-procedure OverwriteObject(DC: HDC; Obj: HGDIOBJ);
+procedure OverwriteObject(DC: HDC; Obj: HGDIOBJ); inline;
 begin
   DeleteObject(SelectObject(DC, Obj));
 end;
 
-procedure SelectClipRect(DC: HDC; const Rect: TRect; Mode: Integer);
+procedure SelectClipRect(DC: HDC; const Rect: TRect; Mode: Integer); inline;
 var
   Region: HRGN;
 begin
@@ -731,15 +800,14 @@ begin
   DeleteObject(Region);
 end;
 
-procedure DrawFrame(DC: HDC; Rect: TRect; State: TDrawFrameState);
+procedure DrawFrame(DC: HDC; Rect: TRect; State: TDrawFrameState); inline;
 var
   PriorPen: HPEN;
   PriorPoint: TPoint;
 begin
   if State = dfFlat then
     Exit;
-  with Rect do
-  begin
+  with Rect do begin
     Dec(Right);
     Dec(Bottom);
     MoveToEx(DC, Left, Top, @PriorPoint);
@@ -864,7 +932,7 @@ begin
   end;
 end;
 
-procedure DrawThemeBorder(DC: HDC; Color: TColor; const Rect: TRect; State: TDrawState);
+procedure DrawThemeBorder(DC: HDC; Color: TColor; const Rect: TRect; State: TDrawState); inline;
 var
 	Brush: HBRUSH;
   Rgn: HRGN;
@@ -898,7 +966,7 @@ begin
 	OverwriteObject(DC, Brush);
 end;
 
-function GetBrush(Bitmap: TBitmap): HBRUSH;
+function GetBrush(Bitmap: TBitmap): HBRUSH; inline;
 var
   LogBrush: TLogBrush;
 begin
@@ -908,7 +976,7 @@ begin
   Result := CreateBrushIndirect(LogBrush);
 end;
 
-procedure DrawCaption(const Canvas: TCanvas; const Caption: String; Rect: TRect; Direction: TDirection; Enabled: Boolean = True);
+procedure DrawCaption(const Canvas: TCanvas; const Caption: String; Rect: TRect; Direction: TDirection; Enabled: Boolean = True); inline;
 var
   DC: HDC;
   DrawRect: TRect;
@@ -933,7 +1001,7 @@ begin
   SetBkMode(DC, PriorMode);
 end;
 
-procedure DrawThemeThinButton(DC: HDC; const Rect: TRect; State: TDrawState);
+procedure DrawThemeThinButton(DC: HDC; const Rect: TRect; State: TDrawState); inline;
 var
   Theme: TThemedToolBar;
 begin
@@ -957,7 +1025,7 @@ begin
   end;
 end;
 
-function GetBitmap(ForeColor: TColor; BackColor: TColor): TBitmap;
+function GetBitmap(ForeColor: TColor; BackColor: TColor): TBitmap; inline;
 var
   PixelColors: array[Boolean] of TColor;
   Col: Integer;
@@ -976,398 +1044,825 @@ begin
   end;
 end;
 
-{ TFolderItem }
+{ TEntryItem }
 
-constructor TFolderItem.Create(Collection: TCollection);
+constructor TEntryItem.Create(Collection: TCollection);
 begin
   inherited Create(Collection);
+  FIndex := -1;
+  FLevel := -1;
+  FCaption := '';
   FEnabled := True;
   FVisible := True;
   FImageIndex := -1;
+  FEntryState := esCollapsed;
+  FItems := TEntryItems.Create(TEntryItems(Collection).Control, Self);
+  FData := Nil;
+  FDataObject := False;
+  FUserFreeProc := Nil;
+  FParentEntries := Nil;
 end;
 
-destructor TFolderItem.Destroy;
+destructor TEntryItem.Destroy;
 begin
   if FDataObject and (FData <> Nil) then
     TObject(FData).Free
   else if (FData <> Nil) and Assigned(FUserFreeProc) then
     FUserFreeProc(FData);
+  FItems.Free;
+  FParentEntries := Nil;
+  FCaption := '';
   inherited Destroy;
 end;
 
-procedure TFolderItem.Assign(Source: TPersistent);
+procedure TEntryItem.Assign(Source: TPersistent);
 var
-  Item: TFolderItem;
+  Item: TEntryItem;
 begin
-  if Source is TFolderItem then begin
-    Item := TFolderItem(Source);
+  if Source is TEntryItem then begin
+    Item := TEntryItem(Source);
     //
-    Caption := Item.Caption;
-    ImageIndex := Item.ImageIndex;
-    Enabled := Item.Enabled;
-    Visible := Item.Visible;
+    FIndex := Item.TreeIndex;
+    FLevel := Item.TreeLevel;
+    FCaption := Item.Caption;
+    FEnabled := Item.Enabled;
+    FVisible := Item.Visible;
+    FImageIndex := Item.ImageIndex;
+    FEntryState := Item.State;
+    FItems.Assign(Item.Items);
+    FData := Item.Data;
+    FDataObject := Item.DataObject;
+    FUserFreeProc := Item.UserFreeProc;
+//    FParentEntries := ; // ???
   end
   else
     inherited Assign(Source);
 end;
 
-procedure TFolderItem.Click;
+procedure TEntryItem.Click;
 begin
-  (Collection as TFolderItems).Control.Perform(CN_ITEMCLICK, Integer(Self), 0);
+  (Collection as TEntryItems).Control.Perform(CN_ITEMCLICK, Integer(Self), 0);
 end;
 
-procedure TFolderItem.SetCaption(const Value: string);
+procedure TEntryItem.Collapse;
+begin
+  if FEntryState = esExpanded then begin
+    FEntryState := esCollapsed;
+    Changed(False);
+  end;
+end;
+
+procedure TEntryItem.Expand;
+begin
+  if FEntryState = esCollapsed then begin
+    FEntryState := esExpanded;
+    Changed(False);
+  end;
+end;
+
+procedure TEntryItem.SetCaption(const Value: string);
 begin
   if Value <> FCaption then begin
     FCaption := Value;
-    Changed(True);
+    Changed(False);
   end;
 end;
 
-procedure TFolderItem.SetEnabled(Value: Boolean);
+procedure TEntryItem.SetEnabled(Value: Boolean);
 begin
   if Value <> FEnabled then begin
     FEnabled := Value;
-    Changed(True);
+    Changed(False);
   end;
 end;
 
-function TFolderItem.GetDisplayRect: TRect;
+procedure TEntryItem.SetEntryState(Value: TEntryStateEnum);
+begin
+  if FEntryState <> Value then begin
+    FEntryState := Value;
+    Changed(False);
+  end;
+end;
+
+function TEntryItem.GetDisplayRect(const AbsoluteOrRelative: TEntryItemPositionEnum): TRect;
 var
-  Folder: TFolderBar;
-  TopIndex: Integer;
-  Details: TFolderItemDetails;
+  View: TCustomEntryView;
+  TopIndex,
+  ItemIndex: Integer;
+  EntryItemDetails: TEntryItemDetails;
   VisibleIndex: Integer;
   I: Integer;
+  Item: TEntryItem;
 begin
-  Folder := (Collection as TFolderItems).Folder;
-  if (Collection as TFolderItems).Control.Perform(CM_ITEMDETAILS, Integer(@Details), 0) = 0 then begin // technically not possible
+  // this is getting parent render control info for us, to know what are the parameters to use while calculating entry position
+  View := TCustomEntryView((Collection as TEntryItems).Control);
+  if View.Perform(CM_ITEMDETAILS, Integer(@EntryItemDetails), 0) = 0 then begin // technically not possible, but ... to be sure
     SetRectEmpty(Result);
     Exit;
   end;
   //
-  TopIndex := Folder.GetNearestTop;
-  if (Folder = Details.Selected) and (TopIndex < Index + 1) and FVisible then begin
-    Result := Folder.DisplayRect;
-    OffsetRect(Result, 0, Details.ItemHeight);
-    VisibleIndex := 0;
-    for I := Folder.GetNearestTop to Index - 1 do
-      if Folder.Items[I].Visible then
-        Inc(VisibleIndex);
-    Result.Top := Result.Top + (Details.ItemHeight * VisibleIndex);
-    Result.Bottom := Result.Top + Details.ItemHeight;
-  end
-  else
-    SetRectEmpty(Result);
+  //Result := ParentEntries.DisplayRect(Self); // this calculates absolute position ??? why ???
+  Result.Top := EntryItemDetails.EntryHeight * (FIndex - IfThen(AbsoluteOrRelative = epRelative, EntryItemDetails.TopIndex, 0));
+  Result.Left := EntryItemDetails.ClientRect.Left;
+  Result.Bottom := Result.Top + EntryItemDetails.EntryHeight;
+  Result.Right := EntryItemDetails.ClientRect.Right;
 end;
 
-procedure TFolderItem.SetImageIndex(Value: Integer);
+function TEntryItem.AbsoluteDisplayRect: TRect;
+begin
+  Result := GetDisplayRect(epAbsolute);
+end;
+
+function TEntryItem.RelativeDisplayRect: TRect;
+begin
+  Result := GetDisplayRect(epRelative);
+end;
+
+function TEntryItem.HasChildren: Boolean;
+begin
+  Result := Items.Count > 0;
+end;
+
+function TEntryItem.IsExpanded: Boolean;
+begin
+  Result := State = esExpanded;
+end;
+
+function TEntryItem.ParentIsVisible: Boolean;
+var
+  Parent: TEntryItem;
+begin
+  Result := False;
+  if (ParentEntries = Nil) or (ParentEntries.OwnerEntry = Nil) then
+    Exit;
+  //
+  Parent := ParentEntries.OwnerEntry;
+  Result := Parent.Visible;
+end;
+
+function TEntryItem.ParentHasChildren: Boolean;
+var
+  Parent: TEntryItem;
+begin
+  Result := False;
+  if (ParentEntries = Nil) or (ParentEntries.OwnerEntry = Nil) then
+    Exit;
+  //
+  Parent := ParentEntries.OwnerEntry;
+  Result := Parent.HasChildren;
+end;
+
+function TEntryItem.ParentIsExpanded: Boolean;
+var
+  Parent: TEntryItem;
+begin
+  Result := False;
+  if (ParentEntries = Nil) or (ParentEntries.OwnerEntry = Nil) then
+    Exit;
+  //
+  Parent := ParentEntries.OwnerEntry;
+  Result := Parent.Visible and Parent.HasChildren and Parent.IsExpanded;
+end;
+
+//function TEntryItem.GetNearestTop: Integer;
+//var
+//  I: Integer;
+//begin
+//  Result := 0;
+//  for I := 0 to Items.Count - 1 do
+//    if Items[I].Visible then
+//      if Result = TCustomEntryView(TEntryItems(Collection).Control).FTopIndex then begin
+//        Result := I;
+//        Break;
+//      end
+//      else
+//        Inc(Result);
+//end;
+
+procedure TEntryItem.SetImageIndex(Value: Integer);
 begin
   if Value <> FImageIndex then begin
     FImageIndex := Value;
-    Changed(True);
+    Changed(False);
   end;
 end;
 
-procedure TFolderItem.SetVisible(Value: Boolean);
+procedure TEntryItem.SetItems(Value: TEntryItems);
+begin
+  if FItems <> Value then begin
+    FItems.Assign(Value);
+    Changed(False);
+  end;
+end;
+
+procedure TEntryItem.SetVisible(Value: Boolean);
 begin
   if Value <> FVisible then begin
     FVisible := Value;
-    Changed(True);
+    Changed(False);
   end;
 end;
 
-{ TFolderItems }
-
-constructor TFolderItems.Create(Control: TControl; Folder: TFolderBar);
+function TEntryItem.GetVisible: Boolean;
 begin
-  inherited Create(TFolderItem);
-  FFolder := Folder;
+  Result := False;
+  if ParentEntries = Nil then
+    Exit;
+  //
+  Result := (ParentIsExpanded or (ParentEntries.OwnerEntry = Nil)) and FVisible;
+end;
+
+{ TEntryItems }
+
+constructor TEntryItems.Create(Control: TControl; OwnerEntry: TEntryItem);
+begin
+  inherited Create(TEntryItem);
   FControl := Control;
+  FOwnerEntry := OwnerEntry;
 end;
 
-procedure TFolderItems.Assign(Source: TPersistent);
-var
-  FolderItems: TFolderItems;
-  I: Integer;
+procedure TEntryItems.Update(Item: TCollectionItem);
 begin
-  if Source is TFolderItems then begin
-    FolderItems := TFolderItems(Source);
+//  inherited Update(Item);
+  if FOwnerEntry <> Nil then
+    TEntryItems(FOwnerEntry.Collection).Update(Item);
+  //
+  TCustomEntryView(FControl).UpdateScrollRange;
+  FControl.Invalidate;
+end;
+
+function TEntryItems.Get(Index: Integer): TEntryItem;
+begin
+  Result := GetItem(Index) as TEntryItem;
+end;
+
+function TEntryItems.GetTreeIndex(Entry: TEntryItem): Integer;
+begin
+  Result := 0;
+  Entry := GetPrevEntry(Entry);
+  if Entry <> Nil then
+    Result := Entry.TreeIndex + 1;
+end;
+
+function TEntryItems.GetTreeLevel(Entry: TEntryItem): Integer;
+var
+  Parent: TEntryItems;
+begin
+  Result := 0;
+  if Entry = Nil then
+    Exit;
+  //
+  Parent := Entry.ParentEntries;
+  while Parent <> Nil do begin
+    if Parent.OwnerEntry = Nil then
+      Exit;
     //
-    BeginUpdate;
-    Clear;
-    for I := 0 to FolderItems.Count - 1 do
-      Add.Assign(FolderItems[I]);
-    EndUpdate;
-  end
-  else
-    inherited Assign(Source);
-end;
-
-function TFolderItems.Add: TFolderItem;
-begin
-  Result := inherited Add as TFolderItem;
-end;
-
-function TFolderItems.Insert(Index: Integer): TFolderItem;
-begin
-  Result := inherited Insert(Index) as TFolderItem;
-end;
-
-procedure TFolderItems.Update(Item: TCollectionItem);
-begin
-  inherited Update(Item);
-  TFolderBars(FFolder.Collection).Changed;
-end;
-
-function TFolderItems.Get(Index: Integer): TFolderItem;
-begin
-  Result := GetItem(Index) as TFolderItem;
-end;
-
-procedure TFolderItems.Put(Index: Integer; Value: TFolderItem);
-begin
-  SetItem(Index, Value);
-end;
-
-{ TFolderBar }
-
-var
-  CheckeredBitmap: TBitmap = Nil;
-
-constructor TFolderBar.Create(Collection: TCollection);
-begin
-  inherited Create(Collection);
-  FVisible := True;
-  FItems := TFolderItems.Create((Collection as TFolderBars).Control, Self);
-  FImageIndex := -1;
-  FSelectedIndex := -1;
-end;
-
-procedure TFolderBar.Assign(Source: TPersistent);
-var
-  Bar: TFolderBar;
-begin
-  if Source is TFolderBar then begin
-    Bar := TFolderBar(Source);
-    //
-    Caption := Bar.Caption;
-    ImageIndex := Bar.ImageIndex;
-    SelectedIndex := Bar.SelectedIndex;
-    Visible := Bar.Visible;
-    Items.Assign(Bar.Items);
-  end
-  else
-    inherited Assign(Source);
-end;
-
-destructor TFolderBar.Destroy;
-begin
-  FItems.Free;
-  if FDataObject and (FData <> Nil) then
-    TObject(FData).Free
-  else if (FData <> Nil) and Assigned(FUserFreeProc) then
-    FUserFreeProc(FData);
-  inherited Destroy;
-end;
-
-procedure TFolderBar.SetCaption(const Value: string);
-begin
-  if Value <> FCaption then begin
-    FCaption := Value;
-    Changed(True);
+    Parent := Parent.OwnerEntry.ParentEntries;
+    if Parent <> Nil then
+      Inc(Result);
   end;
 end;
 
-function TFolderBar.GetDisplayRect: TRect;
+function TEntryItems.GetFirstEntry(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Entry;
+  if Entry = Nil then
+    Exit;
+
+  while Assigned(Result.Items) and (Result.Items.Count > 0) do
+    Result := Result.Items[0];
+end;
+
+function TEntryItems.GetLastEntry(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Entry;
+
+  while Assigned(Result.Items) and (Result.Items.Count > 0) do
+    Result := Result.Items[Result.Items.Count - 1];
+end;
+
+function TEntryItems.GetPrevEntry(Entry: TEntryItem): TEntryItem;
 var
-  Folders: TFolderBars;
-  ParentControlDetails: TFolderItemDetails;
+  PrevSibling: TEntryItem;
+  Parent: TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  // go up
+  if Entry.Collection <> Nil then
+    Parent := TEntryItems(Entry.Collection).OwnerEntry
+  else
+    Parent := Nil;
+
+  if (Parent <> Nil) and (Entry.Index > 0) then
+    Parent := Parent.Items[Entry.Index - 1] // go up
+  else begin
+    // try previous sibling
+    PrevSibling := GetPrevEntrySibling(Entry);
+    if PrevSibling <> Nil then begin
+      // go to its deepest last child
+      Exit(GetLastEntry(PrevSibling));
+    end;
+  end;
+
+  Result := Parent;
+end;
+
+function TEntryItems.GetNextEntry(Entry: TEntryItem): TEntryItem;
+var
+  Items: TEntryItems;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  // go down
+  Result := GetFirstEntrySibling(Entry);
+  if Result <> Nil then
+    Exit;
+
+  // go right or up-right
+  while Entry <> Nil do begin
+    Result := GetNextEntrySibling(Entry);
+    if Result <> Nil then
+      Exit;
+
+    if Entry.Items.Count > 0 then
+      Entry := Entry.Items[0] // go down
+    else
+      Entry := Nil;
+  end;
+
+  Result := Nil;
+end;
+
+function TEntryItems.GetFirstEntrySibling(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  if Entry.Items.Count > 0 then
+    Exit(Entry.Items[0]);
+end;
+
+function TEntryItems.GetLastEntrySibling(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  if Entry.Items.Count > 0 then
+    Exit(Entry.Items[Entry.Items.Count - 1]);
+end;
+
+function TEntryItems.GetPrevEntrySibling(const Entry: TEntryItem): TEntryItem;
+var
+  Items: TEntryItems;
+  Index: Integer;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  //Items := Entry.Items;
+  Items := Entry.ParentEntries;
+  Index := Entry.Index;
+
+  if (Index > 0) and (Items <> Nil) and (Items.Count > 0) then
+    Result := Items[Index - 1];
+end;
+
+function TEntryItems.GetNextEntrySibling(const Entry: TEntryItem): TEntryItem;
+var
+  Parent: TEntryItems;
+  Items: TEntryItems;
+  Index: Integer;
+begin
+  Result := Nil;
+
+  Parent := Entry.ParentEntries; // careful: depends on your design
+
+  if Parent <> Nil then
+    Items := Parent
+  else
+    Exit; // root-level handling needed
+
+  Index := Entry.Index; // TCollectionItem gives me this
+
+  if Index < Items.Count - 1 then
+    Result := Items[Index + 1];
+end;
+
+(*
+function TEntryItems.DisplayRect(const Entry: TEntryItem): TRect;
+var
+  View: TCustomEntryView;
+//  Entry,
+  Item: TEntryItem;
+  ControlDetails: TEntryItemDetails;
   Rect: TRect;
   I: Integer;
 begin
-  Folders := Collection as TFolderBars;
-  if Folders.Control.Perform(CM_ITEMDETAILS, Integer(@ParentControlDetails), 0) = 0 then begin // technically not possible
+  View := TCustomEntryView(Control);
+  if View.Perform(CM_ITEMDETAILS, Integer(@ControlDetails), 0) = 0 then begin // technically not possible
     SetRectEmpty(Result);
     Exit;
   end;
-  if Visible then begin
+//  Entry := Self.OwnerEntry;
+//  if (Entry = Nil) and (Count > 0) then
+//    Entry := Items[0];
+  if Assigned(Entry) and Entry.Visible then begin
     // calculate absolute position
-    Result := ParentControlDetails.ClientRect;
-    if (ParentControlDetails.Selected <> Nil) and (Index > ParentControlDetails.Selected.Index) then
-      Result.Top := Result.Bottom - ParentControlDetails.FolderHeight * (Folders.Count - Index)
-    else
-      Result.Top := Index * ParentControlDetails.FolderHeight;
-    Result.Bottom := Result.Top + ParentControlDetails.FolderHeight;
+    Result := ControlDetails.ClientRect;
     // correct for borders
-    if ParentControlDetails.BorderStyle = bsSingle then begin
+    if ControlDetails.BorderStyle = bsSingle then begin
       InflateRect(Result, -GetBorder, 0);
-      if (ParentControlDetails.Selected <> Nil) and (Index > ParentControlDetails.Selected.Index) then
+      if (ControlDetails.Selected <> Nil) and (Entry.Index > ControlDetails.Selected.Index) then
         OffsetRect(Result, 0, -GetBorder)
       else
         OffsetRect(Result, 0, GetBorder);
     end;
-    for I := Index - 1 downto 0 do
-      if Folders[I].Visible then begin
-        Rect := Folders[I].DisplayRect;
-        if Result.Top < Rect.Bottom then
-          OffsetRect(Result, 0, Rect.Bottom - Result.Top)
-        else if (ParentControlDetails.Selected = Nil) or (Index <= ParentControlDetails.Selected.Index) then
-          OffsetRect(Result, 0, Rect.Bottom - Result.Top);
-        Break;
-      end
-      else if I = 0 then
-        OffsetRect(Result, 0, -Result.Top);
+    //
+    // we count how many entries before current entry is there, and we need to check if those entries are inside rendering rectangle
+    I := 0;
+    Item := Entry;
+    repeat
+      Item := View.GetPrevEntry(Item); // go up
+      // check if item is visible and inside ClientRect
+      if (Item <> Nil) and Item.Visible and RectInRect(Item.RelativeDisplayRect, ControlDetails.ClientRect) then
+        Inc(I);
+      // this condition maybe needed later
+      //else if Item.State = esCollapsed then
+    until Item = Nil;
+    //Dec(I);
+    //
+    // and here we have our absolute position set, this is probably ok, but something with I variable is now
+    Result.Top := I * ControlDetails.EntryHeight;
+    Result.Bottom := Result.Top + ControlDetails.EntryHeight;
+
+
+// @TODO: delete this
     // now correct for relative position
-    Result.Top := Result.Top - ParentControlDetails.FolderHeight * ParentControlDetails.TopIndex;
-    Result.Bottom := Result.Bottom - ParentControlDetails.FolderHeight * ParentControlDetails.TopIndex;
+//    Result.Top := Result.Top - ControlDetails.EntryHeight * ControlDetails.TopIndex;
+//    Result.Bottom := Result.Bottom - ControlDetails.EntryHeight * ControlDetails.TopIndex;
+
+
+
+
+//    if (ControlDetails.Selected <> Nil) and (Entry.Index > ControlDetails.Selected.Index) then
+//      Result.Top := Result.Bottom - ControlDetails.EntryHeight * (Count - Entry.Index)
+//    else
+//      Result.Top := Entry.Index * ControlDetails.EntryHeight;
+//    Result.Bottom := Result.Top + ControlDetails.EntryHeight;
+//    for I := Entry.Index - 1 downto 0 do begin
+//      Item := View.ItemFromIndex(I);
+//      if Item.Visible then begin
+//        Rect := Item.DisplayRect;
+//        if Result.Top < Rect.Bottom then
+//          OffsetRect(Result, 0, Rect.Bottom - Result.Top)
+//        else if (ControlDetails.Selected = Nil) or (Entry.Index <= ControlDetails.Selected.Index) then
+//          OffsetRect(Result, 0, Rect.Bottom - Result.Top);
+//        Break;
+//      end
+//      else if I = 0 then
+//        OffsetRect(Result, 0, -Result.Top);
+//    end;
   end
   else
     SetRectEmpty(Result);
 end;
 
-procedure TFolderBar.SetImageIndex(Value: Integer);
-begin
-  if Value <> FImageIndex then begin
-    FImageIndex := Value;
-    Changed(True);
-  end;
-end;
-
-procedure TFolderBar.SetItems(Value: TFolderItems);
-begin
-  if Value <> FItems then
-    FItems.Assign(Value);
-end;
-
-function TFolderBar.GetNearestTop: Integer;
+// @TODO: this is wrong in this implementation anyway, fix this
+function TEntryItems.GetNearestTop: Integer;
 var
   I: Integer;
 begin
   Result := 0;
-  for I := 0 to Items.Count - 1 do
-    if Items[I].Visible then
-      if Result = FTopIndex then begin
+  for I := 0 to Count - 1 do begin
+    if Items[I].Visible then begin
+      if Result = TCustomEntryView(Control).FTopIndex then begin
         Result := I;
         Break;
       end
       else
         Inc(Result);
-end;
-
-procedure TFolderBar.SetSelectedIndex(Value: Integer);
-begin
-  if Value <> FSelectedIndex then begin
-    FSelectedIndex := Value;
-    Changed(True);
+    end;
   end;
 end;
-
-procedure TFolderBar.SetTopIndex(Value: Integer);
+*)
+procedure TEntryItems.Put(Index: Integer; Value: TEntryItem);
 begin
-  if Value > Items.Count - 1 then
-    Value := Items.Count - 1;
-  if Value < 0 then
-    Value := 0;
-  if Value <> FTopIndex then begin
-    FTopIndex := Value;
-    Changed(True);
-  end;
+  SetItem(Index, Value);
 end;
 
-procedure TFolderBar.SetVisible(Value: Boolean);
-begin
-  if Value <> FVisible then begin
-     FVisible := Value;
-     Changed(True);
-  end;
-end;
-
-{ TFolderBars }
-
-constructor TFolderBars.Create(Control: TControl);
-begin
-  inherited Create(TFolderBar);
-  FControl := Control;
-end;
-
-procedure TFolderBars.Assign(Source: TPersistent);
+procedure TEntryItems.Assign(Source: TPersistent);
 var
-  Bars: TFolderBars absolute Source;
+  LItems: TEntryItems;
   I: Integer;
 begin
-  if Source is TFolderBars then begin
+  if Source is TEntryItems then begin
+    LItems := TEntryItems(Source);
+    //
     BeginUpdate;
     Clear;
-    for I := 0 to Bars.Count - 1 do
-      Add.Assign(Bars[I]);
+    for I := 0 to LItems.Count - 1 do
+      Add.Assign(LItems[I]);
     EndUpdate;
   end
   else
     inherited Assign(Source);
 end;
 
-function TFolderBars.Add: TFolderBar;
+function TEntryItems.Add: TEntryItem;
 begin
-  Result := inherited Add as TFolderBar;
+  Result := inherited Add as TEntryItem;
+  Result.FParentEntries := Self;
+  Result.FIndex := GetTreeIndex(Result);
+  Result.FLevel := GetTreeLevel(Result);
 end;
 
-function TFolderBars.Insert(Index: Integer): TFolderBar;
+function TEntryItems.Insert(Index: Integer): TEntryItem;
 begin
-  Result := inherited Insert(Index) as TFolderBar;
+  Result := inherited Insert(Index) as TEntryItem;
 end;
 
-procedure TFolderBars.Update(Item: TCollectionItem);
-begin
-  inherited Update(Item);
-  if FControl <> Nil then
-    FControl.Update;
-end;
+//{ TEntryItems }
+//
+//constructor TFolderBar.Create(Collection: TCollection);
+//begin
+//  inherited Create(Collection);
+//  FVisible := True;
+//  FItems := TEntryItems.Create((Collection as TFolderBars).Control, Self);
+//  FImageIndex := -1;
+//  FSelectedIndex := -1;
+//end;
+//
+//procedure TFolderBar.Assign(Source: TPersistent);
+//var
+//  Bar: TFolderBar;
+//begin
+//  if Source is TFolderBar then begin
+//    Bar := TFolderBar(Source);
+//    //
+//    Caption := Bar.Caption;
+//    ImageIndex := Bar.ImageIndex;
+//    SelectedIndex := Bar.SelectedIndex;
+//    Visible := Bar.Visible;
+//    Items.Assign(Bar.Items);
+//  end
+//  else
+//    inherited Assign(Source);
+//end;
+//
+//destructor TFolderBar.Destroy;
+//begin
+//  FItems.Free;
+//  if FDataObject and (FData <> Nil) then
+//    TObject(FData).Free
+//  else if (FData <> Nil) and Assigned(FUserFreeProc) then
+//    FUserFreeProc(FData);
+//  inherited Destroy;
+//end;
+//
+//procedure TFolderBar.SetCaption(const Value: string);
+//begin
+//  if Value <> FCaption then begin
+//    FCaption := Value;
+//    Changed(True);
+//  end;
+//end;
+//
+//function TFolderBar.GetDisplayRect: TRect;
+//var
+//  Folders: TFolderBars;
+//  ParentControlDetails: TFolderItemDetails;
+//  Rect: TRect;
+//  I: Integer;
+//begin
+//  Folders := Collection as TFolderBars;
+//  if Folders.Control.Perform(CM_ITEMDETAILS, Integer(@ParentControlDetails), 0) = 0 then begin // technically not possible
+//    SetRectEmpty(Result);
+//    Exit;
+//  end;
+//  if Visible then begin
+//    // calculate absolute position
+//    Result := ParentControlDetails.ClientRect;
+//    if (ParentControlDetails.Selected <> Nil) and (Index > ParentControlDetails.Selected.Index) then
+//      Result.Top := Result.Bottom - ParentControlDetails.FolderHeight * (Folders.Count - Index)
+//    else
+//      Result.Top := Index * ParentControlDetails.FolderHeight;
+//    Result.Bottom := Result.Top + ParentControlDetails.FolderHeight;
+//    // correct for borders
+//    if ParentControlDetails.BorderStyle = bsSingle then begin
+//      InflateRect(Result, -GetBorder, 0);
+//      if (ParentControlDetails.Selected <> Nil) and (Index > ParentControlDetails.Selected.Index) then
+//        OffsetRect(Result, 0, -GetBorder)
+//      else
+//        OffsetRect(Result, 0, GetBorder);
+//    end;
+//    for I := Index - 1 downto 0 do
+//      if Folders[I].Visible then begin
+//        Rect := Folders[I].DisplayRect;
+//        if Result.Top < Rect.Bottom then
+//          OffsetRect(Result, 0, Rect.Bottom - Result.Top)
+//        else if (ParentControlDetails.Selected = Nil) or (Index <= ParentControlDetails.Selected.Index) then
+//          OffsetRect(Result, 0, Rect.Bottom - Result.Top);
+//        Break;
+//      end
+//      else if I = 0 then
+//        OffsetRect(Result, 0, -Result.Top);
+//    // now correct for relative position
+//    Result.Top := Result.Top - ParentControlDetails.FolderHeight * ParentControlDetails.TopIndex;
+//    Result.Bottom := Result.Bottom - ParentControlDetails.FolderHeight * ParentControlDetails.TopIndex;
+//  end
+//  else
+//    SetRectEmpty(Result);
+//end;
+//
+//procedure TFolderBar.SetImageIndex(Value: Integer);
+//begin
+//  if Value <> FImageIndex then begin
+//    FImageIndex := Value;
+//    Changed(True);
+//  end;
+//end;
+//
+//procedure TFolderBar.SetItems(Value: TEntryItems);
+//begin
+//  if Value <> FItems then
+//    FItems.Assign(Value);
+//end;
+//
+//function TFolderBar.GetNearestTop: Integer;
+//var
+//  I: Integer;
+//begin
+//  Result := 0;
+//  for I := 0 to Items.Count - 1 do
+//    if Items[I].Visible then
+//      if Result = FTopIndex then begin
+//        Result := I;
+//        Break;
+//      end
+//      else
+//        Inc(Result);
+//end;
+//
+//procedure TFolderBar.SetSelectedIndex(Value: Integer);
+//begin
+//  if Value <> FSelectedIndex then begin
+//    FSelectedIndex := Value;
+//    Changed(True);
+//  end;
+//end;
+//
+//procedure TFolderBar.SetTopIndex(Value: Integer);
+//begin
+//  if Value > Items.Count - 1 then
+//    Value := Items.Count - 1;
+//  if Value < 0 then
+//    Value := 0;
+//  if Value <> FTopIndex then begin
+//    FTopIndex := Value;
+//    Changed(True);
+//  end;
+//end;
+//
+//procedure TFolderBar.SetVisible(Value: Boolean);
+//begin
+//  if Value <> FVisible then begin
+//     FVisible := Value;
+//     Changed(True);
+//  end;
+//end;
+//
+//{ TFolderBars }
+//
+//constructor TFolderBars.Create(Control: TControl);
+//begin
+//  inherited Create(TFolderBar);
+//  FControl := Control;
+//end;
+//
+//procedure TFolderBars.Assign(Source: TPersistent);
+//var
+//  Bars: TFolderBars absolute Source;
+//  I: Integer;
+//begin
+//  if Source is TFolderBars then begin
+//    BeginUpdate;
+//    Clear;
+//    for I := 0 to Bars.Count - 1 do
+//      Add.Assign(Bars[I]);
+//    EndUpdate;
+//  end
+//  else
+//    inherited Assign(Source);
+//end;
+//
+//function TFolderBars.Add: TFolderBar;
+//begin
+//  Result := inherited Add as TFolderBar;
+//end;
+//
+//function TFolderBars.Insert(Index: Integer): TFolderBar;
+//begin
+//  Result := inherited Insert(Index) as TFolderBar;
+//end;
+//
+//procedure TFolderBars.Update(Item: TCollectionItem);
+//begin
+//  inherited Update(Item);
+//  if FControl <> Nil then
+//    FControl.Update;
+//end;
+//
+//function TFolderBars.Get(Index: Integer): TFolderBar;
+//begin
+//  if (Index > -1) and (Index < Count) then
+//    Result := GetItem(Index) as TFolderBar
+//  else
+//    Result := Nil;
+//end;
+//
+//procedure TFolderBars.Put(Index: Integer; Value: TFolderBar);
+//begin
+//  SetItem(Index, Value);
+//end;
 
-function TFolderBars.Get(Index: Integer): TFolderBar;
-begin
-  if (Index > -1) and (Index < Count) then
-    Result := GetItem(Index) as TFolderBar
-  else
-    Result := Nil;
-end;
+{ TCustomEntryView }
 
-procedure TFolderBars.Put(Index: Integer; Value: TFolderBar);
-begin
-  SetItem(Index, Value);
-end;
-
-{ TCustomFolderView }
-
-constructor TCustomFolderView.Create(AOwner: TComponent);
+constructor TCustomEntryView.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   Color := clAppWorkspace;
   Height := 250;
   Width := 150;
+  //
   FActiveIndex := -1;
   FBorderStyle := bsSingle;
-  FFolderHeight := 25;
-  FItemHeight := 25;
-  FFolders := TFolderBars.Create(Self);
+  FCaptureItem := Nil;
+  FEntryHeight := 25;
+  FEntryImages := Nil;
+  FEntries := TEntryItems.Create(Self, Nil); // no parent entry
+  FHotTrack := False; // allow hot track
+  FHotIndex := -1;
+//  FItemImages: TCustomImageList;
+//  FItemHeight: Integer;
+  FMouseItem := Nil;
+  FMultiSelect := False; // allow multi-select
+  FSelectedCount := 0;
+  FSelected := Nil; // if not multi-select, than this is set, may be usefull
+  FSelectedItems := TObjectList<TEntryItem>.Create(False); // we don't own items here, just storing references
+  FItemIndex := -1;
+  FTextHeight := -1;
+  FTopIndex := -1;
+  FLocked := False;
+  FLockedIndex := -1;
+  FShift := [];
+  FShiftIndex := -1;
   FOverlay := TPicture.Create;
   FOverlay.OnChange := OverlayChange;
   FChangeLink := TChangeLink.Create;
   FChangeLink.OnChange := ImagesChange;
 end;
 
-destructor TCustomFolderView.Destroy;
+procedure TCustomEntryView.DblClick;
+var
+  MousePoint: TPoint;
+  Entry: TEntryItem;
 begin
-  UpdateImages(FFolderImages, Nil);
-  UpdateImages(FItemImages, Nil);
-  FFolders.Free;
+  MousePoint := Mouse.CursorPos;
+  MousePoint := Self.ScreenToClient(MousePoint);
+  Entry := EntryFromPoint(MousePoint.X, MousePoint.Y);
+  if Entry <> Nil then begin
+    if Entry.Items.Count > 0 then begin
+      case Entry.State of
+        esCollapsed: Entry.State := esExpanded;
+        esExpanded : Entry.State := esCollapsed;
+      end;
+    end;
+  end;
+  inherited;
+end;
+
+destructor TCustomEntryView.Destroy;
+begin
+  UpdateImages(FEntryImages, Nil);
+  FSelectedItems.Clear; // explicit
+  FSelectedItems.Free;
+  FEntries.Free;
+  FChangeLink.OnChange := Nil;
   FChangeLink.Free;
   FOverlay.OnChange := Nil;
   FOverlay.Free;
   inherited Destroy;
 end;
 
-procedure TCustomFolderView.ImagesChange(Sender: TObject);
+procedure TCustomEntryView.ImagesChange(Sender: TObject);
 var
   DC: HDC;
   F: HFont;
@@ -1375,40 +1870,25 @@ var
 begin
   DC := GetDC(0);
   F := SelectObject(DC, Font.Handle);
-  FTextHeight := CalculateCaptionSize(DC, ' ').cY;
+  FTextHeight := CalculateCaptionSize(DC, 'Why?').cY; // do not modiffy
   SelectObject(DC, F);
   ReleaseDC(0, DC);
   //
   // calculate folder height
-//  if FFolderImages <> Nil then
-//    ImageHeight := FFolderImages.Height
-//  else
-//    ImageHeight := 0;
-//  if ImageHeight > FTextHeight then
-//    FFolderHeight := ImageHeight
-//  else
-//    FFolderHeight := FTextHeight;
-//  Inc(FFolderHeight, 10);
-  //
-  // calculate item height
-  if FItemImages <> Nil then
-    ImageHeight := FItemImages.Height
+  if FEntryImages <> Nil then
+    ImageHeight := FEntryImages.Height
   else
     ImageHeight := 0;
   if ImageHeight > FTextHeight then
-    FItemHeight := ImageHeight
+    FEntryHeight := ImageHeight
   else
-    FItemHeight := FTextHeight;
-  Inc(FItemHeight, Round(FTextHeight * 1.5));
-  //Inc(FItemHeight, 10);
+    FEntryHeight := FTextHeight;
+  Inc(FEntryHeight, Round(FTextHeight * 1.5));
   //
-  // folder height equals item height
-  FFolderHeight := FItemHeight;
-
-  Invalidate;
+  Invalidate; // repaint visible entries
 end;
 
-procedure TCustomFolderView.InvalidateItem(Item: Integer);
+procedure TCustomEntryView.InvalidateItem(Item: Integer);
 var
   Rect: TRect;
 begin
@@ -1424,23 +1904,7 @@ begin
   end;
 end;
 
-procedure TCustomFolderView.DoItemClick(Item: TFolderItem);
-begin
-  CaptureItem := Nil;
-  if Assigned(FOnItemClick) then
-    FOnItemClick(Self, Item);
-end;
-
-procedure TCustomFolderView.EnsureItemVisible;
-begin
-  if (ItemIndex < 0) or (TopIndex >= ItemIndex) then
-    Exit;
-  if ItemRect(ItemIndex).Bottom > ClientHeight then begin
-    TopIndex := ItemIndex - ClientHeight div FItemHeight + 1;
-  end;
-end;
-
-procedure TCustomFolderView.CreateHandle;
+procedure TCustomEntryView.CreateHandle;
 begin
   inherited CreateHandle;
   if FTextHeight = 0 then
@@ -1448,26 +1912,144 @@ begin
   UpdateScrollRange;
 end;
 
-function TCustomFolderView.FolderFromPoint(X, Y: Integer): TFolderBar;
+procedure TCustomEntryView.DoItemClick(Item: TEntryItem);
+begin
+  CaptureItem := Nil;
+  if Assigned(FOnItemClick) then
+    FOnItemClick(Self, Item);
+end;
+
+procedure TCustomEntryView.EnsureItemVisible;
+begin
+  if (ItemIndex < 0) or (TopIndex >= ItemIndex) then
+    Exit;
+  if ItemRect(ItemIndex).Bottom > ClientHeight then begin
+    TopIndex := ItemIndex - ClientHeight div FEntryHeight + 1;
+  end;
+end;
+
+function TCustomEntryView.ItemFromPoint(X, Y: Integer): TEntryItem;
 var
   P: TPoint;
   I: Integer;
 begin
   P := Point(X, Y);
-  Result := Nil;
-  for I := 0 to FFolders.Count - 1 do
-    if PtInRect(Folders[I].DisplayRect, P) then begin
-      Result := FFolders[I];
-      Break;
-    end;
+  Result := EntryFromPoint(X, Y); // { + (FTopIndex * FEntryHeight)});
+  if Result <> Nil then
+    Exit;
+  if Selected <> Nil then
+    for I := 0 to Selected.Items.Count - 1 do
+      if PtInRect(Selected.Items[I].RelativeDisplayRect, P) then begin
+        Result := Selected.Items[I];
+        Break;
+      end;
 end;
 
-function TCustomFolderView.ItemAtPos(const Pos: TPoint; Existing: Boolean): Integer;
+function TCustomEntryView.EntryFromPoint(X, Y: Integer): TEntryItem;
+var
+  P: TPoint;
+  I: Integer;
+  Item: TEntryItem;
+  ItemRect: TRect;
+begin
+  Result := Nil;
+  if Entries.Count = 0 then
+    Exit;
+
+  // here we have some problems locating item that we hover over
+  // left one list is ok, but right list is not working for now, lets fix it
+  //
+  // ok, we have totaly wrong positions calculation algo, we need to fix it first and than locating hovered row should be easy
+  // this task is simple to state, but it probably needs alot of work, so get to it
+  // but first, i need to think about it, i know what i want to achive, i'm not sure right now what i need to destroy and/or recreate
+  // to not put myself in a situation, that can be harder to bend to my needs
+  // simple solution, and probably obvious, is to store this location in an entry itself
+  // right now i calculate it every time when i need to use it, it is burning cpu cycles without need,
+  // and may cause renderer to slow down, while iterating through the list
+  // it is not easy to mentally picture it, but i need relative positions only, absolute ones are not usefull to me right now
+
+  P := Point(X, Y);
+  Item := Entries.Items[0];
+  while Item <> Nil do begin
+//    ItemRect := TRect.Empty;
+//    if Item.Visible then
+    ItemRect := Item.RelativeDisplayRect;
+//    OutputDebugString(PChar('Mouse: (' + IntToStr(X) + ', ' + IntToStr(Y) + '), Item: "' + Item.Caption + '", ItemVisible: ' + BoolToStr(Item.Visible, True) + ', ItemEnabled: ' + BoolToStr(Item.Enabled, True) + ', ItemRect: (' + IntToStr(ItemRect.Left) + ', ' + IntToStr(ItemRect.Top) + ', ' + IntToStr(ItemRect.Right) + ', ' + IntToStr(ItemRect.Bottom) + ')'));
+    if Item.Visible and PtInRect(ItemRect, P) then begin
+      Result := Item;
+      Exit;
+    end;
+    //
+    Item := Entries.GetNextEntry(Item);
+  end;
+end;
+
+
+// little explanation of what is going on
+
+// i have this component TCustomEntryView, it was earlier named different and used in other project
+// because i didn't wanted to make it from scratch, i decided to refactor it and reuse in my NitroEDitor for some things
+// not only to present folders and files names, but to primarly make it a tree display
+// this tree of entries of any kind, later would be used to display NitroPascal compiler project properties and other things,
+// for now i do not know what it will be usefull for, but it must be flexible enough
+
+// now, there is this tree entries list, each entry has its own Index and Level
+
+  //  Root collection
+  //   ├─ Item A - (Index: 0; Level: 0)
+  //   │   ├─ Item A1 - (Index: 1; Level: 1)
+  //   │   ├─ Item A2 - (Index: 2; Level: 1)
+  //   │   │   └─ Item A2a - (Index: 3; Level: 2)
+  //   │   └─ Item A3 - (Index: 4; Level: 1)
+  //   └─ Item B - (Index: 5; Level: 0)
+  //       └─ Item B1 - (Index: 6; Level: 1)
+
+// so if we do some transformation, we get this:
+
+  //  Root collection
+  //   ├─ (0:0) - Item A
+  //   │   ├─ (1:1) - Item A1
+  //   │   ├─ (2:1) - Item A2
+  //   │   │   └─ (3:2) - Item A2a
+  //   │   └─ (4:1) - Item A3
+  //   └─ (5:0) - Item B
+  //       └─ (6:1) - Item B1
+
+// and any item that has children can be Collapsed or Expanded showing its children
+// also any item can be not Visible
+// this states change how tree is rendered/displayed
+// not visible items are not rendered, and there Indexes are set to -1, so we can skip them
+// this should look like this:
+
+  //  Root collection
+  //   ├─ (0:0) - Item A
+  //   │   ├─ (1:1) - Item A1
+  //   │   ├─ (-1:1) - Item A2 - [hidden item]
+  //   │   │   └─ (-1:2) - Item A2a
+  //   │   └─ (2:1) - Item A3
+  //   └─ (3:0) - Item B
+  //       └─ (4:1) - Item B1
+
+// now, when i render entries, all of them are visible, so there is no need to do enything with Indexes,
+// there is one problem, number of entries to display maybe greater then number of rows that this component can display at once
+// this is handled by showing only those that we need at any given moment, if this situation occurs, we show scrollbars,
+// for user to be able to scroll this list up or down, if user scrolls down, the internal variable TopIndex is set, to the value
+// that corresponds with scrollbar position, value greater than 0 (zero) indicates that we scrolled down,
+// i calculate Entries position based on this TopIndex variable, and for now i have trouble with indicating for user that mouse
+// hovered over an Entry should be repainted as hot, this situation is present if TopIndex is non zero
+
+// i have to debug this situation, and find where i made a mistake
+// ok, now i found it, this was wrong, adding offset to the mouse position, was causing some problems in matching mouse pos with Entry row pos
+// Result := EntryFromPoint(X, Y); // { + (FTopIndex * FEntryHeight)});
+
+
+
+function TCustomEntryView.ItemAtPos(const Pos: TPoint; Existing: Boolean): Integer;
 var
   count: Integer;
 begin
   count := GetCount;
-  Result := FTopIndex + (Pos.Y div FItemHeight);
+  Result := FTopIndex + (Pos.Y div FEntryHeight);
   if Result > count - 1 then
     if Existing then
       Result := -1
@@ -1477,66 +2059,131 @@ begin
     Result := -1;
 end;
 
-function TCustomFolderView.ItemFromPoint(X, Y: Integer): TFolderItem;
+function TCustomEntryView.ItemFromIndex(const Index: Integer): TEntryItem;
 var
-  P: TPoint;
-  I: Integer;
+  Entry, Item: TEntryItem;
+  i, idx: Integer;
 begin
-  P := Point(X, Y);
+  //
   Result := Nil;
-  if FolderFromPoint(X, Y + (FTopIndex * FItemHeight)) <> Nil then
-    Exit;
-  if Selected <> Nil then
-    for I := 0 to Selected.Items.Count - 1 do
-      if PtInRect(Selected.Items[I].DisplayRect, P) then begin
-        Result := Selected.Items[I];
-        Break;
+  idx := 0;
+
+  // select item knowing only its index on the list, from items that have children, so we need to enter those lists if needed
+  // i could do it by recursion, but linear solutin is an option here
+
+  // last time i stated:
+  // no, i do not have time to fight with this, i must go forward, with this project
+  //
+  // i must say that i was tired, id did not have enough mental capacity to thing hard at this algorithm that i atempted to create
+  // i knew what i need to do, but had trouble with picturing how to put it in, into existing at the time code
+  //
+  // after couple of days of break, i returned to this with a clear mind and started by implementing functions that are responsilbe for
+  // picking entries:
+  // - first_item, last_item, prev_item, next_item, prev_sibling, next_sibling
+  //
+  // here are those functions:
+
+//  function GetFirstEntry(const Entry: TEntryItem): TEntryItem;
+//  function GetLastEntry(const Entry: TEntryItem): TEntryItem;
+//  function GetPrevEntry(Entry: TEntryItem): TEntryItem;
+//  function GetNextEntry(Entry: TEntryItem): TEntryItem;
+//  function GetFirstEntrySibling(const Entry: TEntryItem): TEntryItem;
+//  function GetLastEntrySibling(const Entry: TEntryItem): TEntryItem;
+//  function GetPrevEntrySibling(const Entry: TEntryItem): TEntryItem;
+//  function GetNextEntrySibling(const Entry: TEntryItem): TEntryItem;
+
+  // those functions operate on this tree structure:
+  //
+  //  Root collection
+  //   ├─ Item A
+  //   │   ├─ Item A1
+  //   │   ├─ Item A2
+  //   │   │   └─ Item A2a
+  //   │   └─ Item A3
+  //   └─ Item B
+  //       └─ Item B1
+
+  // this tree entries have 2 properties that can change how three must be rendered
+  // first property : Visible - determines that whole entry is shown or not
+  // second property: State   - tells renderer to show only this entry or render any children that this entry has
+
+  // DFS implementation without local stack
+
+  Entry := Nil;
+  if Entries.Count > 0 then
+    Entry := Entries.Items[0];
+
+  while Entry <> Nil do begin
+    // process item
+    if Entry.Visible then begin
+      if idx = Index then
+        Exit(Entry)
+      else if Entry.State = esCollapsed then begin
+        Inc(idx);
+      end
+      else begin // if Item.State = esExpanded then
+        // ok now we must check all the children, if they have any children of their own
+        Inc(idx);
+
+        if Entry.Items.Count > 0 then begin
+          Entry := Entry.Items[0];
+          Continue;
+        end;
       end;
+    end;
+    //
+    Entry := Entries.GetNextEntry(Entry);
+  end;
 end;
 
-function TCustomFolderView.ItemRect(Item: Integer): TRect;
+function TCustomEntryView.ItemSelected(const Item: TEntryItem): Boolean;
 begin
-  Result := Rect(0, (Item - FTopIndex) * FItemHeight, ClientWidth, FItemHeight);
+  Result := FSelectedItems.IndexOf(Item) > -1;
 end;
 
-procedure TCustomFolderView.KeyDown(var Key: Word; Shift: TShiftState);
+function TCustomEntryView.ItemRect(Item: Integer): TRect;
+begin
+  Result := Rect(0, (Item - FTopIndex) * FEntryHeight, ClientWidth, FEntryHeight);
+end;
+
+procedure TCustomEntryView.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited KeyDown(Key, Shift);
   case Key of
     VK_HOME: ItemIndex := 0;
     VK_END: ItemIndex := GetCount - 1;
-    VK_NEXT: SetScrollIndex(ItemIndex + ClientHeight div FItemHeight);
-    VK_PRIOR: SetScrollIndex(ItemIndex - ClientHeight div FItemHeight);
+    VK_NEXT: SetScrollIndex(ItemIndex + ClientHeight div FEntryHeight);
+    VK_PRIOR: SetScrollIndex(ItemIndex - ClientHeight div FEntryHeight);
     VK_LEFT,
     VK_RIGHT: Key := 0;
     VK_UP: begin
       if (Selected <> Nil) and (Selected.Index > 0) then
-        Selected := FFolders[Selected.Index - 1];
+        Selected := FEntries[Selected.Index - 1];
       Key := 0;
     end;
     VK_DOWN: begin
-      if (Selected <> Nil) and (Selected.Index < FFolders.Count - 1) then
-        Selected := FFolders[Selected.Index + 1];
+      if (Selected <> Nil) and (Selected.Index < FEntries.Count - 1) then
+        Selected := FEntries[Selected.Index + 1];
       Key := 0;
     end;
   end;
   EnsureItemVisible;
 end;
 
-procedure TCustomFolderView.Loaded;
+procedure TCustomEntryView.Loaded;
 begin
   inherited Loaded;
   ActiveIndex := FActiveIndex;
 end;
 
-procedure TCustomFolderView.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TCustomEntryView.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 
   function CanFocus: Boolean;
   var
     W: TWinControl;
   begin
     W := Self;
-    while W <> nil do
+    while W <> Nil do
       if (not W.Visible) or (not W.Enabled) then
         Exit(False)
       else
@@ -1546,7 +2193,7 @@ procedure TCustomFolderView.MouseDown(Button: TMouseButton; Shift: TShiftState; 
 
 var
 //  Point: TPoint;
-  Folder: TFolderBar;
+  Entry: TEntryItem;
 //  ScrollButton: TFolderScrollButton;
   Rect: TRect;
 begin
@@ -1555,6 +2202,7 @@ begin
     if CanFocus then
       SetFocus;
 //    Point := GetPoint(X, Y);
+//    FMousePoint := Point(X, Y);
 //    FButtons := [];
 //    for ScrollButton := Low(TFolderScrollButton) to High(TFolderScrollButton) do
 //      if PtInRect(ButtonRect[ScrollButton], Point) then begin
@@ -1569,20 +2217,26 @@ begin
 //        SetTimer(Handle, 1, 125, Nil);
 //        Exit;
 //      end;
-    Folder := FolderFromPoint(X, Y);
-    if Folder <> Nil then begin
-      Selected := Folder;
+    Entry := EntryFromPoint(X, Y);
+    if Entry <> Nil then begin
+      if MultiSelect and (ssShift in Shift) then begin
+        FSelectedItems.Add(Entry);
+        CaptureItem := Entry; // this does invalidate
+      end
+      else
+        Selected := Entry; // this does invalidate
       Exit;
     end;
-    CaptureItem := ItemFromPoint(X, Y);
-    if CaptureItem <> Nil then begin
-      Rect := CaptureItem.DisplayRect;
-      InvalidateRect(Handle, @Rect, False);
-    end;
+    // capture item is used as indicator of what item was focussed
+//    CaptureItem := ItemFromPoint(X, Y);
+//    if CaptureItem <> Nil then begin
+//      Rect := CaptureItem.DisplayRect;
+//      InvalidateRect(Handle, @Rect, False);
+//    end;
   end;
 end;
 
-procedure TCustomFolderView.MouseMove(Shift: TShiftState; X, Y: Integer);
+procedure TCustomEntryView.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
   if not MouseCapture then begin
@@ -1591,8 +2245,9 @@ begin
   end;
 end;
 
-procedure TCustomFolderView.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TCustomEntryView.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
+  Entry: TEntryItem;
 //  Point: TPoint;
 //  ScrollButton: TFolderScrollButton;
   Rect: TRect;
@@ -1601,6 +2256,7 @@ begin
   if csDesigning in ComponentState then
     Exit;
   if Button = mbLeft then begin
+//    FMousePoint := Point(X, Y);
 //    Point := GetPoint(X, Y);
 //    if FButtons <> [] then
 //      for ScrollButton := Low(TFolderScrollButton) to High(TFolderScrollButton) do
@@ -1614,33 +2270,34 @@ begin
 //      FButtons := [];
 //      Invalidate;
 //    end;
+    Entry := EntryFromPoint(X, Y);
     if CaptureItem <> Nil then begin
-      Rect := CaptureItem.DisplayRect;
+      Rect := CaptureItem.AbsoluteDisplayRect;
       InvalidateRect(Handle, @Rect, False);
-      if CaptureItem = ItemFromPoint(X, Y) then
-        DoItemClick(CaptureItem);
     end;
-    CaptureItem := ItemFromPoint(Mouse.CursorPos.X, Mouse.CursorPos.Y);
+    if CaptureItem = Entry then
+      DoItemClick(CaptureItem);
+//    CaptureItem := ItemFromPoint(Mouse.CursorPos.X, Mouse.CursorPos.Y);
   end;
 end;
 
-procedure TCustomFolderView.Notification(AComponent: TComponent;
-  Operation: TOperation);
+procedure TCustomEntryView.Notification(AComponent: TComponent; Operation: TOperation);
 begin
   inherited Notification(AComponent, Operation);
-  if (Operation = opRemove) and (AComponent <> Nil) then
-    if AComponent = FFolderImages then
-      UpdateImages(FFolderImages, Nil)
-    else if AComponent = FItemImages then
-      UpdateImages(FItemImages, Nil);
+  if (Operation = opRemove) and (AComponent <> Nil) then begin
+    if AComponent = FEntryImages then
+      UpdateImages(FEntryImages, Nil);
+//    else if AComponent = FItemImages then
+//      UpdateImages(FItemImages, Nil);
+  end;
 end;
 
-procedure TCustomFolderView.Update;
+procedure TCustomEntryView.Update;
 begin
   ActiveIndex := FActiveIndex;
 end;
 
-procedure TCustomFolderView.UpdateImages(var InternalImages: TCustomImageList;
+procedure TCustomEntryView.UpdateImages(var InternalImages: TCustomImageList;
   ExternalImages: TCustomImageList);
 begin
   if InternalImages <> Nil then begin
@@ -1655,22 +2312,24 @@ begin
   Invalidate;
 end;
 
-procedure TCustomFolderView.UpdateScrollRange;
+procedure TCustomEntryView.UpdateScrollRange;
 var
   ScrollInfo: TScrollInfo;
   count: Integer;
 begin
   if HandleAllocated then begin
-    count := GetCount;
+    count := GetCount; // all visible and expanded items
     ScrollInfo.cbSize := SizeOf(TScrollInfo);
     ScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
     ScrollInfo.nMin := 0;
     ScrollInfo.nMax := count - 1;
-    ScrollInfo.nPage := ClientHeight div FItemHeight;
+    ScrollInfo.nPage := ClientHeight div FEntryHeight;
     ScrollInfo.nPos := FTopIndex;
-    SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
+    //
     if count - FTopIndex < Integer(ScrollInfo.nPage) then
       SetTopIndex(count - Integer(ScrollInfo.nPage));
+    // and here is the magic, we let know to OS that we have vertical scrollbar and sets its info, but OS does not render it, we do it ourselfs
+    SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
   end;
 //  with ScrollInfo do begin
 //    ScrollInfo.cbSize := SizeOf(TScrollInfo);
@@ -1683,7 +2342,7 @@ begin
 //  end;
 end;
 
-procedure TCustomFolderView.OverlayChange(Sender: TObject);
+procedure TCustomEntryView.OverlayChange(Sender: TObject);
 begin
   FOverlay.Bitmap.Transparent := True;
   FOverlay.Bitmap.TransparentMode := tmAuto;
@@ -1715,7 +2374,7 @@ end;
 //    end;
 //  end;
 
-procedure TCustomFolderView.Paint;
+procedure TCustomEntryView.Paint;
 var
   Rect: TRect;
 begin
@@ -1726,19 +2385,14 @@ begin
   DrawItems(Canvas, Rect); //draw items
 end;
 
-procedure TCustomFolderView.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
-var
-  DC: HDC;
-  Brush: HBRUSH;
+procedure TCustomEntryView.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
 begin
-  DC := ACanvas.Handle;
-  SetBkMode(DC, OPAQUE);
-  Brush := CreateSolidBrush(ColorToRGB(Color));
-  FillRect(DC, ARect, Brush);
-  DeleteObject(Brush);
+  ACanvas.Brush.Style := bsSolid;
+  ACanvas.Brush.Color := ColorToRGB(Color);
+  ACanvas.FillRect(ARect);
   //
   if FBorderStyle = bsSingle then begin
-    DrawThemeBorder(DC, Color, ARect, []);
+    DrawThemeBorder(ACanvas.Handle, Color, ARect, []);
     InflateRect(ARect, -GetBorder, -GetBorder);
     //SelectClipRect(DC, Rect, RGN_AND);
   end;
@@ -1870,28 +2524,32 @@ end;
 // dsExpanded,
 // dsDefaulted,
 
-procedure TCustomFolderView.DrawItems(const ACanvas: TCanvas; const ARect: TRect);
+procedure TCustomEntryView.DrawItems(const ACanvas: TCanvas; const ARect: TRect);
 var
   Clip, Row, R: TRect;
   I: Integer;
   DrawState: TDrawState;
+  Item: TEntryItem;
 begin
   //
   Clip := Canvas.ClipRect;
   Row := ARect;
-  Row.Height := FItemHeight;
+  Row.Height := FEntryHeight;
 //  if FScrollWidth > 0 then
 //    Row.Width := FScrollWidth;
-  for I := 0 to ARect.Height div (FItemHeight + 1) do begin
+  for I := 0 to ARect.Height div (FEntryHeight + 1) do begin // divide client-area into horizontal strips and render Entries
+    // set strip dimmensions
     if I + FTopIndex > GetCount - 1 then
       Break;
     R := Row;
-    R.Top := R.Top + I * FItemHeight;
-    R.Height := FItemHeight;
-    if R.Bottom <= Clip.Top then
+    R.Top := R.Top + I * FEntryHeight;
+    R.Height := FEntryHeight;
+    if R.Bottom <= Clip.Top then // if we are ouside of client-area, go to next entry
       Continue;
-    if R.Top >= Clip.Bottom then
+    if R.Top >= Clip.Bottom then // if we are ouside of client-area, go to next entry
       Continue;
+    //
+    // set render state
     DrawState := [];
     if Focused then
       Include(DrawState, dsFocused);
@@ -1901,8 +2559,8 @@ begin
       else
         Include(DrawState, dsSelected);
     end;
-//    if FMultiSelect and FSelectItems[FTopIndex + I] then
-//      Include(DrawState, dsSelected);
+    if FMultiSelect and ItemSelected(ItemFromIndex(FTopIndex + I)) then
+      Include(DrawState, dsSelected);
     if FTopIndex + I = FHotIndex then
       Include(DrawState, dsHot);
     //
@@ -1910,132 +2568,102 @@ begin
   end;
 end;
 
-procedure TCustomFolderView.DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; DrawState: TDrawState);
-type
-  TDrawingType = (dtNone, dtFolder, dtFolderItem);
+procedure TCustomEntryView.DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; DrawState: TDrawState);
 var
-////  HotBrush: HBRUSH;
-  Folder: TFolderBar;
-  Item: TFolderItem;
-//  Point: TPoint;
-  I, J, K: Integer;
-  DrawingType: TDrawingType;
+  Item: TEntryItem;
 begin
-  DrawingType := dtNone;
-  K:=-1;
-  for I := 0 to FFolders.Count - 1 do begin
-    Inc(K);
-    Folder := FFolders[I];
-    if not Folder.Visible then
-      Continue;
-    if K = ItemIdx then begin
-      DrawingType := dtFolder;
-      Break;
-    end;
-    for J := 0 to Folder.FItems.Count - 1 do begin
-      Item := Folder.FItems[j];
-      if K = ItemIdx then begin
-        DrawingType := dtFolderItem;
-        Break;
-      end;
-      Inc(K);
-    end;
-  end;
-  if (K = -1) or (K > ItemIdx) then
+  Item := ItemFromIndex(ItemIdx);
+  if (Item = Nil) or
+     ((Item.ParentEntries <> Nil) and (Item.ParentEntries.OwnerEntry <> Nil) and (Item.ParentEntries.OwnerEntry.Items.Count > 0) and (Item.ParentEntries.OwnerEntry.State = esCollapsed)) then
     Exit;
   //
-  // ensure item selected state for children
-//  if (Folder.SelectedIndex > -1) and not (dsSelected in DrawState) then begin
-//    if Folder = Selected then
+  DrawEntryItem(ACanvas, ARect, DrawState, Item);
+end;
+
+//procedure TCustomEntryView.DrawFolder(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Folder: TFolderBar);
+//var
+//  DC: HDC;
+//  DrawRect: TRect;
+//  CheckeredBrush: HBRUSH;
+//  top: Integer;
+//begin
+//  if not Assigned(Folder) then
+//    Exit;
+//  //
+//  DC := ACanvas.Handle;
+//  CheckeredBrush := GetBrush(CheckeredBitmap);
+//  //DrawRect := Folder.DisplayRect;
+//  DrawRect := ARect;
+//
+//  // clear item background
+//  SetBkMode(DC, OPAQUE);
+//  ACanvas.Brush.Color := ColorToRGB(Color);
+//  ACanvas.FillRect(ARect);
+//
+//  if StyleServices.Enabled then begin
+//    Inc(DrawRect.Right, 10);
+//    if dsSelected in DrawState then
+//      StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
+//    else
+//      StyleServices.DrawElement(DC, GetDetails(thHeaderItemNormal), DrawRect);
+//    Dec(DrawRect.Right, 10);
+//  end
+//  else begin
+//    DrawFrame(DC, DrawRect, dfRaised);
+//    InflateRect(DrawRect, -1, -1);
+//    if dsSelected in DrawState then
+//      FillRect(DC, DrawRect, CheckeredBrush)
+//    else
+//      ACanvas.FillRect(DrawRect);
 //  end;
-//  if (FCaptureItem <> Nil) and (FCaptureItem = Item) and  then
-  //
-  case DrawingType of
-    dtFolder    : DrawFolder(ACanvas, ARect, DrawState, Folder);
-    dtFolderItem: DrawFolderItem(ACanvas, ARect, DrawState, Item);
-  end;
-end;
+//  DeleteObject(CheckeredBrush);
+//  // draw item icon
+//  InflateRect(DrawRect, -6, 0);
+//  if FFolderImages <> Nil then begin
+//    top := (FItemHeight - FFolderImages.Height) div 2;
+//    if (dsSelected in DrawState) and (Folder.SelectedIndex > -1) then begin
+//      ImageList_DrawEx(FFolderImages.Handle, Folder.SelectedIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
+//    end
+//    else if Folder.ImageIndex > -1 then
+//      ImageList_DrawEx(FFolderImages.Handle, Folder.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
+//    Inc(DrawRect.Left, FFolderImages.Width + 2);
+//  end;
+//  // draw item caption
+//  InflateRect(DrawRect, -1, -1);
+//
+//  ACanvas.Font.Color := clWindowText;
+//  SetBkMode(DC, TRANSPARENT);
+//  DrawCaption(ACanvas, Folder.Caption, DrawRect, drLeft);
+//  //
+////  InflateRect(DrawRect, 2, 2);
+////  if FFolderImages <> Nil then
+////    Dec(DrawRect.Left, FFolderImages.Width + 2);
+//////  DrawRect := Folder.DisplayRect;
+//////    SelectClipRect(DC, DrawRect, RGN_DIFF);
+////  if FOverlay <> Nil then
+////    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlay.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
+//end;
 
-procedure TCustomFolderView.DrawFolder(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Folder: TFolderBar);
+procedure TCustomEntryView.DrawEntryItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TEntryItem);
 var
   DC: HDC;
   DrawRect: TRect;
-  CheckeredBrush: HBRUSH;
+//  CheckeredBrush: HBRUSH;
   top: Integer;
-begin
-  if not Assigned(Folder) then
-    Exit;
-  //
-  DC := ACanvas.Handle;
-  CheckeredBrush := GetBrush(CheckeredBitmap);
-  //DrawRect := Folder.DisplayRect;
-  DrawRect := ARect;
-
-  // clear item background
-  SetBkMode(DC, OPAQUE);
-  ACanvas.Brush.Color := ColorToRGB(Color);
-  ACanvas.FillRect(ARect);
-
-  if StyleServices.Enabled then begin
-    Inc(DrawRect.Right, 10);
-    if dsSelected in DrawState then
-      StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
-    else
-      StyleServices.DrawElement(DC, GetDetails(thHeaderItemNormal), DrawRect);
-    Dec(DrawRect.Right, 10);
-  end
-  else begin
-    DrawFrame(DC, DrawRect, dfRaised);
-    InflateRect(DrawRect, -1, -1);
-    if dsSelected in DrawState then
-      FillRect(DC, DrawRect, CheckeredBrush)
-    else
-      ACanvas.FillRect(DrawRect);
-  end;
-  DeleteObject(CheckeredBrush);
-  // draw item icon
-  InflateRect(DrawRect, -6, 0);
-  if FFolderImages <> Nil then begin
-    top := (FItemHeight - FFolderImages.Height) div 2;
-    if (dsSelected in DrawState) and (Folder.SelectedIndex > -1) then begin
-      ImageList_DrawEx(FFolderImages.Handle, Folder.SelectedIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
-    end
-    else if Folder.ImageIndex > -1 then
-      ImageList_DrawEx(FFolderImages.Handle, Folder.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
-    Inc(DrawRect.Left, FFolderImages.Width + 2);
-  end;
-  // draw item caption
-  InflateRect(DrawRect, -1, -1);
-
-  ACanvas.Font.Color := clWindowText;
-  SetBkMode(DC, TRANSPARENT);
-  DrawCaption(ACanvas, Folder.Caption, DrawRect, drLeft);
-  //
-//  InflateRect(DrawRect, 2, 2);
-//  if FFolderImages <> Nil then
-//    Dec(DrawRect.Left, FFolderImages.Width + 2);
-////  DrawRect := Folder.DisplayRect;
-////    SelectClipRect(DC, DrawRect, RGN_DIFF);
-//  if FOverlay <> Nil then
-//    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlay.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
-end;
-
-procedure TCustomFolderView.DrawFolderItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TFolderItem);
-var
-  DC: HDC;
-  DrawRect: TRect;
-  CheckeredBrush: HBRUSH;
-  top: Integer;
+  Indent: Integer;
 begin
   if not Assigned(Item) then
     Exit;
   //
+  //Indent := GetIndentLevel(Item);
+  Indent := Item.TreeLevel;
+  //
   DC := ACanvas.Handle;
-  CheckeredBrush := GetBrush(CheckeredBitmap);
+//  CheckeredBrush := GetBrush(CheckeredBitmap);
   DrawRect := ARect;
 
   // clear item background
-  SetBkMode(DC, OPAQUE);
+  ACanvas.Brush.Style := bsSolid;
   ACanvas.Brush.Color := ColorToRGB(Color);
   ACanvas.FillRect(ARect);
 
@@ -2043,26 +2671,37 @@ begin
     Inc(DrawRect.Right, 10);
     if dsSelected in DrawState then
       StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
-    else if dsHot in DrawState then
-      FillRect(DC, DrawRect, CheckeredBrush);
+    else if dsHot in DrawState then begin
+      //FillRect(DC, DrawRect, CheckeredBrush);
+      ACanvas.Brush.Bitmap := CheckeredBitmap;
+      ACanvas.FillRect(DrawRect);
+      ACanvas.Brush.Bitmap := Nil;
+    end;
     Dec(DrawRect.Right, 10);
   end
   else begin
     DrawFrame(DC, DrawRect, dfRaised);
     InflateRect(DrawRect, -1, -1);
-    if dsSelected in DrawState then
-      FillRect(DC, DrawRect, CheckeredBrush)
+    if dsSelected in DrawState then begin
+      //FillRect(DC, DrawRect, CheckeredBrush)
+      ACanvas.Brush.Bitmap := CheckeredBitmap;
+      ACanvas.FillRect(DrawRect);
+      ACanvas.Brush.Bitmap := Nil;
+    end
     else
       ACanvas.FillRect(DrawRect);
   end;
-  DeleteObject(CheckeredBrush);
+  //DeleteObject(CheckeredBrush);
+
+  Inc(DrawRect.Left, 20 * Indent);
+
   // draw item icon
   InflateRect(DrawRect, -6, 0);
-  if FFolderImages <> Nil then begin
-    top := (FItemHeight - FFolderImages.Height) div 2;
+  if FEntryImages <> Nil then begin
+    top := (FEntryHeight - FEntryImages.Height) div 2;
     if Item.ImageIndex > -1 then
-      ImageList_DrawEx(FFolderImages.Handle, Item.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
-    Inc(DrawRect.Left, FFolderImages.Width + 2);
+      ImageList_DrawEx(FEntryImages.Handle, Item.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
+    Inc(DrawRect.Left, FEntryImages.Width + 2);
   end;
   // draw item caption
   InflateRect(DrawRect, -1, -1);
@@ -2073,14 +2712,41 @@ begin
     ACanvas.Font.Color := clCaptionText;
   SetBkMode(DC, TRANSPARENT);
   DrawCaption(ACanvas, Item.Caption, DrawRect, drLeft);
+  // draw expand indicator if item has children
+  if Item.Items.Count > 0 then begin
+    ACanvas.Pen.Color := clWindow;
+    if dsSelected in DrawState then
+      ACanvas.Pen.Color := clWindowText
+    else if dsHot in DrawState then
+      ACanvas.Pen.Color := clCaptionText;
+    ACanvas.Pen.Style := psSolid;
+    ACanvas.Pen.Width := 2;
+    //
+    if Item.State = esCollapsed then begin
+      ACanvas.Polyline(
+        [Point(ARect.Right - 20, ARect.Height div 2 - 3),
+         Point(ARect.Right - 15, ARect.Height div 2 + 2),
+         Point(ARect.Right - 10, ARect.Height div 2 - 3)
+        ]
+      );
+    end
+    else begin // esExpanded
+      ACanvas.Polyline(
+        [Point(ARect.Right - 20, ARect.Height div 2 + 3),
+         Point(ARect.Right - 15, ARect.Height div 2 - 2),
+         Point(ARect.Right - 10, ARect.Height div 2 + 3)
+        ]
+      );
+    end;
+  end;
 end;
 
-procedure TCustomFolderView.Scroll(Delta: Integer);
+procedure TCustomEntryView.Scroll(Delta: Integer);
 begin
   ScrollBy(0, Delta);
 end;
 
-procedure TCustomFolderView.ScrollBy(DeltaX, DeltaY: Integer);
+procedure TCustomEntryView.ScrollBy(DeltaX, DeltaY: Integer);
 var
   R: TRect;
 begin
@@ -2093,15 +2759,15 @@ begin
   end
 end;
 
-procedure TCustomFolderView.ScrollToSelection;
+procedure TCustomEntryView.ScrollToSelection;
 begin
   if FItemIndex < FTopIndex then
     SetTopIndex(FItemIndex)
-  else if FItemIndex >= FTopIndex + (ClientHeight + 1) div FItemHeight then
-    SetTopIndex(FItemIndex - (ClientHeight - 1) div FItemHeight);
+  else if FItemIndex >= FTopIndex + (ClientHeight + 1) div FEntryHeight then
+    SetTopIndex(FItemIndex - (ClientHeight - 1) div FEntryHeight);
 end;
 
-procedure TCustomFolderView.SelectItem(PriorIndex, NewIndex: Integer; var CanSelect: Boolean);
+procedure TCustomEntryView.SelectItem(PriorIndex, NewIndex: Integer; var CanSelect: Boolean);
 begin
   if CanSelect then begin
     FItemIndex := NewIndex;
@@ -2110,7 +2776,7 @@ begin
   end;
 end;
 
-procedure TCustomFolderView.SetActiveIndex(Value: Integer);
+procedure TCustomEntryView.SetActiveIndex(Value: Integer);
 var
   Form: TCustomForm;
 begin
@@ -2119,10 +2785,10 @@ begin
     Exit;
   if FActiveIndex < -1 then
     FActiveIndex := -1;
-  if FActiveIndex > FFolders.Count - 1 then
-    FActiveIndex := FFolders.Count - 1;
-  if (FActiveIndex > -1) and (FFolders[FActiveIndex].Visible) then
-    FSelected := FFolders[FActiveIndex]
+  if FActiveIndex > FEntries.Count - 1 then
+    FActiveIndex := FEntries.Count - 1;
+  if (FActiveIndex > -1) and (FEntries[FActiveIndex].Visible) then
+    FSelected := FEntries[FActiveIndex]
   else
     FSelected := Nil;
   Invalidate;
@@ -2133,7 +2799,7 @@ begin
   end;
 end;
 
-procedure TCustomFolderView.SetBorderStyle(Value: TBorderStyle);
+procedure TCustomEntryView.SetBorderStyle(Value: TBorderStyle);
 begin
   if Value <> FBorderStyle then begin
     FBorderStyle := Value;
@@ -2141,51 +2807,70 @@ begin
   end;
 end;
 
-function TCustomFolderView.GetButtonRect(Button: TFolderScrollButton): TRect;
+//function TCustomEntryView.GetButtonRect(Button: TFolderScrollButton): TRect;
+//var
+//	ButtonHeight: Integer;
+//  Rect: TRect;
+//  Counter: Integer;
+//  I: Integer;
+//begin
+//  ButtonHeight := GetSystemMetrics(SM_CXVSCROLL) + 4;
+//  SetRectEmpty(Result);
+//  if Selected <> Nil then begin
+//    Rect := GetSelectedRect;
+//    if HeightOf(Rect) > ButtonHeight * 2 + 8 then
+//      case Button of
+//        fbScrollUp: begin
+//          if Selected.TopIndex > 0 then
+//            Result := GetRect(Rect.Right - ButtonHeight - 4, Rect.Top + 4, Rect.Right - 4, Rect.Top + ButtonHeight + 4);
+//        end;
+//        fbScrollDown: begin
+//          Counter := 0;
+//          for I := Selected.Items.Count - 1 downto 1 do begin
+//            if Selected.Items[I].Visible then begin
+//              if Counter = 1 then
+//                Break;
+//              if Selected.Items[I].DisplayRect.Bottom > Rect.Bottom then
+//                Result := GetRect(Rect.Right - ButtonHeight - 4, Rect.Bottom - ButtonHeight - 4, Rect.Right - 4, Rect.Bottom - 4);
+//              Inc(Counter);
+//            end;
+//          end;
+//          if Counter = 0 then
+//            SetRectEmpty(Result);
+//        end;
+//      end;
+//  end;
+//end;
+
+  //  Root collection
+  //   ├─ (0:0) - Item A - [collapsed]
+  //   │   ├─ (1:1) - Item A1 -
+  //   │   ├─ (-1:1) - Item A2 - [collapsed]
+  //   │   │   └─ (-1:2) - Item A2a - parent visible and collapsed - hide me
+  //   │   └─ (2:1) - Item A3
+  //   └─ (3:0) - Item B
+  //       └─ (4:1) - Item B1
+
+function TCustomEntryView.GetCount: Integer;
 var
-	ButtonHeight: Integer;
-  Rect: TRect;
-  Counter: Integer;
-  I: Integer;
+  Item: TEntryItem;
 begin
-  ButtonHeight := GetSystemMetrics(SM_CXVSCROLL) + 4;
-  SetRectEmpty(Result);
-  if Selected <> Nil then begin
-    Rect := GetSelectedRect;
-    if HeightOf(Rect) > ButtonHeight * 2 + 8 then
-      case Button of
-        fbScrollUp: begin
-          if Selected.TopIndex > 0 then
-            Result := GetRect(Rect.Right - ButtonHeight - 4, Rect.Top + 4, Rect.Right - 4, Rect.Top + ButtonHeight + 4);
-        end;
-        fbScrollDown: begin
-          Counter := 0;
-          for I := Selected.Items.Count - 1 downto 1 do begin
-            if Selected.Items[I].Visible then begin
-              if Counter = 1 then
-                Break;
-              if Selected.Items[I].DisplayRect.Bottom > Rect.Bottom then
-                Result := GetRect(Rect.Right - ButtonHeight - 4, Rect.Bottom - ButtonHeight - 4, Rect.Right - 4, Rect.Bottom - 4);
-              Inc(Counter);
-            end;
-          end;
-          if Counter = 0 then
-            SetRectEmpty(Result);
-        end;
-      end;
+  Result := 0;
+  //
+  if Entries.Count = 0 then
+    Exit;
+  //
+  Item := Entries.Items[0];
+  while Item <> Nil do begin
+    //if (Item.ParentIsExpanded and Item.Visible) or (Item.Visible and (not Item.HasChildren or (Item.HasChildren and not Item.IsExpanded))) then
+    if Item.Visible then
+      Inc(Result);
+//    Inc(Result, IfThen(Item.Items.Count > 0, Item.Items.Count, 0));
+    Item := Entries.GetNextEntry(Item);
   end;
 end;
 
-function TCustomFolderView.GetCount: Integer;
-var
-  i: Integer;
-begin
-  Result := Folders.Count;
-  for i := 0 to Folders.Count - 1 do
-    Result := Result + Folders.Items[i].FItems.Count;
-end;
-
-procedure TCustomFolderView.SetCaptureItem(Value: TFolderItem);
+procedure TCustomEntryView.SetCaptureItem(Value: TEntryItem);
 var
   Rect: tRect;
 begin
@@ -2193,13 +2878,13 @@ begin
 //    Value := Nil;
   if Value <> FCaptureItem then begin
     if FCaptureItem <> Nil then begin
-      Rect := FCaptureItem.DisplayRect;
+      Rect := FCaptureItem.RelativeDisplayRect;
       InvalidateRect(Handle, @Rect, False);
     end;
     FCaptureItem := Value;
     if Value <> Nil then
       if FCaptureItem.Enabled then begin
-        Rect := FCaptureItem.DisplayRect;
+        Rect := FCaptureItem.RelativeDisplayRect;
         InvalidateRect(Handle, @Rect, False);
       end
       else
@@ -2207,37 +2892,29 @@ begin
   end;
 end;
 
-procedure TCustomFolderView.SetFolderHeight(Value: Integer);
+procedure TCustomEntryView.SetEntryHeight(Value: Integer);
 begin
-  if Value <> FFolderHeight then begin
-    FFolderHeight := Value;
+  if Value <> FEntryHeight then begin
+    FEntryHeight := Value;
     Invalidate;
   end;
 end;
 
-procedure TCustomFolderView.SetFolderImages(Value: TCustomImageList);
+procedure TCustomEntryView.SetEntryImages(Value: TCustomImageList);
 begin
-  if Value <> FFolderImages then begin
-    UpdateImages(FFolderImages, Value);
-    ImagesChange(FFolderImages);
+  if Value <> FEntryImages then begin
+    UpdateImages(FEntryImages, Value);
+    ImagesChange(FEntryImages);
   end;
 end;
 
-procedure TCustomFolderView.SetFolders(Value: TFolderBars);
+procedure TCustomEntryView.SetEntries(Value: TEntryItems);
 begin
-  if Value <> FFolders then
-    FFolders.Assign(Value);
+  if Value <> FEntries then
+    FEntries.Assign(Value);
 end;
 
-procedure TCustomFolderView.SetItemImages(Value: TCustomImageList);
-begin
-  if Value <> FItemImages then begin
-    UpdateImages(FItemImages, Value);
-    ImagesChange(FItemImages);
-  end;
-end;
-
-procedure TCustomFolderView.SetItemIndex(Value: Integer);
+procedure TCustomEntryView.SetItemIndex(Value: Integer);
 var
   PriorIndex: Integer;
   CanSelect: Boolean;
@@ -2275,6 +2952,7 @@ begin
 //              WasSelected := False;
 //            for I := Low(FSelectItems) to High(FSelectItems) do
 //              FSelectItems[I] := False;
+(*
             SetLength(FSelectItems, 0);
             FSelectCount := 0;
             if FShiftIndex > -1 then begin
@@ -2294,11 +2972,12 @@ begin
               Invalidate;
             end
             else begin
+*)
 //              FSelectItems[FItemIndex] := True;
-              FSelectCount := 1;
+              FSelectedCount := 1;
               FShiftIndex := FItemIndex;
               Invalidate;
-            end;
+//            end;
           end
           else if ssCtrl in FShift then begin
 //            if FSelectItems[FItemIndex] then
@@ -2306,7 +2985,7 @@ begin
 //            FSelectItems[FItemIndex] := not FSelectItems[FItemIndex];
 //            if FSelectItems[FItemIndex] then
 //              Inc(FSelectCount);
-            if FSelectCount > 1 then
+            if FSelectedCount > 1 then
               Invalidate;
           end
 //          else if (PriorIndex > -1) and (FSelectCount = 1) and FSelectItems[FItemIndex] then begin
@@ -2316,7 +2995,7 @@ begin
           else begin
 //            for I := FSelectItems.Lo to FSelectItems.Hi do
 //              FSelectItems[I] := False;
-            FSelectCount := 1;
+            FSelectedCount := 1;
 //            FSelectItems[FItemIndex] := True;
             Invalidate;
           end;
@@ -2331,7 +3010,7 @@ begin
 //    FSelectItems[FItemIndex] := not FSelectItems[FItemIndex];
 //    if FSelectItems[FItemIndex] then
 //      Inc(FSelectCount);
-    if FSelectCount > 1 then
+    if FSelectedCount > 1 then
       Invalidate
     else
       InvalidateItem(FItemIndex);
@@ -2339,13 +3018,13 @@ begin
   FShift := FShift - [ssCtrl];
 end;
 
-procedure TCustomFolderView.SetMultiSelect(Value: Boolean);
+procedure TCustomEntryView.SetMultiSelect(Value: Boolean);
 var
   count: Integer;
 begin
   if Value <> FMultiSelect then begin
     FMultiSelect := Value;
-    FSelectItems := nil;
+    FSelectedItems.Clear;
     count := GetCount;
     if FMultiSelect and (count > 0) then begin
 //      FSelectItems.Length := FCount;
@@ -2353,20 +3032,20 @@ begin
 //        FSelectItems[FItemIndex] := True;
     end
     else
-      FSelectCount := 0;
+      FSelectedCount := 0;
     Invalidate;
     FHotIndex := -1;
     KillTimer(Handle, 1);
   end;
 end;
 
-procedure TCustomFolderView.SetOverlay(Value: TPicture);
+procedure TCustomEntryView.SetOverlay(Value: TPicture);
 begin
   FOverlay.Assign(Value);
   Invalidate;
 end;
 
-procedure TCustomFolderView.SetScrollIndex(Value: Integer);
+procedure TCustomEntryView.SetScrollIndex(Value: Integer);
 var
   count: Integer;
 begin
@@ -2383,7 +3062,7 @@ begin
     SetItemIndex(Value);
 end;
 
-procedure TCustomFolderView.SetSelected(Value: TFolderBar);
+procedure TCustomEntryView.SetSelected(Value: TEntryItem);
 begin
   if Value <> FSelected then begin
     FSelected := Value;
@@ -2397,7 +3076,7 @@ begin
   end;
 end;
 
-procedure TCustomFolderView.SetTopIndex(Value: Integer);
+procedure TCustomEntryView.SetTopIndex(Value: Integer);
 var
   ScrollInfo: TScrollInfo;
   Delta: Integer;
@@ -2405,12 +3084,12 @@ var
   count: Integer;
 begin
   count := GetCount;
-  if Value > count - ClientHeight div FItemHeight then
-    Value := count - ClientHeight div FItemHeight;
+  if Value > count - ClientHeight div FEntryHeight then
+    Value := count - ClientHeight div FEntryHeight;
   if Value < 0 then
     Value := 0;
   if Value <> FTopIndex then begin
-    Delta := (FTopIndex - Value) * FItemHeight;
+    Delta := (FTopIndex - Value) * FEntryHeight;
     FTopIndex := Value;
     if FHotTrack then
       if FHotIndex > - 1 then
@@ -2434,7 +3113,7 @@ begin
   end;
 end;
 
-function TCustomFolderView.GetSelectedRect: TRect;
+function TCustomEntryView.GetSelectedRect: TRect;
 var
   I: Integer;
 begin
@@ -2442,10 +3121,10 @@ begin
   if FBorderStyle = bsSingle then
     InflateRect(Result, -GetBorder, -GetBorder);
   if Selected <> Nil then begin
-    Result.Top := Selected.DisplayRect.Bottom;
-    for I := Selected.Index + 1 to Folders.Count - 1 do
-      if Folders[I].Visible then begin
-        Result.Bottom := Folders[I].DisplayRect.Top;
+    Result.Top := Selected.AbsoluteDisplayRect.Bottom;
+    for I := Selected.Index + 1 to Entries.Count - 1 do
+      if Entries[I].Visible then begin
+        Result.Bottom := Entries[I].AbsoluteDisplayRect.Top;
         Break;
       end;
   end
@@ -2453,34 +3132,55 @@ begin
     SetRectEmpty(Result);
 end;
 
-procedure TCustomFolderView.CMDesignHitTest(var Message: TCMDesignHitTest);
+function TCustomEntryView.GetIndentLevel(const Entry: TEntryItem): Integer;
+var
+  Entries: TEntryItems;
+begin
+  Result := 0;
+  //
+  if Entry = Nil then
+    Exit;
+  //
+  Entries := Entry.ParentEntries;
+  while Entries <> Nil do begin
+    if Entries.OwnerEntry <> Nil then begin
+      Inc(Result);
+      Entries := Entries.OwnerEntry.ParentEntries;
+    end
+    else
+      Break;
+  end;
+end;
+
+procedure TCustomEntryView.CMDesignHitTest(var Message: TCMDesignHitTest);
 const
   HitTests: array[Boolean] of Integer = (0, 1);
 begin
   inherited;
   with Message do
-    Result := HitTests[FolderFromPoint(XPos, YPos) <> Nil];
+    Result := HitTests[EntryFromPoint(XPos, YPos) <> Nil];
 end;
 
-procedure TCustomFolderView.CMFontChanged(var Message: TMessage);
+procedure TCustomEntryView.CMFontChanged(var Message: TMessage);
 begin
   inherited;
   Canvas.Font := Font;
   FTextHeight := Canvas.TextHeight(' ');
-  if FFolderImages <> Nil then
-    ImagesChange(FFolderImages);
-  if FItemImages <> Nil then
-    ImagesChange(FItemImages);
+  if FEntryImages <> Nil then
+    ImagesChange(FEntryImages);
+//  if FItemImages <> Nil then
+//    ImagesChange(FItemImages);
 end;
 
-procedure TCustomFolderView.CMMouseEnter(var Message: TMessage);
+procedure TCustomEntryView.CMMouseEnter(var Message: TMessage);
 begin
   inherited;
   CaptureItem := FMouseItem;
   FMouseItem := Nil;
+  Repaint;
 end;
 
-procedure TCustomFolderView.CMMouseLeave(var Message: TMessage);
+procedure TCustomEntryView.CMMouseLeave(var Message: TMessage);
 begin
   inherited;
   if MouseCapture then
@@ -2488,56 +3188,57 @@ begin
   else
     FMouseItem := Nil;
   CaptureItem := Nil;
+  Repaint;
 end;
 
-procedure TCustomFolderView.CMFolderImages(var Message: TMessage);
+procedure TCustomEntryView.CMEntryImages(var Message: TMessage);
 begin
-	Message.Result := Integer(FFolderImages);
+	Message.Result := Integer(FEntryImages);
 end;
 
-procedure TCustomFolderView.CMItemImages(var Message: TMessage);
-begin
-	Message.Result := Integer(FItemImages);
-end;
+//procedure TCustomEntryView.CMItemImages(var Message: TMessage);
+//begin
+//	Message.Result := Integer(FItemImages);
+//end;
 
-procedure TCustomFolderView.CMItemDetails(var Message: TMessage);
+procedure TCustomEntryView.CMItemDetails(var Message: TMessage);
 var
-  Details: PFolderItemDetails;
+  Details: PEntryItemDetails;
 begin
-  Details := PFolderItemDetails(Message.WParam);
+  Details := PEntryItemDetails(Message.WParam);
   Details.BorderStyle := BorderStyle;
   Details.Selected := Selected;
   Details.ClientRect := ClientRect;
-  Details.ItemHeight := FItemHeight;
-  Details.FolderHeight := FFolderHeight;
+  Details.EntryHeight := FEntryHeight;
+  //Details.FolderHeight := FFolderHeight;
   Details.TopIndex := FTopIndex;
   //
   Message.Result := 1;
 end;
 
-procedure TCustomFolderView.CNItemClick(var Message: TMessage);
+procedure TCustomEntryView.CNItemClick(var Message: TMessage);
 begin
-  DoItemClick(TFolderItem(Message.WParam));
+  DoItemClick(TEntryItem(Message.WParam));
   Message.Result := 1;
 end;
 
-procedure TCustomFolderView.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+procedure TCustomEntryView.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
   Message.Result := 1;
 end;
 
-procedure TCustomFolderView.WMGetDlgCode(var Message: TWMGetDlgCode);
+procedure TCustomEntryView.WMGetDlgCode(var Message: TWMGetDlgCode);
 begin
   Message.Result := DLGC_WANTARROWS or DLGC_WANTCHARS;
 end;
 
-procedure TCustomFolderView.WMSize(var Message: TWMSize);
+procedure TCustomEntryView.WMSize(var Message: TWMSize);
 begin
   inherited;
   UpdateScrollRange;
 end;
 
-procedure TCustomFolderView.WMMouseWheel(var Message: TWMMouseWheel);
+procedure TCustomEntryView.WMMouseWheel(var Message: TWMMouseWheel);
 var
   Delta: Integer;
   p: TPoint;
@@ -2560,25 +3261,25 @@ begin
   inherited;
 end;
 
-procedure TCustomFolderView.WMVScroll(var Message: TWMScroll);
+procedure TCustomEntryView.WMVScroll(var Message: TWMScroll);
 begin
   case Message.ScrollCode of
     SB_BOTTOM    : SetTopIndex(GetCount - 1);
     SB_LINEDOWN  : SetTopIndex(FTopIndex + 1);
     SB_LINEUP    : SetTopIndex(FTopIndex - 1);
-    SB_PAGEDOWN  : SetTopIndex(FTopIndex + ClientHeight div FItemHeight);
-    SB_PAGEUP    : SetTopIndex(FTopIndex - ClientHeight div FItemHeight);
+    SB_PAGEDOWN  : SetTopIndex(FTopIndex + ClientHeight div FEntryHeight);
+    SB_PAGEUP    : SetTopIndex(FTopIndex - ClientHeight div FEntryHeight);
     SB_THUMBTRACK: SetTopIndex(Message.Pos);
     SB_TOP       : SetTopIndex(0);
   end;
 end;
 
-procedure TCustomFolderView.WMHScroll(var Message: TWMScroll);
+procedure TCustomEntryView.WMHScroll(var Message: TWMScroll);
 begin
   // we do not scroll left/right
 end;
 
-procedure TCustomFolderView.WMTimer(var Message: TWMTimer);
+procedure TCustomEntryView.WMTimer(var Message: TWMTimer);
 begin
 //  if FButtons = [] then begin
 //    KillTimer(Handle, 1);
@@ -2599,13 +3300,13 @@ begin
 //    KillTimer(Handle, 1);
 end;
 
-procedure TCustomFolderView.WMSetFocus(var Message: TWMSetFocus);
+procedure TCustomEntryView.WMSetFocus(var Message: TWMSetFocus);
 begin
   inherited;
   Invalidate;
 end;
 
-procedure TCustomFolderView.WMKillFocus(var Message: TWMKillFocus);
+procedure TCustomEntryView.WMKillFocus(var Message: TWMKillFocus);
 begin
   inherited;
 //  FMouseCapture := False;
