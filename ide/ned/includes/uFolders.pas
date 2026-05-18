@@ -240,6 +240,9 @@ type
     FSelectedItems: TObjectList<TEntryItem>;
     FOverlay: TPicture;
     FItemIndex: Integer;
+    FActiveColor: TColor;
+    FSelectedColor: TColor;
+    FHotColor: TColor;
     // events
     FOnChange: TNotifyEvent;
     FOnItemClick: TEntryItemEvent;
@@ -263,7 +266,11 @@ type
     procedure SetScrollIndex(Value: Integer);
     procedure SetSelected(Value: TEntryItem);
     procedure SetTopIndex(Value: Integer);
+    procedure SetActiveColor(Value: TColor);
+    procedure SetSelectedColor(Value: TColor);
+    procedure SetHotColor(Value: TColor);
   private // getters
+    procedure ComponentPropertiesChanged;
     //function GetButtonRect(Button: TFolderScrollButton): TRect;
     function GetCount: Integer;
     //function GetSelectedRect: TRect;
@@ -337,12 +344,16 @@ type
     property MultiSelect: Boolean read FMultiSelect write SetMultiSelect;
     property Selected: TEntryItem read FSelected write SetSelected;
     property TopIndex: Integer read FTopIndex write SetTopIndex;
+    property ActiveColor: TColor read FActiveColor write SetActiveColor;
+    property SelectedColor: TColor read FSelectedColor write SetSelectedColor;
+    property HotColor: TColor read FHotColor write SetHotColor;
+    // events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnItemClick: TEntryItemEvent read FOnItemClick write FOnItemClick;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-
+    //
     procedure Update; override;
     function EntryFromPoint(X, Y: Integer): TEntryItem;
   end;
@@ -353,6 +364,7 @@ type
     property EntryHeight;
   published
     property Align;
+    property ActiveColor;
     property ActiveIndex;
     property Anchors;
     property BorderStyle;
@@ -365,7 +377,9 @@ type
     property Font;
     property EntryImages;
     property Entries;
+    property HotColor;
 //    property ItemImages;
+    property MultiSelect;
     property Overlay;
     property OnItemClick;
     property ParentBiDiMode;
@@ -373,6 +387,7 @@ type
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
+    property SelectedColor;
     property TabOrder;
     property TabStop;
     property OnCanResize;
@@ -1828,6 +1843,9 @@ begin
   FOverlay.OnChange := OverlayChange;
   FChangeLink := TChangeLink.Create;
   FChangeLink.OnChange := ImagesChange;
+  FActiveColor := $0080F080; // xxBBGGRR
+  FSelectedColor := clHighlight;
+  FHotColor := $00E06464;
 end;
 
 procedure TCustomEntryView.DblClick;
@@ -2184,7 +2202,7 @@ procedure TCustomEntryView.MouseDown(Button: TMouseButton; Shift: TShiftState; X
   begin
     W := Self;
     while W <> Nil do
-      if (not W.Visible) or (not W.Enabled) then
+      if not W.Visible or not W.Enabled then
         Exit(False)
       else
         W := W.Parent;
@@ -2201,6 +2219,30 @@ begin
   if Button = mbLeft then begin
     if CanFocus then
       SetFocus;
+    Entry := EntryFromPoint(X, Y);
+    if Entry <> Nil then begin
+      if MultiSelect and (ssShift in Shift) then begin
+        // ok, now we have to check if selected Entry is on the list, if it is not, than add, else remove
+        if not ItemSelected(Entry) then // add
+          FSelectedItems.Add(Entry)
+        else // remove
+          FSelectedItems.Remove(Entry);
+        CaptureItem := Entry; // this does invalidate
+      end
+      else
+        Selected := Entry; // this does invalidate
+      Exit;
+    end;
+  end;
+end;
+
+      // capture item is used as indicator of what item was focussed
+//    CaptureItem := ItemFromPoint(X, Y);
+//    if CaptureItem <> Nil then begin
+//      Rect := CaptureItem.DisplayRect;
+//      InvalidateRect(Handle, @Rect, False);
+//    end;
+
 //    Point := GetPoint(X, Y);
 //    FMousePoint := Point(X, Y);
 //    FButtons := [];
@@ -2217,24 +2259,7 @@ begin
 //        SetTimer(Handle, 1, 125, Nil);
 //        Exit;
 //      end;
-    Entry := EntryFromPoint(X, Y);
-    if Entry <> Nil then begin
-      if MultiSelect and (ssShift in Shift) then begin
-        FSelectedItems.Add(Entry);
-        CaptureItem := Entry; // this does invalidate
-      end
-      else
-        Selected := Entry; // this does invalidate
-      Exit;
-    end;
-    // capture item is used as indicator of what item was focussed
-//    CaptureItem := ItemFromPoint(X, Y);
-//    if CaptureItem <> Nil then begin
-//      Rect := CaptureItem.DisplayRect;
-//      InvalidateRect(Handle, @Rect, False);
-//    end;
-  end;
-end;
+
 
 procedure TCustomEntryView.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
@@ -2553,7 +2578,7 @@ begin
     DrawState := [];
     if Focused then
       Include(DrawState, dsFocused);
-    if FTopIndex + I = ItemIndex then begin
+    if FTopIndex + I = ItemIndex then begin // ok, ItemIndex is not set at all, it returns -1, this is not right
       if FMultiSelect then
         Include(DrawState, dsDefaulted)
       else
@@ -2644,6 +2669,34 @@ end;
 ////    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlay.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
 //end;
 
+//  if StyleServices.Enabled then begin
+//    //Inc(DrawRect.Right, 10);
+//    if (DrawState * [dsSelected, dsHot] = [dsSelected, dsHot]) or (dsHot in DrawState) then begin
+//      ACanvas.Brush.Bitmap := CheckeredBitmap;
+//      //ACanvas.Brush.Style := bsClear;
+//      ACanvas.FillRect(DrawRect);
+//      ACanvas.Brush.Bitmap := Nil;
+//    end
+//    else if dsSelected in DrawState then
+//      StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
+//    else if dsDefaulted in DrawState then
+//      StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
+//    //Dec(DrawRect.Right, 10);
+//  end
+//  else begin
+//    DrawFrame(DC, DrawRect, dfRaised);
+//    InflateRect(DrawRect, -1, -1);
+//    if dsSelected in DrawState then begin
+//      //FillRect(DC, DrawRect, CheckeredBrush)
+//      ACanvas.Brush.Bitmap := CheckeredBitmap;
+//      ACanvas.FillRect(DrawRect);
+//      ACanvas.Brush.Bitmap := Nil;
+//    end
+//    else
+//      ACanvas.FillRect(DrawRect);
+//  end;
+  //DeleteObject(CheckeredBrush);
+
 procedure TCustomEntryView.DrawEntryItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TEntryItem);
 var
   DC: HDC;
@@ -2665,33 +2718,13 @@ begin
   // clear item background
   ACanvas.Brush.Style := bsSolid;
   ACanvas.Brush.Color := ColorToRGB(Color);
+  if (DrawState * [dsSelected, dsHot] = [dsSelected, dsHot]) or (dsHot in DrawState) then
+    ACanvas.Brush.Color := ColorToRGB(HotColor)
+  else if dsSelected in DrawState then
+    ACanvas.Brush.Color := ColorToRGB(SelectedColor)
+  else if dsDefaulted in DrawState then
+    ACanvas.Brush.Color := ColorToRGB(ActiveColor);
   ACanvas.FillRect(ARect);
-
-  if StyleServices.Enabled then begin
-    Inc(DrawRect.Right, 10);
-    if dsSelected in DrawState then
-      StyleServices.DrawElement(DC, GetDetails(thHeaderItemHot), DrawRect)
-    else if dsHot in DrawState then begin
-      //FillRect(DC, DrawRect, CheckeredBrush);
-      ACanvas.Brush.Bitmap := CheckeredBitmap;
-      ACanvas.FillRect(DrawRect);
-      ACanvas.Brush.Bitmap := Nil;
-    end;
-    Dec(DrawRect.Right, 10);
-  end
-  else begin
-    DrawFrame(DC, DrawRect, dfRaised);
-    InflateRect(DrawRect, -1, -1);
-    if dsSelected in DrawState then begin
-      //FillRect(DC, DrawRect, CheckeredBrush)
-      ACanvas.Brush.Bitmap := CheckeredBitmap;
-      ACanvas.FillRect(DrawRect);
-      ACanvas.Brush.Bitmap := Nil;
-    end
-    else
-      ACanvas.FillRect(DrawRect);
-  end;
-  //DeleteObject(CheckeredBrush);
 
   Inc(DrawRect.Left, 20 * Indent);
 
@@ -2706,7 +2739,9 @@ begin
   // draw item caption
   InflateRect(DrawRect, -1, -1);
   ACanvas.Font.Color := clWindow;
-  if dsSelected in DrawState then
+  if DrawState * [dsSelected, dsHot] = [dsSelected, dsHot] then
+    ACanvas.Font.Color := TWinControlAccess(Parent).Color
+  else if dsSelected in DrawState then
     ACanvas.Font.Color := clWindowText
   else if dsHot in DrawState then
     ACanvas.Font.Color := clCaptionText;
@@ -2778,25 +2813,29 @@ end;
 
 procedure TCustomEntryView.SetActiveIndex(Value: Integer);
 var
-  Form: TCustomForm;
+  count: Integer;
+  Entry: TEntryItem;
 begin
   FActiveIndex := Value;
   if csLoading in ComponentState then
     Exit;
+  // ok, Value can't be less than zero
   if FActiveIndex < -1 then
     FActiveIndex := -1;
-  if FActiveIndex > FEntries.Count - 1 then
-    FActiveIndex := FEntries.Count - 1;
-  if (FActiveIndex > -1) and (FEntries[FActiveIndex].Visible) then
-    FSelected := FEntries[FActiveIndex]
+  // but FEntries is a tree, so FEntries.Count is not enough to determine the number of elements
+  // so, we need to count the expanded and visible entries, each time we are going to select one
+  count := GetCount;
+  if FActiveIndex > count - 1 then
+    FActiveIndex := count - 1;
+  // here we need to use ItemFromIndex
+  Entry := ItemFromIndex(FActiveIndex);
+  if (FActiveIndex > -1) and (Entry <> Nil) and Entry.Visible then
+    Selected := Entry // route through setter, so the component can know what is selected
   else
-    FSelected := Nil;
+    Selected := Nil;
   Invalidate;
-  if csDesigning in ComponentState then begin
-    Form := GetParentForm(Self);
-    if Form <> Nil then
-      Form.Designer.Modified;
-  end;
+  // let Delphi form know, that we modified something within our component
+  ComponentPropertiesChanged;
 end;
 
 procedure TCustomEntryView.SetBorderStyle(Value: TBorderStyle);
@@ -2841,6 +2880,17 @@ end;
 //      end;
 //  end;
 //end;
+
+procedure TCustomEntryView.ComponentPropertiesChanged;
+var
+  Form: TCustomForm;
+begin
+  if csDesigning in ComponentState then begin
+    Form := GetParentForm(Self);
+    if Form <> Nil then
+      Form.Designer.Modified;
+  end;
+end;
 
   //  Root collection
   //   ├─ (0:0) - Item A - [collapsed]
@@ -3019,19 +3069,19 @@ begin
 end;
 
 procedure TCustomEntryView.SetMultiSelect(Value: Boolean);
-var
-  count: Integer;
+//var
+//  count: Integer;
 begin
   if Value <> FMultiSelect then begin
     FMultiSelect := Value;
     FSelectedItems.Clear;
-    count := GetCount;
-    if FMultiSelect and (count > 0) then begin
-//      FSelectItems.Length := FCount;
-//      if FItemIndex > -1 then
-//        FSelectItems[FItemIndex] := True;
-    end
-    else
+//    count := GetCount;
+//    if FMultiSelect and (count > 0) then begin
+////      FSelectItems.Length := FCount;
+////      if FItemIndex > -1 then
+////        FSelectItems[FItemIndex] := True;
+//    end
+//    else
       FSelectedCount := 0;
     Invalidate;
     FHotIndex := -1;
@@ -3067,9 +3117,11 @@ begin
   if Value <> FSelected then begin
     FSelected := Value;
     if FSelected = Nil then
-      FActiveIndex := -1
+      FItemIndex := -1
     else
-      FActiveIndex := FSelected.Index;
+      FItemIndex := FSelected.TreeIndex; // each visible Entry has its own index number in the tree
+    if FActiveIndex <> FItemIndex then
+      FActiveIndex := FItemIndex;
     Invalidate;
     if Assigned(FOnChange) then
       FOnChange(Self);
@@ -3110,6 +3162,33 @@ begin
         else
           FHotIndex := -1;
     end;
+  end;
+end;
+
+procedure TCustomEntryView.SetActiveColor(Value: TColor);
+begin
+  if FActiveColor <> Value then begin
+    FActiveColor := Value;
+    Repaint;
+    ComponentPropertiesChanged;
+  end;
+end;
+
+procedure TCustomEntryView.SetSelectedColor(Value: TColor);
+begin
+  if FSelectedColor <> Value then begin
+    FSelectedColor := Value;
+    Repaint;
+    ComponentPropertiesChanged;
+  end;
+end;
+
+procedure TCustomEntryView.SetHotColor(Value: TColor);
+begin
+  if FHotColor <> Value then begin
+    FHotColor := Value;
+    Repaint;
+    ComponentPropertiesChanged;
   end;
 end;
 
@@ -3175,7 +3254,7 @@ end;
 procedure TCustomEntryView.CMMouseEnter(var Message: TMessage);
 begin
   inherited;
-  CaptureItem := FMouseItem;
+//  CaptureItem := FMouseItem;
   FMouseItem := Nil;
   Repaint;
 end;
@@ -3187,7 +3266,7 @@ begin
     FMouseItem := CaptureItem
   else
     FMouseItem := Nil;
-  CaptureItem := Nil;
+//  CaptureItem := Nil;
   Repaint;
 end;
 

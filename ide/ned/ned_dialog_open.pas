@@ -407,6 +407,8 @@ begin
     FreeItemIDList(IDL);
   end;
   FolderView.ActiveIndex := 0;
+  if FolderView.Selected <> Nil then
+    FolderView.Selected.Expand;
 end;
 
 procedure TNEDDialogOpen.ListDirs(const Folders: TEntryItems);
@@ -647,12 +649,22 @@ begin
       //
       FMainForm.OverlayType := otTransparent;
       //
+      FolderView.ActiveColor := SelectAccentColor(GetCommonThemeManager, FolderView.ActiveColor);
+      FolderView.SelectedColor := FolderView.ActiveColor;
+      FilesView.ActiveColor := FolderView.ActiveColor;
+      FilesView.SelectedColor := FolderView.ActiveColor;
+      //FolderView.MultiSelect := True;
+      //
       FolderView.Show;
+      FilesView.Show;
       Application.ProcessMessages;
     finally
       FMainForm.EnableAlign;
       Application.ProcessMessages;
     end;
+    //
+    // it would be good to show FolderView first entry as expanded - done
+    //
     try
       Self.Show;
       Self.BringToFront;
