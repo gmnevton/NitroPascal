@@ -75,6 +75,8 @@ type
     function GetPathFromPIDL(const IDL: PItemIDList): String;
     function GetPIDLFromPath(const Path: String): PItemIDList;
     function GetDirFromSpecialFolder(const Folder: Integer): String;
+    procedure TrySelectMatchingFolder;
+    procedure FolderChanged(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -92,6 +94,7 @@ uses
   Types,
   Graphics,
   ActiveX,
+  StrUtils,
   UCL.FormOverlay;
 
 //type
@@ -231,6 +234,7 @@ begin
   FolderView.EntryImages := ImageList1;
   //FolderView.ItemImages := ImageList1;
   FolderView.TabStop := True;
+  FolderView.OnChange := FolderChanged;
 //  FolderView.Show;
   //
   FilesView := TEntryView.Create(Self);
@@ -382,7 +386,7 @@ procedure TNEDDialogOpen.GetFolders;
 var
   Parent: IShellFolder;
   Root: IShellFolder;
-  IDL: PItemIDList;
+  IDL, CloneIDL: PItemIDList;
   Attr: Cardinal;
   Folder: TEntryItem;
   temp: String;
@@ -397,6 +401,8 @@ begin
       temp := GetShellItemName(Parent, IDL, SHGDN_NORMAL);
       Folder := FolderView.Entries.Add;
       Folder.Caption := temp;
+      CloneIDL := ILClone(IDL);
+      Folder.Data := CloneIDL;
       GetFolderIcon(IDL, Folder);
       GetChildren(Root, IDL, Folder);
         //
@@ -461,10 +467,15 @@ end;
 
 procedure TNEDDialogOpen.GetFilesList;
 begin
-  FilesView.Entries.Clear;
-  ListDirs(FilesView.Entries);
-  ListFiles(FilesView.Entries);
-  FilesView.ActiveIndex := 0;
+  FilesView.BeginUpdate;
+  try
+    FilesView.Clear;
+    ListDirs(FilesView.Entries);
+    ListFiles(FilesView.Entries);
+  finally
+    FilesView.EndUpdate;
+    FilesView.ActiveIndex := 0;
+  end;
 end;
 
 procedure TNEDDialogOpen.GetFolderIcon(const IDL: PItemIDList; Item: TEntryItem);
@@ -519,6 +530,51 @@ begin
   SetLength(Result, StrLen(PChar(Result)));
   Result := IncludeTrailingPathDelimiter(Result);
   FreeItemIDList(SpecialDirIDL);
+end;
+
+procedure TNEDDialogOpen.TrySelectMatchingFolder;
+var
+  Item: TEntryItem;
+  IDL: PItemIDList;
+  LPath, LLastPath: String;
+  Idx: Integer;
+begin
+  Idx := -1;
+  LPath := '';
+  LLastPath := '';
+  Item := FolderView.GetFirstEntry;
+  while Item <> Nil do begin
+    IDL := Item.Data;
+    LPath := GetPathFromPIDL(IDL);
+    if (Length(LPath) > 0) and StartsText(LPath, FPath) and (Item.TreeIndex > -1) and (Length(LPath) > Length(LLastPath)) then begin
+      LLastPath := LPath;
+      Idx := Item.TreeIndex;
+    end;
+    Item := FolderView.GetNextEntry(Item);
+  end;
+  if Idx > -1 then
+    FolderView.ActiveIndex := Idx;
+  LPath := '';
+  LLastPath := '';
+end;
+
+procedure TNEDDialogOpen.FolderChanged(Sender: TObject);
+var
+  Item: TEntryItem;
+  IDL: PItemIDList;
+  LPath: String;
+begin
+  LPath := '';
+  Item := FolderView.Selected;
+  if Item <> Nil then begin
+    IDL := Item.Data;
+    LPath := GetPathFromPIDL(IDL);
+    if Length(LPath) > 0 then begin
+      FPath := LPath;
+      txtPath.Caption := FPath;
+      GetFilesList;
+    end;
+  end;
 end;
 
 procedure TNEDDialogOpen.GetChildren(ShellFolder: IShellFolder; const IDL: PItemIDList; Entry: TEntryItem);
@@ -646,6 +702,8 @@ begin
       //
       txtPath.Caption := FPath;
       GetFilesList;
+      //
+      TrySelectMatchingFolder;
       //
       FMainForm.OverlayType := otTransparent;
       //

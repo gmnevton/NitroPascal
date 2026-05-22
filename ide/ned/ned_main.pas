@@ -322,6 +322,7 @@ procedure TNEDMainForm.btnHomeClick(Sender: TObject);
 var
   open: TNEDDialogOpen;
 begin
+  btnHome.Enabled := False;
   open := TNEDDialogOpen.Create(Application);
   FModalForm := open;
   try
@@ -330,6 +331,7 @@ begin
     end;
   finally
     FModalForm := Nil;
+    btnHome.Enabled := True;
     open.Free;
   end;
 end;

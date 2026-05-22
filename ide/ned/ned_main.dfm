@@ -446,7 +446,7 @@ object NEDMainForm: TNEDMainForm
       Left = 8
       Top = 4
       Width = 44
-      Height = 24
+      Height = 17
       Margins.Left = 8
       Margins.Top = 4
       Margins.Right = 0
@@ -460,7 +460,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
       Left = 52
@@ -476,7 +475,7 @@ object NEDMainForm: TNEDMainForm
       Left = 72
       Top = 4
       Width = 34
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -490,7 +489,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
       Left = 106
@@ -504,7 +502,7 @@ object NEDMainForm: TNEDMainForm
       Left = 126
       Top = 4
       Width = 28
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -518,7 +516,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
       Left = 154
@@ -533,7 +530,7 @@ object NEDMainForm: TNEDMainForm
       Left = 174
       Top = 4
       Width = 32
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -547,7 +544,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
       Left = 206
@@ -561,7 +557,7 @@ object NEDMainForm: TNEDMainForm
       Left = 226
       Top = 4
       Width = 118
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -575,7 +571,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
       Left = 344
@@ -591,7 +586,7 @@ object NEDMainForm: TNEDMainForm
       Left = 364
       Top = 4
       Width = 15
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -606,7 +601,6 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
-      ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
       Left = 578

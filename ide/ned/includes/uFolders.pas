@@ -354,7 +354,18 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     //
+    procedure Clear;
+    procedure BeginUpdate;
+    procedure EndUpdate;
     procedure Update; override;
+    function GetFirstEntry: TEntryItem; // inline;
+    function GetLastEntry: TEntryItem; // inline;
+    function GetPrevEntry(Entry: TEntryItem): TEntryItem; // inline;
+    function GetNextEntry(Entry: TEntryItem): TEntryItem; // inline;
+    function GetFirstEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetLastEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetPrevEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
+    function GetNextEntrySibling(const Entry: TEntryItem): TEntryItem; // inline;
     function EntryFromPoint(X, Y: Integer): TEntryItem;
   end;
 
@@ -1164,23 +1175,35 @@ var
   View: TCustomEntryView;
   TopIndex,
   ItemIndex: Integer;
-  EntryItemDetails: TEntryItemDetails;
+  ControlDetails: TEntryItemDetails;
   VisibleIndex: Integer;
   I: Integer;
   Item: TEntryItem;
 begin
+  if Collection = Nil then begin
+    SetRectEmpty(Result);
+    Exit;
+  end;
   // this is getting parent render control info for us, to know what are the parameters to use while calculating entry position
   View := TCustomEntryView((Collection as TEntryItems).Control);
-  if View.Perform(CM_ITEMDETAILS, Integer(@EntryItemDetails), 0) = 0 then begin // technically not possible, but ... to be sure
+  if View.Perform(CM_ITEMDETAILS, Integer(@ControlDetails), 0) = 0 then begin // technically not possible, but ... to be sure
     SetRectEmpty(Result);
     Exit;
   end;
   //
   //Result := ParentEntries.DisplayRect(Self); // this calculates absolute position ??? why ???
-  Result.Top := EntryItemDetails.EntryHeight * (FIndex - IfThen(AbsoluteOrRelative = epRelative, EntryItemDetails.TopIndex, 0));
-  Result.Left := EntryItemDetails.ClientRect.Left;
-  Result.Bottom := Result.Top + EntryItemDetails.EntryHeight;
-  Result.Right := EntryItemDetails.ClientRect.Right;
+  Result.Top := ControlDetails.EntryHeight * (FIndex - IfThen(AbsoluteOrRelative = epRelative, ControlDetails.TopIndex, 0));
+  Result.Left := ControlDetails.ClientRect.Left;
+  Result.Bottom := Result.Top + ControlDetails.EntryHeight;
+  Result.Right := ControlDetails.ClientRect.Right;
+  // correct for borders
+  if ControlDetails.BorderStyle = bsSingle then begin
+    InflateRect(Result, -GetBorder, 0);
+    if (ControlDetails.Selected <> Nil) and (Self.TreeIndex > ControlDetails.Selected.TreeIndex) then
+      OffsetRect(Result, 0, -GetBorder)
+    else
+      OffsetRect(Result, 0, GetBorder);
+  end;
 end;
 
 function TEntryItem.AbsoluteDisplayRect: TRect;
@@ -2317,9 +2340,102 @@ begin
   end;
 end;
 
+procedure TCustomEntryView.Clear;
+begin
+  FActiveIndex := -1;
+  FCaptureItem := Nil;
+  FHotIndex := -1;
+  FMouseItem := Nil;
+  FSelected := Nil;
+  FSelectedItems.Clear;
+  FItemIndex := -1;
+  FTopIndex := 0;
+  FShiftIndex := -1;
+  //
+  Entries.Clear;
+end;
+
+procedure TCustomEntryView.BeginUpdate;
+begin
+  Entries.BeginUpdate;
+end;
+
+procedure TCustomEntryView.EndUpdate;
+begin
+  Entries.EndUpdate;
+end;
+
 procedure TCustomEntryView.Update;
 begin
   ActiveIndex := FActiveIndex;
+end;
+
+function TCustomEntryView.GetFirstEntry: TEntryItem;
+begin
+  Result := Nil;
+  if Entries.Count > 0 then
+    Result := Entries.Items[0];
+end;
+
+function TCustomEntryView.GetLastEntry: TEntryItem;
+begin
+  Result := Nil;
+  if Entries.Count > 0 then
+    Result := Entries.GetLastEntry(Entries.Items[Entries.Count - 1]);
+end;
+
+function TCustomEntryView.GetPrevEntry(Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  Result := Entries.GetPrevEntry(Entry);
+end;
+
+function TCustomEntryView.GetNextEntry(Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  Result := Entries.GetNextEntry(Entry);
+end;
+
+function TCustomEntryView.GetFirstEntrySibling(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  Result := Entries.GetFirstEntrySibling(Entry);
+end;
+
+function TCustomEntryView.GetLastEntrySibling(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  Result := Entries.GetLastEntrySibling(Entry);
+end;
+
+function TCustomEntryView.GetPrevEntrySibling(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  Result := Entries.GetPrevEntrySibling(Entry);
+end;
+
+function TCustomEntryView.GetNextEntrySibling(const Entry: TEntryItem): TEntryItem;
+begin
+  Result := Nil;
+  if Entry = Nil then
+    Exit;
+
+  Result := Entries.GetNextEntrySibling(Entry);
 end;
 
 procedure TCustomEntryView.UpdateImages(var InternalImages: TCustomImageList;
