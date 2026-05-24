@@ -12,21 +12,21 @@
   
   - [x] Implement UpDirectory push button event
   
-  - [ ] Fix list drawing when list is focused
+  - [x] Fix list drawing when list is focused
   
-  - [ ] Fix list drawing when list is not focused
+  - [x] Fix list drawing when list is not focused
   
-  - [ ] Fix list scrolling by keyboard
+  - [x] Fix list scrolling by keyboard
   
-  - [ ] Fix OnMouseEnter / OnMouseLeave events
+  - [x] Fix OnMouseEnter / OnMouseLeave events
   
-  - [ ] Implement hide selection feature
+  - [ ] Implement hide selection feature (later)
   
-  - [ ] Speed up lists loading
+  - [ ] Speed up lists loading (later)
   
   - [x] Speed up lists scrolling
   
-  - [ ] Custom paint scrollbar
+  - [ ] Custom paint scrollbar (in progress)
   
   - [ ] Implement smooth scroll
   

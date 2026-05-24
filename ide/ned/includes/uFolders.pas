@@ -217,6 +217,68 @@ type
 //    property Control: TControl read FControl;
 //  end;
 
+{ TCustomScrollBar }
+
+// we successfully hidden native scrollbars, so now we have to draw our own, using this component bellow, we place it above Entries
+// this will allow us to receive OS events directly, so mouse enter/leave, mouse move, clicks and potentially gestures are to handle
+// but need to keep small steps, one after another, so handle basics first
+
+  TCustomScrollBarThumbButtonEnum = (tbTop, tbScroll, tbBottom);
+
+  TCustomScrollBar = class(TCustomControl)
+  private
+//    FMin: Integer;
+//    FMax: Integer;
+    FRange: Integer; // total content size
+    FPageSize: Integer; // visible size
+    FPosition: Integer; // current offset
+    FScrollBarKind: TScrollBarKind;
+    // colors
+    FThumbButtonColorInactive: TColor;
+    FThumbButtonColorActive: TColor;
+    FThumbButtonColorPressed: TColor;
+    //
+    FScrollColorInactive: TColor;
+    FScrollColorActive: TColor;
+    FScrollColorPressed: TColor;
+  private
+    procedure SetRange(const Value: Integer);
+    procedure SetPageSize(const Value: Integer);
+    procedure SetPosition(const Value: Integer);
+    function GetMaxPosition: Integer;
+    // messages
+    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
+    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
+  protected
+    function  CalculateThumbRect(const Button: TCustomScrollBarThumbButtonEnum): TRect;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    procedure Paint; override;
+    procedure DrawBackground(const ACanvas: TCanvas; var ARect: TRect); virtual;
+    procedure DrawButtons(const ACanvas: TCanvas; const ARect: TRect); virtual;
+  public
+    constructor Create(AOwner: TComponent; AKind: TScrollBarKind); reintroduce;
+    destructor Destroy; override;
+    // methods
+    procedure SetSize(const ARange, APageSize: Integer);
+    // properties
+    property Range: Integer read FRange write SetRange;
+    property PageSize: Integer read FPageSize write SetPageSize;
+    property Position: Integer read FPosition write SetPosition;
+    property MaxPosition: Integer read GetMaxPosition;
+  end;
+
+  TEntryViewScrollBar = class(TCustomScrollBar)
+  public
+  published
+  end;
+
+// i have to go, so for now this is not finished, but i come back to this custom drawn scrollbar probably in the next stream
+// there was good background work done, so now it is a matter of finding of what is going on, debugging and fixing stuff
+// until it starts to work as intended
+
 { TCustomEntryView }
 
   TEntryItemEvent = procedure (Sender: TObject; Item: TEntryItem) of object;
@@ -242,7 +304,7 @@ type
     FSelectedCount: Integer;
     FSelected: TEntryItem;
     FSelectedItems: TObjectList<TEntryItem>;
-    FOverlay: TPicture;
+    FOverlayPicture: TPicture;
     FItemIndex: Integer;
     FActiveColor: TColor;
     FSelectedColor: TColor;
@@ -261,6 +323,7 @@ type
     FShiftIndex: Integer;
     FEntriesCount: Integer;
     FVisibleEntriesCount: Integer;
+    FVerticalScrollBar: TEntryViewScrollBar;
   private // setters
     procedure SetActiveIndex(Value: Integer);
     procedure SetBorderStyle(Value: TBorderStyle);
@@ -270,7 +333,7 @@ type
     procedure SetEntries(Value: TEntryItems);
     procedure SetItemIndex(Value: Integer);
     procedure SetMultiSelect(Value: Boolean);
-    procedure SetOverlay(Value: TPicture);
+    procedure SetOverlayPicture(Value: TPicture);
     procedure SetScrollIndex(Value: Integer);
     procedure SetSelected(Value: TEntryItem);
     procedure SetTopIndex(Value: Integer);
@@ -286,7 +349,11 @@ type
     //function GetSelectedRect: TRect;
     //function GetButtonRect(Button: TFolderScrollButton): TRect;
     function GetSelectedRect: TRect;
-    function GetIndentLevel(const Entry: TEntryItem): Integer; // inline;
+    //function GetIndentLevel(const Entry: TEntryItem): Integer; // inline;
+    function CanShowScrollBar: Boolean;
+    procedure UpdateModernScrollBar;
+    procedure ShowModernScrollBar;
+    procedure HideModernScrollBar;
   private // internal methods
     procedure ImagesChange(Sender: TObject);
     procedure OverlayChange(Sender: TObject);
@@ -308,7 +375,9 @@ type
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
     procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+    procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
   protected
+    procedure CreateParams(var Params: TCreateParams); override;
     procedure CreateHandle; override;
     procedure DoItemClick(Item: TEntryItem); dynamic;
     procedure EnsureItemVisible;
@@ -334,6 +403,7 @@ type
     procedure DrawEntryItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TEntryItem);
     procedure SelectItem(PriorIndex: Integer; NewIndex: Integer; var CanSelect: Boolean); virtual;
     procedure UpdateImages(var InternalImages: TCustomImageList; ExternalImages: TCustomImageList);
+    procedure HideNativeScrollBars;
     procedure UpdateScrollRange;
     procedure InvalidateItem(Item: Integer);
     procedure ScrollToSelection;
@@ -346,7 +416,7 @@ type
     property CaptureItem: TEntryItem read FCaptureItem write SetCaptureItem;
     property EntryHeight: Integer read FEntryHeight write SetEntryHeight;
     property EntryImages: TCustomImageList read FEntryImages write SetEntryImages;
-    property Overlay: TPicture read FOverlay write SetOverlay;
+    property OverlayPicture: TPicture read FOverlayPicture write SetOverlayPicture;
     property Entries: TEntryItems read FEntries write SetEntries;
 //    property ItemImages: TCustomImageList read FItemImages write SetItemImages;
     property ItemIndex: Integer read FItemIndex write SetItemIndex;
@@ -407,7 +477,7 @@ type
     property HotColor;
 //    property ItemImages;
     property MultiSelect;
-    property Overlay;
+    property OverlayPicture;
     property ParentBiDiMode;
     property ParentColor;
     property ParentFont;
@@ -440,6 +510,7 @@ type
 implementation
 
 uses
+  Math,
   Themes,
   UXTheme;
 
@@ -1086,6 +1157,34 @@ begin
       for Row := 0 to Height - 1 do
         Canvas.Pixels[Col, Row] := PixelColors[Odd(Col + Row)];
     HandleType := bmDDB;
+  end;
+end;
+
+procedure DrawBorder(const Canvas: TCanvas; R: TRect; Color: TColor; Thickness: Integer; const Overlay: Boolean = False);
+var
+  TL, BR: Byte;
+  spm: TPenMode;
+begin
+  if Thickness > 0 then begin
+    TL := Thickness div 2;
+    if Thickness mod 2 = 0 then
+      BR := TL - 1
+    else
+      BR := TL;
+
+    Canvas.Pen.Color := Color;
+    Canvas.Pen.Width := Thickness;
+    spm:=pmBlack; // satisfy compiler
+    if Overlay then begin
+      spm:=Canvas.Pen.Mode; // remember old state
+      Canvas.Pen.Mode:=pmXor;
+    end;
+    //
+    // for this rectangle the coordinates are relative to top/left, but for windows it doesn't matter, it draws backwards if it must
+    Canvas.Rectangle(Rect(R.Left, R.Top, R.Left + R.Width - BR, R.Top + R.Height - BR));
+    //
+    if Overlay then
+      Canvas.Pen.Mode:=spm; // restore old state
   end;
 end;
 
@@ -1854,6 +1953,214 @@ end;
 //  SetItem(Index, Value);
 //end;
 
+{ TCustomScrollBar }
+
+constructor TCustomScrollBar.Create(AOwner: TComponent; AKind: TScrollBarKind);
+begin
+  inherited Create(AOwner);
+  // inherited properties first
+{$IF CompilerVersion > 29}
+  StyleElements :=[];
+{$IFEND}
+  BevelEdges := [];
+  BevelOuter := bvNone;
+  BevelInner := bvNone;
+//  FullRepaint := False;
+  DoubleBuffered := True;
+  ParentBackground := False;
+  ParentColor := False;
+  //
+  Visible := False;
+
+  // our properties
+  FRange := -1;
+  FPageSize := -1;
+  FPosition := -1;
+  FScrollBarKind := AKind;
+  //
+  FThumbButtonColorInactive := clNone;
+  FThumbButtonColorActive   := clNone;
+  FThumbButtonColorPressed  := clNone;
+  //
+  FScrollColorInactive := $00202020; // xxBBGGRR
+  FScrollColorActive   := $00404040;
+  FScrollColorPressed  := $00808080;
+end;
+
+destructor TCustomScrollBar.Destroy;
+begin
+
+  inherited;
+end;
+
+procedure TCustomScrollBar.SetRange(const Value: Integer);
+begin
+  if Value <= 0 then
+    Exit;
+  //
+  if FRange <> Value then begin
+    FRange := Value;
+
+    // Clamp current position
+    FPosition := EnsureRange(FPosition, 0, GetMaxPosition);
+
+    Invalidate;
+  end;
+end;
+
+procedure TCustomScrollBar.SetPageSize(const Value: Integer);
+begin
+  if FPageSize <> Value then begin
+    FPageSize := Value;
+
+    // Clamp current position
+    FPosition := EnsureRange(FPosition, 0, GetMaxPosition);
+
+    Invalidate;
+  end;
+end;
+
+procedure TCustomScrollBar.SetPosition(const Value: Integer);
+var
+  NewPos: Integer;
+begin
+  NewPos := EnsureRange(Value, 0, GetMaxPosition);
+
+  if FPosition <> NewPos then begin
+    FPosition := NewPos;
+
+    Invalidate;
+
+    // optional:
+    // if Assigned(FOnScroll) then
+    //   FOnScroll(Self, FPosition);
+  end;
+end;
+
+function TCustomScrollBar.GetMaxPosition: Integer;
+begin
+  Result := FRange - FPageSize;
+
+  if Result < 0 then
+    Result := 0;
+end;
+
+procedure TCustomScrollBar.SetSize(const ARange, APageSize: Integer);
+begin
+  if ARange <= 0 then
+    Exit;
+  FRange := ARange;
+  FPageSize := APageSize;
+  //
+  Invalidate;
+end;
+
+procedure TCustomScrollBar.CMMouseEnter(var Message: TMessage);
+begin
+  inherited;
+  if not Visible then
+    Show;
+  Repaint; // ???
+end;
+
+procedure TCustomScrollBar.CMMouseLeave(var Message: TMessage);
+begin
+  inherited;
+  if Visible then
+    Hide;
+  Repaint;
+end;
+
+procedure TCustomScrollBar.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+begin
+//  Message.Result := 1;
+end;
+
+procedure TCustomScrollBar.WMNCHitTest(var Msg: TWMNCHitTest);
+//var
+//  P: TPoint;
+//  R: TRect;
+begin
+  inherited;
+  // this should make entire control transparent when mouse clicking
+  Msg.Result := HTTRANSPARENT;
+end;
+
+function TCustomScrollBar.CalculateThumbRect(const Button: TCustomScrollBarThumbButtonEnum): TRect;
+var
+  TrackHeight: Integer;
+  ThumbHeight: Integer;
+  ThumbTop: Integer;
+begin
+  case Button of
+    tbTop   : Result := Rect(0, 0, ClientWidth, 16);
+    tbScroll: begin
+      if FPageSize >= FRange then begin
+        ThumbTop := 0;
+        TrackHeight := ClientHeight - 32;
+        ThumbHeight := ClientHeight;
+      end
+      else begin
+        ThumbHeight  := MulDiv(ClientHeight, FPageSize, FRange);
+        TrackHeight := ClientHeight - ThumbHeight;
+        ThumbTop := MulDiv(TrackHeight, FPosition, GetMaxPosition);
+      end;
+//      ThumbSize := Round(ControlSize * ControlSize / SB.Range);
+//      ThumbPos := Round(ControlSize * SB.Position / SB.Range);
+      Result := Rect(0, ThumbTop, ClientWidth, ThumbTop + TrackHeight);
+    end;
+    tbBottom: Result := Rect(0, ClientHeight - 15, ClientWidth, ClientHeight);
+  end;
+end;
+
+procedure TCustomScrollBar.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  inherited;
+
+end;
+
+procedure TCustomScrollBar.MouseMove(Shift: TShiftState; X, Y: Integer);
+begin
+  inherited;
+
+end;
+
+procedure TCustomScrollBar.Paint;
+var
+  Rect: TRect;
+begin
+  Rect := ClientRect;
+  DrawBackground(Canvas, Rect); // clear background
+  DrawButtons(Canvas, Rect); //draw buttons
+end;
+
+procedure TCustomScrollBar.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
+begin
+  // do we really want to paint background ??? how about transparent control
+  Canvas.Brush.Color := clGray;
+  Canvas.FillRect(ClientRect);
+end;
+
+procedure TCustomScrollBar.DrawButtons(const ACanvas: TCanvas; const ARect: TRect);
+var
+  ThumbRect: TRect;
+begin
+  // paint top thumb
+  ThumbRect := CalculateThumbRect(tbTop);
+  Canvas.Brush.Color := clGray;
+  Canvas.FillRect(ThumbRect);
+
+  // paint scroll
+  ThumbRect := CalculateThumbRect(tbScroll);
+  Canvas.Brush.Color := clGray;
+  Canvas.FillRect(ThumbRect);
+
+  // paint bottom thumb
+  ThumbRect := CalculateThumbRect(tbBottom);
+  Canvas.Brush.Color := clGray;
+  Canvas.FillRect(ThumbRect);
+end;
+
 { TCustomEntryView }
 
 constructor TCustomEntryView.Create(AOwner: TComponent);
@@ -1888,13 +2195,32 @@ begin
   FEntriesCount := 0;
   FVisibleEntriesCount := 0;
   //
-  FOverlay := TPicture.Create;
-  FOverlay.OnChange := OverlayChange;
+  FOverlayPicture := TPicture.Create;
+  FOverlayPicture.OnChange := OverlayChange;
   FChangeLink := TChangeLink.Create;
   FChangeLink.OnChange := ImagesChange;
   FActiveColor := $0080F080; // xxBBGGRR
   FSelectedColor := clHighlight;
   FHotColor := $00E06464;
+  //
+  FVerticalScrollBar := TEntryViewScrollBar.Create(Self, sbVertical);
+  FVerticalScrollBar.Parent := Self;
+  FVerticalScrollBar.Width := 16;
+  FVerticalScrollBar.Align := alRight;
+end;
+
+destructor TCustomEntryView.Destroy;
+begin
+  UpdateImages(FEntryImages, Nil);
+  FSelectedItems.Clear; // explicit
+  FSelectedItems.Free;
+  FEntries.Free;
+  FChangeLink.OnChange := Nil;
+  FChangeLink.Free;
+  FOverlayPicture.OnChange := Nil;
+  FOverlayPicture.Free;
+  FVerticalScrollBar.Free;
+  inherited Destroy;
 end;
 
 procedure TCustomEntryView.DblClick;
@@ -1936,19 +2262,6 @@ begin
     end;
   end;
   inherited;
-end;
-
-destructor TCustomEntryView.Destroy;
-begin
-  UpdateImages(FEntryImages, Nil);
-  FSelectedItems.Clear; // explicit
-  FSelectedItems.Free;
-  FEntries.Free;
-  FChangeLink.OnChange := Nil;
-  FChangeLink.Free;
-  FOverlay.OnChange := Nil;
-  FOverlay.Free;
-  inherited Destroy;
 end;
 
 procedure TCustomEntryView.ImagesChange(Sender: TObject);
@@ -1993,6 +2306,14 @@ begin
   end;
 end;
 
+procedure TCustomEntryView.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  // remove OS (windows) painted scrollbars
+  // after this we need our own scrollbar component, that will paint them as we want, so with a little help form non-human this task will be faster
+  Params.WindowClass.style := Params.WindowClass.style and not (CS_HREDRAW or CS_VREDRAW);
+end;
+
 procedure TCustomEntryView.CreateHandle;
 begin
   inherited CreateHandle;
@@ -2010,8 +2331,11 @@ end;
 
 procedure TCustomEntryView.EnsureItemVisible;
 begin
-  if (ItemIndex < 0) or (TopIndex >= ItemIndex) then
-    Exit;
+//  if (ItemIndex < 0) or (TopIndex >= ItemIndex) then
+//    Exit;
+  if ItemRect(ItemIndex).Top < 0 then begin
+    TopIndex := ItemIndex - Abs(ItemRect(ItemIndex).Top) div FEntryHeight + 1;
+  end;
   if ItemRect(ItemIndex).Bottom > ClientHeight then begin
     TopIndex := ItemIndex - ClientHeight div FEntryHeight + 1;
   end;
@@ -2231,8 +2555,11 @@ begin
 end;
 
 function TCustomEntryView.ItemRect(Item: Integer): TRect;
+var
+  Top: Integer;
 begin
-  Result := Rect(0, (Item - FTopIndex) * FEntryHeight, ClientWidth, FEntryHeight);
+  Top := (Item - FTopIndex) * FEntryHeight;
+  Result := Rect(0, Top, ClientWidth, Top + FEntryHeight);
 end;
 
 procedure TCustomEntryView.KeyDown(var Key: Word; Shift: TShiftState);
@@ -2246,13 +2573,13 @@ begin
     VK_LEFT,
     VK_RIGHT: Key := 0;
     VK_UP: begin
-      if (Selected <> Nil) and (Selected.Index > 0) then
-        Selected := FEntries[Selected.Index - 1];
+      if (Selected <> Nil) and (Selected.TreeIndex > 0) then
+        Selected := ItemFromIndex(Selected.TreeIndex - 1);
       Key := 0;
     end;
     VK_DOWN: begin
-      if (Selected <> Nil) and (Selected.Index < VisibleEntriesCount - 1) then
-        Selected := FEntries[Selected.Index + 1];
+      if (Selected <> Nil) and (Selected.TreeIndex < VisibleEntriesCount - 1) then
+        Selected := ItemFromIndex(Selected.TreeIndex + 1);
       Key := 0;
     end;
   end;
@@ -2334,6 +2661,8 @@ end;
 
 procedure TCustomEntryView.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
+  HideNativeScrollBars;
+  ShowModernScrollBar;
   inherited MouseMove(Shift, X, Y);
   if not MouseCapture then begin
     CaptureItem := ItemFromPoint(X, Y);
@@ -2501,6 +2830,11 @@ begin
   Invalidate;
 end;
 
+procedure TCustomEntryView.HideNativeScrollBars;
+begin
+  FlatSB_ShowScrollBar(Handle, SB_BOTH, False);
+end;
+
 procedure TCustomEntryView.UpdateScrollRange;
 var
   ScrollInfo: TScrollInfo;
@@ -2533,8 +2867,8 @@ end;
 
 procedure TCustomEntryView.OverlayChange(Sender: TObject);
 begin
-  FOverlay.Bitmap.Transparent := True;
-  FOverlay.Bitmap.TransparentMode := tmAuto;
+  FOverlayPicture.Bitmap.Transparent := True;
+  FOverlayPicture.Bitmap.TransparentMode := tmAuto;
   Invalidate;
 end;
 
@@ -2567,8 +2901,6 @@ procedure TCustomEntryView.Paint;
 var
   Rect: TRect;
 begin
-  inherited Paint;
-  //
   Rect := ClientRect;
   DrawBackground(Canvas, Rect); // clear background
   DrawItems(Canvas, Rect); //draw items
@@ -2641,8 +2973,8 @@ end;
 //      if (FItemImages <> Nil) and (Item.ImageIndex > -1) then begin
 //        ImageList_DrawEx(FItemImages.Handle, Item.ImageIndex, DC, Point.X, Point.Y, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
 //        Inc(DrawRect.Left, Point.X + FItemImages.Width);
-//        if not Item.Enabled and (FOverlay.Height > 0) then
-//          Canvas.Draw(DrawRect.Left + (DrawRect.Right - DrawRect.Left - FOverlay.Width) div 2 - FTextHeight div 4, Top + (DrawRect.Bottom - DrawRect.Top - FOverlay.Height) div 2 - FTextHeight div 2, FOverlay.Bitmap);
+//        if not Item.Enabled and (FOverlayPicture.Height > 0) then
+//          Canvas.Draw(DrawRect.Left + (DrawRect.Right - DrawRect.Left - FOverlayPicture.Width) div 2 - FTextHeight div 4, Top + (DrawRect.Bottom - DrawRect.Top - FOverlayPicture.Height) div 2 - FTextHeight div 2, FOverlayPicture.Bitmap);
 //      end;
 //      SetTextColor(DC, GetTextColor(Color));
 //      SetBkMode(DC, TRANSPARENT);
@@ -2740,7 +3072,7 @@ begin
     //
     // set render state
     DrawState := [];
-    if Focused then
+    if Focused and (FTopIndex + I = ItemIndex) then // draw focused only Entry that is active
       Include(DrawState, dsFocused);
     if FTopIndex + I = ItemIndex then begin // ok, ItemIndex is not set at all, it returns -1, this is not right
       if FMultiSelect then
@@ -2829,8 +3161,8 @@ end;
 ////    Dec(DrawRect.Left, FFolderImages.Width + 2);
 //////  DrawRect := Folder.DisplayRect;
 //////    SelectClipRect(DC, DrawRect, RGN_DIFF);
-////  if FOverlay <> Nil then
-////    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlay.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
+////  if FOverlayPicture <> Nil then
+////    BitBlt(DC, DrawRect.Left, DrawRect.Bottom, DrawRect.Width, DrawRect.Height, FOverlayPicture.Bitmap.Canvas.Handle, 0, 0, SRCCOPY);
 //end;
 
 //  if StyleServices.Enabled then begin
@@ -2889,6 +3221,10 @@ begin
   else if dsDefaulted in DrawState then
     ACanvas.Brush.Color := ColorToRGB(ActiveColor);
   ACanvas.FillRect(ARect);
+
+  // if focused
+  if not (csLoading in ComponentState) and (dsFocused in DrawState) then
+    DrawBorder(ACanvas, ARect, clWhite, 2); // @TODO: fix overlay mode
 
   Inc(DrawRect.Left, 20 * Indent);
 
@@ -3275,9 +3611,9 @@ begin
   end;
 end;
 
-procedure TCustomEntryView.SetOverlay(Value: TPicture);
+procedure TCustomEntryView.SetOverlayPicture(Value: TPicture);
 begin
-  FOverlay.Assign(Value);
+  FOverlayPicture.Assign(Value);
   Invalidate;
 end;
 
@@ -3397,24 +3733,67 @@ begin
     SetRectEmpty(Result);
 end;
 
-function TCustomEntryView.GetIndentLevel(const Entry: TEntryItem): Integer;
+//function TCustomEntryView.GetIndentLevel(const Entry: TEntryItem): Integer;
+//var
+//  Entries: TEntryItems;
+//begin
+//  Result := 0;
+//  //
+//  if Entry = Nil then
+//    Exit;
+//  //
+//  Entries := Entry.ParentEntries;
+//  while Entries <> Nil do begin
+//    if Entries.OwnerEntry <> Nil then begin
+//      Inc(Result);
+//      Entries := Entries.OwnerEntry.ParentEntries;
+//    end
+//    else
+//      Break;
+//  end;
+//end;
+
+function TCustomEntryView.CanShowScrollBar: Boolean;
 var
-  Entries: TEntryItems;
+  ScrollBar: TEntryViewScrollBar;
+  ControlSize: Integer;
 begin
-  Result := 0;
+  Result := True;
+  // get orientation values
+  ScrollBar := FVerticalScrollBar;
+  ControlSize := Height;
   //
-  if Entry = Nil then
+  if (ScrollBar.Range = 0) or (ScrollBar.Range <= ControlSize) then
+    Result := False;
+end;
+
+procedure TCustomEntryView.UpdateModernScrollBar;
+var
+  ScrollBar: TEntryViewScrollBar;
+  ControlSize: Integer;
+begin
+  if not CanShowScrollBar then
     Exit;
-  //
-  Entries := Entry.ParentEntries;
-  while Entries <> Nil do begin
-    if Entries.OwnerEntry <> Nil then begin
-      Inc(Result);
-      Entries := Entries.OwnerEntry.ParentEntries;
-    end
-    else
-      Break;
-  end;
+
+  ControlSize := Height;
+
+  if FVerticalScrollBar.Range = 0 then
+    Exit;
+
+  FVerticalScrollBar.SetSize(VisibleEntriesCount * FEntryHeight, ClientHeight);
+end;
+
+procedure TCustomEntryView.ShowModernScrollBar;
+begin
+  FVerticalScrollBar.Visible := CanShowScrollBar;
+  UpdateModernScrollBar;
+  if FVerticalScrollBar.Visible then
+    FVerticalScrollBar.BringToFront;
+end;
+
+procedure TCustomEntryView.HideModernScrollBar;
+begin
+  FVerticalScrollBar.Visible := False;
 end;
 
 procedure TCustomEntryView.CMDesignHitTest(var Message: TCMDesignHitTest);
@@ -3439,20 +3818,24 @@ end;
 
 procedure TCustomEntryView.CMMouseEnter(var Message: TMessage);
 begin
+  HideNativeScrollBars;
+  ShowModernScrollBar;
   inherited;
-//  CaptureItem := FMouseItem;
+  CaptureItem := FMouseItem;
   FMouseItem := Nil;
   Repaint;
 end;
 
 procedure TCustomEntryView.CMMouseLeave(var Message: TMessage);
 begin
+  HideModernScrollBar;
   inherited;
   if MouseCapture then
     FMouseItem := CaptureItem
   else
     FMouseItem := Nil;
-//  CaptureItem := Nil;
+  CaptureItem := Nil;
+  FHotIndex := -1;
   Repaint;
 end;
 
@@ -3500,6 +3883,7 @@ end;
 procedure TCustomEntryView.WMSize(var Message: TWMSize);
 begin
   inherited;
+  HideNativeScrollBars;
   UpdateScrollRange;
 end;
 
@@ -3526,8 +3910,24 @@ begin
   inherited;
 end;
 
+procedure TCustomEntryView.WMNCHitTest(var Msg: TWMNCHitTest);
+var
+  P: TPoint;
+  R: TRect;
+begin
+  P := ScreenToClient(Point(Msg.XPos, Msg.YPos));
+  R := ClientRect;
+
+  // Right-side fake scrollbar
+  if P.X >= R.Right - 12 then begin
+    Msg.Result := HTVSCROLL;
+    Exit;
+  end;
+end;
+
 procedure TCustomEntryView.WMVScroll(var Message: TWMScroll);
 begin
+  HideNativeScrollBars;
   case Message.ScrollCode of
     SB_BOTTOM    : SetTopIndex(VisibleEntriesCount - 1);
     SB_LINEDOWN  : SetTopIndex(FTopIndex + 1);
@@ -3542,6 +3942,7 @@ end;
 procedure TCustomEntryView.WMHScroll(var Message: TWMScroll);
 begin
   // we do not scroll left/right
+  HideNativeScrollBars;
 end;
 
 procedure TCustomEntryView.WMTimer(var Message: TWMTimer);
@@ -3584,5 +3985,5 @@ initialization
 
 finalization
   CheckeredBitmap.Free;
-  
+
 end.

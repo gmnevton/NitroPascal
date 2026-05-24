@@ -784,7 +784,8 @@ begin
     try
       Self.Show;
       Self.BringToFront;
-      Self.SetFocus;
+      //Self.SetFocus;
+      FilesView.SetFocus;
       //Self.KeyPreview := False;
       //
       // block execution at this point
