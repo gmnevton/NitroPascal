@@ -28,14 +28,14 @@
   
   - [ ] Custom paint scrollbar
   
+  - [ ] Implement smooth scroll
+  
   - [ ] Implement file list entries sort options
-
-
+  
+  - [ ] Implement showing date/time and/or size for file entries, and only date/time for sub-directories
 
 ## TODO
 
 - Save file dialog / folder view
 - Editor backbuffer class (editor backend engine)
 - TSynEdit component rework
-
-
