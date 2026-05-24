@@ -60,6 +60,8 @@ type
 
   TEntryItemPositionEnum = (epAbsolute, epRelative);
 
+  TEntryItemTypeEnum = (etUnknown, etSubDirectory, etFile);
+
   TEntryItem = class(TCollectionItem)
   private
     // expand/collapse icon (left/right aligned) - entry icon - entry caption - [child entries]
@@ -128,7 +130,7 @@ type
     FOwnerEntry: TEntryItem;
     FControl: TControl;
   protected
-    procedure Update(Item: TCollectionItem); override;
+    procedure Update(Item: TCollectionItem); override; // this tells us, that collection changed after EndUpdate
     function Get(Index: Integer): TEntryItem;
     procedure Put(Index: Integer; Value: TEntryItem);
     //
@@ -217,7 +219,9 @@ type
 
 { TCustomEntryView }
 
-  TEntryItemEvent = procedure(Sender: TObject; Item: TEntryItem) of object;
+  TEntryItemEvent = procedure (Sender: TObject; Item: TEntryItem) of object;
+  TEntryItemSelectionEvent = procedure (Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean) of object;
+  TEntryItemGetTypeEvent = procedure (Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum) of object;
 
   TCustomEntryView = class(TCustomControl)
   private // fileds that will be accesible by user
@@ -246,6 +250,8 @@ type
     // events
     FOnChange: TNotifyEvent;
     FOnItemClick: TEntryItemEvent;
+    FOnItemSelection: TEntryItemSelectionEvent;
+    FOnItemGetType: TEntryItemGetTypeEvent;
   private // internal fields
     FTextHeight: Integer;
     FTopIndex: Integer;
@@ -253,6 +259,8 @@ type
     FLockedIndex: Integer;
     FShift: TShiftState;
     FShiftIndex: Integer;
+    FEntriesCount: Integer;
+    FVisibleEntriesCount: Integer;
   private // setters
     procedure SetActiveIndex(Value: Integer);
     procedure SetBorderStyle(Value: TBorderStyle);
@@ -272,7 +280,9 @@ type
   private // getters
     procedure ComponentPropertiesChanged;
     //function GetButtonRect(Button: TFolderScrollButton): TRect;
-    function GetCount: Integer;
+    procedure EntriesChanged;
+    function GetEntriesCount: Integer;
+    function GetVisibleEntriesCount: Integer;
     //function GetSelectedRect: TRect;
     //function GetButtonRect(Button: TFolderScrollButton): TRect;
     function GetSelectedRect: TRect;
@@ -298,7 +308,6 @@ type
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
     procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
-    //
   protected
     procedure CreateHandle; override;
     procedure DoItemClick(Item: TEntryItem); dynamic;
@@ -330,7 +339,7 @@ type
     procedure ScrollToSelection;
     procedure Scroll(Delta: Integer); virtual;
     procedure ScrollBy(DeltaX, DeltaY: Integer); reintroduce;
-
+    // properties
     property ActiveIndex: Integer read FActiveIndex write SetActiveIndex;
     property BorderStyle: TBorderStyle read FBorderStyle write SetBorderStyle;
 //    property ButtonRect[Button: TFolderScrollButton]: TRect read GetButtonRect;
@@ -344,12 +353,17 @@ type
     property MultiSelect: Boolean read FMultiSelect write SetMultiSelect;
     property Selected: TEntryItem read FSelected write SetSelected;
     property TopIndex: Integer read FTopIndex write SetTopIndex;
+    property EntriesCount: Integer read FEntriesCount;
+    property VisibleEntriesCount: Integer read FVisibleEntriesCount;
+    // colors
     property ActiveColor: TColor read FActiveColor write SetActiveColor;
     property SelectedColor: TColor read FSelectedColor write SetSelectedColor;
     property HotColor: TColor read FHotColor write SetHotColor;
     // events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnItemClick: TEntryItemEvent read FOnItemClick write FOnItemClick;
+    property OnItemSelection: TEntryItemSelectionEvent read FOnItemSelection write FOnItemSelection;
+    property OnItemGetType: TEntryItemGetTypeEvent read FOnItemGetType write FOnItemGetType;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -373,6 +387,8 @@ type
   public
     property Selected;
     property EntryHeight;
+    property EntriesCount;
+    property VisibleEntriesCount;
   published
     property Align;
     property ActiveColor;
@@ -392,7 +408,6 @@ type
 //    property ItemImages;
     property MultiSelect;
     property Overlay;
-    property OnItemClick;
     property ParentBiDiMode;
     property ParentColor;
     property ParentFont;
@@ -401,6 +416,7 @@ type
     property SelectedColor;
     property TabOrder;
     property TabStop;
+    // events
     property OnCanResize;
     property OnDblClick;
     property OnChange;
@@ -410,6 +426,9 @@ type
     property OnDragOver;
     property OnEndDock;
     property OnEndDrag;
+    property OnItemClick;
+    property OnItemGetType;
+    property OnItemSelection;
     property OnMouseDown;
     property OnMouseMove;
     property OnMouseUp;
@@ -1321,12 +1340,16 @@ end;
 
 procedure TEntryItems.Update(Item: TCollectionItem);
 begin
-//  inherited Update(Item);
-  if FOwnerEntry <> Nil then
-    TEntryItems(FOwnerEntry.Collection).Update(Item);
+  if TCustomEntryView(FControl).Entries.UpdateCount > 0 then
+    Exit;
   //
-  TCustomEntryView(FControl).UpdateScrollRange;
-  FControl.Invalidate;
+  if FOwnerEntry <> Nil then // propagate up
+    TEntryItems(FOwnerEntry.Collection).Update(Item)
+  else begin
+    TCustomEntryView(FControl).EntriesChanged;
+    TCustomEntryView(FControl).UpdateScrollRange;
+    FControl.Invalidate;
+  end;
 end;
 
 function TEntryItems.Get(Index: Integer): TEntryItem;
@@ -1862,6 +1885,9 @@ begin
   FLockedIndex := -1;
   FShift := [];
   FShiftIndex := -1;
+  FEntriesCount := 0;
+  FVisibleEntriesCount := 0;
+  //
   FOverlay := TPicture.Create;
   FOverlay.OnChange := OverlayChange;
   FChangeLink := TChangeLink.Create;
@@ -1875,15 +1901,37 @@ procedure TCustomEntryView.DblClick;
 var
   MousePoint: TPoint;
   Entry: TEntryItem;
+  EntryType: TEntryItemTypeEnum;
+  IsSubDirectory: Boolean;
 begin
   MousePoint := Mouse.CursorPos;
   MousePoint := Self.ScreenToClient(MousePoint);
   Entry := EntryFromPoint(MousePoint.X, MousePoint.Y);
   if Entry <> Nil then begin
-    if Entry.Items.Count > 0 then begin
+    if Entry.Items.Count > 0 then begin // collapse or expand as default behavior when Entry has children; so for now it can't be selected by double click
       case Entry.State of
         esCollapsed: Entry.State := esExpanded;
         esExpanded : Entry.State := esCollapsed;
+      end;
+    end
+    else begin // Entry has no children, if it is a sub-directory - open it, else - select Entry and fire OnSelection event
+      // now i can't just assume that i know what is inside Entries list, so i need to ask user to tell me what is inside
+      // the user responds with:
+      // - sub-directory
+      // - file
+      if Assigned(FOnItemGetType) then begin
+        EntryType := etUnknown;
+        FOnItemGetType(Self, Entry, EntryType);
+        //
+        case EntryType of
+          etUnknown: ;
+          etSubDirectory,
+          etFile: begin
+            IsSubDirectory := EntryType = etSubDirectory;
+            if Assigned(FOnItemSelection) then
+              FOnItemSelection(Self, Entry, IsSubDirectory);
+          end;
+        end;
       end;
     end;
   end;
@@ -2089,7 +2137,7 @@ function TCustomEntryView.ItemAtPos(const Pos: TPoint; Existing: Boolean): Integ
 var
   count: Integer;
 begin
-  count := GetCount;
+  count := VisibleEntriesCount;
   Result := FTopIndex + (Pos.Y div FEntryHeight);
   if Result > count - 1 then
     if Existing then
@@ -2192,7 +2240,7 @@ begin
   inherited KeyDown(Key, Shift);
   case Key of
     VK_HOME: ItemIndex := 0;
-    VK_END: ItemIndex := GetCount - 1;
+    VK_END: ItemIndex := VisibleEntriesCount - 1;
     VK_NEXT: SetScrollIndex(ItemIndex + ClientHeight div FEntryHeight);
     VK_PRIOR: SetScrollIndex(ItemIndex - ClientHeight div FEntryHeight);
     VK_LEFT,
@@ -2203,7 +2251,7 @@ begin
       Key := 0;
     end;
     VK_DOWN: begin
-      if (Selected <> Nil) and (Selected.Index < FEntries.Count - 1) then
+      if (Selected <> Nil) and (Selected.Index < VisibleEntriesCount - 1) then
         Selected := FEntries[Selected.Index + 1];
       Key := 0;
     end;
@@ -2459,7 +2507,7 @@ var
   count: Integer;
 begin
   if HandleAllocated then begin
-    count := GetCount; // all visible and expanded items
+    count := VisibleEntriesCount; // all visible and expanded items
     ScrollInfo.cbSize := SizeOf(TScrollInfo);
     ScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
     ScrollInfo.nMin := 0;
@@ -2680,7 +2728,7 @@ begin
 //    Row.Width := FScrollWidth;
   for I := 0 to ARect.Height div (FEntryHeight + 1) do begin // divide client-area into horizontal strips and render Entries
     // set strip dimmensions
-    if I + FTopIndex > GetCount - 1 then
+    if I + FTopIndex > VisibleEntriesCount - 1 then
       Break;
     R := Row;
     R.Top := R.Top + I * FEntryHeight;
@@ -2940,7 +2988,7 @@ begin
     FActiveIndex := -1;
   // but FEntries is a tree, so FEntries.Count is not enough to determine the number of elements
   // so, we need to count the expanded and visible entries, each time we are going to select one
-  count := GetCount;
+  count := VisibleEntriesCount;
   if FActiveIndex > count - 1 then
     FActiveIndex := count - 1;
   // here we need to use ItemFromIndex
@@ -3008,6 +3056,12 @@ begin
   end;
 end;
 
+procedure TCustomEntryView.EntriesChanged;
+begin
+  FEntriesCount := GetEntriesCount;
+  FVisibleEntriesCount := GetVisibleEntriesCount;
+end;
+
   //  Root collection
   //   ├─ (0:0) - Item A - [collapsed]
   //   │   ├─ (1:1) - Item A1 -
@@ -3017,7 +3071,23 @@ end;
   //   └─ (3:0) - Item B
   //       └─ (4:1) - Item B1
 
-function TCustomEntryView.GetCount: Integer;
+function TCustomEntryView.GetEntriesCount: Integer;
+var
+  Item: TEntryItem;
+begin
+  Result := 0;
+  //
+  if Entries.Count = 0 then
+    Exit;
+  //
+  Item := Entries.Items[0];
+  while Item <> Nil do begin
+    Inc(Result);
+    Item := Entries.GetNextEntry(Item);
+  end;
+end;
+
+function TCustomEntryView.GetVisibleEntriesCount: Integer;
 var
   Item: TEntryItem;
 begin
@@ -3090,7 +3160,7 @@ begin
   if FLocked then
     if Value > -1 then
       Value := FLockedIndex;
-  count := GetCount;
+  count := VisibleEntriesCount;
   if Value > count - 1 then
     Value := count - 1;
   if Value > -1 then
@@ -3215,7 +3285,7 @@ procedure TCustomEntryView.SetScrollIndex(Value: Integer);
 var
   count: Integer;
 begin
-  count := GetCount;
+  count := VisibleEntriesCount;
   if count = 0 then
     SetItemIndex(-1)
   else if Value > count - 1 then begin
@@ -3251,7 +3321,7 @@ var
   P: TPoint;
   count: Integer;
 begin
-  count := GetCount;
+  count := VisibleEntriesCount;
   if Value > count - ClientHeight div FEntryHeight then
     Value := count - ClientHeight div FEntryHeight;
   if Value < 0 then
@@ -3459,7 +3529,7 @@ end;
 procedure TCustomEntryView.WMVScroll(var Message: TWMScroll);
 begin
   case Message.ScrollCode of
-    SB_BOTTOM    : SetTopIndex(GetCount - 1);
+    SB_BOTTOM    : SetTopIndex(VisibleEntriesCount - 1);
     SB_LINEDOWN  : SetTopIndex(FTopIndex + 1);
     SB_LINEUP    : SetTopIndex(FTopIndex - 1);
     SB_PAGEDOWN  : SetTopIndex(FTopIndex + ClientHeight div FEntryHeight);

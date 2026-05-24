@@ -5,9 +5,9 @@ Nitro EDitor for Nitro Pascal programming language.
 ---
 
 NED project uses this components:
- - UniversalCL from: https://github.com/gmnevton/UniversalCL,
- - SynEdit from: https://github.com/TurboPack/SynEdit/releases/tag/102Tokyo
 
+- UniversalCL from: https://github.com/gmnevton/UniversalCL,
+- SynEdit from: https://github.com/TurboPack/SynEdit/releases/tag/102Tokyo
 
 ![Nitro EDitor](../../git_res/ned.png)
 

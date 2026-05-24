@@ -119,7 +119,7 @@ object NEDDialogOpen: TNEDDialogOpen
       ExplicitWidth = 39
       ExplicitHeight = 17
     end
-    object UQuickButton2: TUQuickButton
+    object btnUpDirectory: TUQuickButton
       Left = 0
       Top = 0
       Height = 41
@@ -130,6 +130,7 @@ object NEDDialogOpen: TNEDDialogOpen
       Font.Name = 'Segoe MDL2 Assets'
       Font.Style = []
       ParentFont = False
+      OnClick = btnUpDirectoryClick
       BackColors.Enabled = False
       BackColors.Color = clBlack
       BackColors.LightColor = 13619151

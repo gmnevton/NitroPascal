@@ -38,7 +38,7 @@ type
     btnOpen: TUButton;
     edtPath: TUEdit;
     txtPath: TUText;
-    UQuickButton2: TUQuickButton;
+    btnUpDirectory: TUQuickButton;
     SplitterEx1: TSplitterEx;
     ImageList1: TImageList;
     //
@@ -49,6 +49,7 @@ type
     procedure btnCloseClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
     procedure btnOpenClick(Sender: TObject);
+    procedure btnUpDirectoryClick(Sender: TObject);
   private
     FCanClose: Boolean;
     FExecutionResult: TModalResult;
@@ -71,12 +72,15 @@ type
     procedure GetFilesList;
     procedure GetFolderIcon(const IDL: PItemIDList; Item: TEntryItem);
     procedure GetItemIcon(const IDL: PItemIDList; Item: TEntryItem);
+    function GetItemAttributes(const IDL: PItemIDList; var Info: TSHFileInfo): Boolean;
     procedure GetChildren(ShellFolder: IShellFolder; const IDL: PItemIDList; Entry: TEntryItem);
     function GetPathFromPIDL(const IDL: PItemIDList): String;
     function GetPIDLFromPath(const Path: String): PItemIDList;
     function GetDirFromSpecialFolder(const Folder: Integer): String;
     procedure TrySelectMatchingFolder;
     procedure FolderChanged(Sender: TObject);
+    procedure FilesViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum);
+    procedure FilesViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -95,6 +99,7 @@ uses
   Graphics,
   ActiveX,
   StrUtils,
+  IOUtils,
   UCL.FormOverlay;
 
 //type
@@ -246,6 +251,8 @@ begin
   FilesView.EntryImages := ImageList1;
   //FilesView.ItemImages := ImageList1;
   FilesView.TabStop := True;
+  FilesView.OnItemGetType := FilesViewItemGetType;
+  FilesView.OnItemSelection := FilesViewItemSelection;
 //  FilesView.Show;
 
   FPath := '';
@@ -392,29 +399,34 @@ var
   temp: String;
   Child: PItemIDList;
 begin
-  FolderView.Entries.Clear;
-  Root := Nil;
-//  SHGetDesktopFolder(Desktop);
-  if Succeeded(SHGetSpecialFolderLocation(0, CSIDL_DRIVES, IDL)) and Succeeded(SHBindToParent(IDL, IID_IShellFolder, Pointer(Parent), Child)) then begin
-    Root := GetInterfaceForObj(IDL) as IShellFolder;
-    if Succeeded(Parent.GetAttributesOf(1, IDL, Attr)) then begin
-      temp := GetShellItemName(Parent, IDL, SHGDN_NORMAL);
-      Folder := FolderView.Entries.Add;
-      Folder.Caption := temp;
-      CloneIDL := ILClone(IDL);
-      Folder.Data := CloneIDL;
-      GetFolderIcon(IDL, Folder);
-      GetChildren(Root, IDL, Folder);
-        //
-//        if (HasAttribute(SFGAO_FOLDER)) then
-//          SHGetFileInfo(Pointer(AbsoluteIDL), 0, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_OPENICON);
-//        FolderBar
+  FolderView.BeginUpdate;
+  try
+    FolderView.Entries.Clear;
+    Root := Nil;
+  //  SHGetDesktopFolder(Desktop);
+    if Succeeded(SHGetSpecialFolderLocation(0, CSIDL_DRIVES, IDL)) and Succeeded(SHBindToParent(IDL, IID_IShellFolder, Pointer(Parent), Child)) then begin
+      Root := GetInterfaceForObj(IDL) as IShellFolder;
+      if Succeeded(Parent.GetAttributesOf(1, IDL, Attr)) then begin
+        temp := GetShellItemName(Parent, IDL, SHGDN_NORMAL);
+        Folder := FolderView.Entries.Add;
+        Folder.Caption := temp;
+        CloneIDL := ILClone(IDL);
+        Folder.Data := CloneIDL;
+        GetFolderIcon(IDL, Folder);
+        GetChildren(Root, IDL, Folder);
+          //
+  //        if (HasAttribute(SFGAO_FOLDER)) then
+  //          SHGetFileInfo(Pointer(AbsoluteIDL), 0, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_OPENICON);
+      end;
+      FreeItemIDList(IDL);
     end;
-    FreeItemIDList(IDL);
+  finally
+    FolderView.EndUpdate;
+    //
+    FolderView.ActiveIndex := 0;
+    if FolderView.Selected <> Nil then
+      FolderView.Selected.Expand;
   end;
-  FolderView.ActiveIndex := 0;
-  if FolderView.Selected <> Nil then
-    FolderView.Selected.Expand;
 end;
 
 procedure TNEDDialogOpen.ListDirs(const Folders: TEntryItems);
@@ -422,7 +434,7 @@ var
   List: TStringList;
   Item: TEntryItem;
   path: String;
-  IDL: PItemIDList;
+  IDL, CloneIDL: PItemIDList;
   i: Integer;
 begin
   List := TStringList.Create;
@@ -433,6 +445,8 @@ begin
       Item := Folders.Add;
       Item.Caption := path;
       IDL := GetPIDLFromPath(FPath + path);
+      CloneIDL := ILClone(IDL);
+      Item.Data := CloneIDL;
       GetItemIcon(IDL, Item);
       FreeItemIDList(IDL);
     end;
@@ -446,7 +460,7 @@ var
   List: TStringList;
   Item: TEntryItem;
   path: String;
-  IDL: PItemIDList;
+  IDL, CloneIDL: PItemIDList;
   i: Integer;
 begin
   List := TStringList.Create;
@@ -457,6 +471,8 @@ begin
       Item := Files.Add;
       Item.Caption := path;
       IDL := GetPIDLFromPath(FPath + path);
+      CloneIDL := ILClone(IDL);
+      Item.Data := CloneIDL;
       GetItemIcon(IDL, Item);
       FreeItemIDList(IDL);
     end;
@@ -483,7 +499,7 @@ var
   FileInfo: TSHFileInfo;
 begin
   if Assigned(IDL) then begin
-    SHGetFileInfo(Pointer(IDL), SFGAO_SHARE, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+    SHGetFileInfo(Pointer(IDL), SFGAO_SHARE, FileInfo, SizeOf(TSHFileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
     Item.ImageIndex := FileInfo.iIcon;
   end
   else
@@ -495,11 +511,22 @@ var
   FileInfo: TSHFileInfo;
 begin
   if Assigned(IDL) then begin
-    SHGetFileInfo(Pointer(IDL), 0{SFGAO_SHARE}, FileInfo, SizeOf(FileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_LARGEICON);
+    SHGetFileInfo(Pointer(IDL), 0{SFGAO_SHARE}, FileInfo, SizeOf(TSHFileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_LARGEICON);
     Item.ImageIndex := FileInfo.iIcon;
   end
   else
     Item.ImageIndex := -1;
+end;
+
+function TNEDDialogOpen.GetItemAttributes(const IDL: PItemIDList; var Info: TSHFileInfo): Boolean;
+begin
+  Result := True;
+  if Assigned(IDL) then begin
+    FillChar(Info, SizeOf(TSHFileInfo), 0);
+    Result := SHGetFileInfo(Pointer(IDL), 0{SFGAO_SHARE}, Info, SizeOf(TSHFileInfo), SHGFI_PIDL or SHGFI_ATTRIBUTES) <> 0;
+  end
+  else
+    Result := False;
 end;
 
 function TNEDDialogOpen.GetPathFromPIDL(const IDL: PItemIDList): String;
@@ -567,6 +594,37 @@ begin
   LPath := '';
   Item := FolderView.Selected;
   if Item <> Nil then begin
+    IDL := Item.Data;
+    LPath := GetPathFromPIDL(IDL);
+    if Length(LPath) > 0 then begin
+      FPath := LPath;
+      txtPath.Caption := FPath;
+      GetFilesList;
+    end;
+  end;
+end;
+
+procedure TNEDDialogOpen.FilesViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum);
+var
+  IDL: PItemIDList;
+  FileInfo: TSHFileInfo;
+begin
+  IDL := Item.Data;
+  if GetItemAttributes(IDL, FileInfo) then begin
+    if FileInfo.dwAttributes and SFGAO_FOLDER = SFGAO_FOLDER then
+      ItemType := etSubDirectory
+    else
+      ItemType := etFile;
+  end;
+end;
+
+procedure TNEDDialogOpen.FilesViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean);
+var
+  IDL: PItemIDList;
+  LPath: String;
+begin
+  if IsSubDirectory then begin
+    LPath := '';
     IDL := Item.Data;
     LPath := GetPathFromPIDL(IDL);
     if Length(LPath) > 0 then begin
@@ -760,6 +818,25 @@ procedure TNEDDialogOpen.btnOpenClick(Sender: TObject);
 begin
   FExecutionResult := mrOk;
   FCanClose := True;
+end;
+
+procedure TNEDDialogOpen.btnUpDirectoryClick(Sender: TObject);
+var
+  IDL: PItemIDList;
+  LPath: String;
+begin
+  LPath := IncludeTrailingPathDelimiter(TDirectory.GetParent(ExcludeTrailingPathDelimiter(FPath)));
+  if LPath <> FPath then begin
+    if Length(LPath) > 0 then begin
+      IDL := GetPIDLFromPath(LPath);
+      if IDL <> Nil then begin
+        FPath := LPath;
+        txtPath.Caption := FPath;
+        TrySelectMatchingFolder;
+        GetFilesList;
+      end;
+    end;
+  end;
 end;
 
 end.
