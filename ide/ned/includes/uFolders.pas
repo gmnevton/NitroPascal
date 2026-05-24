@@ -227,12 +227,12 @@ type
 
   TCustomScrollBar = class(TCustomControl)
   private
-//    FMin: Integer;
-//    FMax: Integer;
     FRange: Integer; // total content size
     FPageSize: Integer; // visible size
     FPosition: Integer; // current offset
     FScrollBarKind: TScrollBarKind;
+    FXYScrollSize: TSize;
+    FUpdating: Boolean;
     // colors
     FThumbButtonColorInactive: TColor;
     FThumbButtonColorActive: TColor;
@@ -252,7 +252,7 @@ type
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
     procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
   protected
-    function  CalculateThumbRect(const Button: TCustomScrollBarThumbButtonEnum): TRect;
+    function  CalculateThumbRect(const DrawRect: TRect; const Button: TCustomScrollBarThumbButtonEnum): TRect;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure Paint; override;
@@ -1181,7 +1181,7 @@ begin
     end;
     //
     // for this rectangle the coordinates are relative to top/left, but for windows it doesn't matter, it draws backwards if it must
-    Canvas.Rectangle(Rect(R.Left, R.Top, R.Left + R.Width - BR, R.Top + R.Height - BR));
+    Canvas.Rectangle(Rect(R.Left + TL, R.Top + TL, R.Left + R.Width - BR, R.Top + R.Height - BR));
     //
     if Overlay then
       Canvas.Pen.Mode:=spm; // restore old state
@@ -1446,7 +1446,6 @@ begin
     TEntryItems(FOwnerEntry.Collection).Update(Item)
   else begin
     TCustomEntryView(FControl).EntriesChanged;
-    TCustomEntryView(FControl).UpdateScrollRange;
     FControl.Invalidate;
   end;
 end;
@@ -1969,14 +1968,20 @@ begin
   DoubleBuffered := True;
   ParentBackground := False;
   ParentColor := False;
+  // OS scrollbar width and height
+  FXYScrollSize.cx := GetSystemMetrics(SM_CXVSCROLL);
+  FXYScrollSize.cy := GetSystemMetrics(SM_CYHSCROLL);
   //
-  Visible := False;
+  Width := FXYScrollSize.cx;
+  //
+  Visible := True;
 
   // our properties
   FRange := -1;
   FPageSize := -1;
   FPosition := -1;
   FScrollBarKind := AKind;
+  FUpdating := False;
   //
   FThumbButtonColorInactive := clNone;
   FThumbButtonColorActive   := clNone;
@@ -2004,7 +2009,8 @@ begin
     // Clamp current position
     FPosition := EnsureRange(FPosition, 0, GetMaxPosition);
 
-    Invalidate;
+    if not FUpdating then
+      Invalidate;
   end;
 end;
 
@@ -2016,7 +2022,8 @@ begin
     // Clamp current position
     FPosition := EnsureRange(FPosition, 0, GetMaxPosition);
 
-    Invalidate;
+    if not FUpdating then
+      Invalidate;
   end;
 end;
 
@@ -2029,7 +2036,8 @@ begin
   if FPosition <> NewPos then begin
     FPosition := NewPos;
 
-    Invalidate;
+    if not FUpdating then
+      Invalidate;
 
     // optional:
     // if Assigned(FOnScroll) then
@@ -2049,25 +2057,29 @@ procedure TCustomScrollBar.SetSize(const ARange, APageSize: Integer);
 begin
   if ARange <= 0 then
     Exit;
-  FRange := ARange;
-  FPageSize := APageSize;
-  //
-  Invalidate;
+  FUpdating := True;
+  try
+    Range := ARange;
+    PageSize := APageSize;
+  finally
+    FUpdating := False;
+    Invalidate;
+  end;
 end;
 
 procedure TCustomScrollBar.CMMouseEnter(var Message: TMessage);
 begin
   inherited;
-  if not Visible then
-    Show;
+//  if not Visible then
+//    Show;
   Repaint; // ???
 end;
 
 procedure TCustomScrollBar.CMMouseLeave(var Message: TMessage);
 begin
   inherited;
-  if Visible then
-    Hide;
+//  if Visible then
+//    Hide;
   Repaint;
 end;
 
@@ -2086,30 +2098,30 @@ begin
   Msg.Result := HTTRANSPARENT;
 end;
 
-function TCustomScrollBar.CalculateThumbRect(const Button: TCustomScrollBarThumbButtonEnum): TRect;
+function TCustomScrollBar.CalculateThumbRect(const DrawRect: TRect; const Button: TCustomScrollBarThumbButtonEnum): TRect;
 var
   TrackHeight: Integer;
   ThumbHeight: Integer;
   ThumbTop: Integer;
 begin
   case Button of
-    tbTop   : Result := Rect(0, 0, ClientWidth, 16);
+    tbTop   : Result := Rect(0, 0, DrawRect.Width, FXYScrollSize.cy);
     tbScroll: begin
       if FPageSize >= FRange then begin
-        ThumbTop := 0;
-        TrackHeight := ClientHeight - 32;
-        ThumbHeight := ClientHeight;
+        ThumbTop := FXYScrollSize.cy - 1;
+        TrackHeight := DrawRect.Height - FXYScrollSize.cy * 2;
+        ThumbHeight := 0;
       end
       else begin
-        ThumbHeight  := MulDiv(ClientHeight, FPageSize, FRange);
-        TrackHeight := ClientHeight - ThumbHeight;
+        ThumbHeight  := MulDiv(DrawRect.Height, FPageSize, FRange);
+        TrackHeight := DrawRect.Height - ThumbHeight;
         ThumbTop := MulDiv(TrackHeight, FPosition, GetMaxPosition);
       end;
 //      ThumbSize := Round(ControlSize * ControlSize / SB.Range);
 //      ThumbPos := Round(ControlSize * SB.Position / SB.Range);
-      Result := Rect(0, ThumbTop, ClientWidth, ThumbTop + TrackHeight);
+      Result := Rect(0, ThumbTop, DrawRect.Width, ThumbTop + TrackHeight);
     end;
-    tbBottom: Result := Rect(0, ClientHeight - 15, ClientWidth, ClientHeight);
+    tbBottom: Result := Rect(0, DrawRect.Height - FXYScrollSize.cy, DrawRect.Width, DrawRect.Height);
   end;
 end;
 
@@ -2127,18 +2139,18 @@ end;
 
 procedure TCustomScrollBar.Paint;
 var
-  Rect: TRect;
+  LRect: TRect;
 begin
-  Rect := ClientRect;
-  DrawBackground(Canvas, Rect); // clear background
-  DrawButtons(Canvas, Rect); //draw buttons
+  LRect := ClientRect;
+  DrawBackground(Canvas, LRect); // clear background
+  DrawButtons(Canvas, LRect); // draw buttons
 end;
 
 procedure TCustomScrollBar.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
 begin
   // do we really want to paint background ??? how about transparent control
   Canvas.Brush.Color := clGray;
-  Canvas.FillRect(ClientRect);
+  Canvas.FillRect(ARect);
 end;
 
 procedure TCustomScrollBar.DrawButtons(const ACanvas: TCanvas; const ARect: TRect);
@@ -2146,18 +2158,18 @@ var
   ThumbRect: TRect;
 begin
   // paint top thumb
-  ThumbRect := CalculateThumbRect(tbTop);
-  Canvas.Brush.Color := clGray;
+  ThumbRect := CalculateThumbRect(ARect, tbTop);
+  Canvas.Brush.Color := clYellow;
   Canvas.FillRect(ThumbRect);
 
   // paint scroll
-  ThumbRect := CalculateThumbRect(tbScroll);
-  Canvas.Brush.Color := clGray;
+  ThumbRect := CalculateThumbRect(ARect, tbScroll);
+  Canvas.Brush.Color := clGreen;
   Canvas.FillRect(ThumbRect);
 
   // paint bottom thumb
-  ThumbRect := CalculateThumbRect(tbBottom);
-  Canvas.Brush.Color := clGray;
+  ThumbRect := CalculateThumbRect(ARect, tbBottom);
+  Canvas.Brush.Color := clYellow;
   Canvas.FillRect(ThumbRect);
 end;
 
@@ -2319,7 +2331,9 @@ begin
   inherited CreateHandle;
   if FTextHeight = 0 then
     FTextHeight := Canvas.TextHeight(' ');
+  HideNativeScrollBars;
   UpdateScrollRange;
+  ShowModernScrollBar;
 end;
 
 procedure TCustomEntryView.DoItemClick(Item: TEntryItem);
@@ -3396,6 +3410,9 @@ procedure TCustomEntryView.EntriesChanged;
 begin
   FEntriesCount := GetEntriesCount;
   FVisibleEntriesCount := GetVisibleEntriesCount;
+  HideNativeScrollBars;
+  UpdateScrollRange;
+  ShowModernScrollBar;
 end;
 
   //  Root collection
@@ -3780,12 +3797,13 @@ begin
   if FVerticalScrollBar.Range = 0 then
     Exit;
 
-  FVerticalScrollBar.SetSize(VisibleEntriesCount * FEntryHeight, ClientHeight);
+  FVerticalScrollBar.SetSize(VisibleEntriesCount * FEntryHeight, ClientHeight div FEntryHeight);
 end;
 
 procedure TCustomEntryView.ShowModernScrollBar;
 begin
-  FVerticalScrollBar.Visible := CanShowScrollBar;
+  //FVerticalScrollBar.Visible := CanShowScrollBar;
+  FVerticalScrollBar.Visible := True;
   UpdateModernScrollBar;
   if FVerticalScrollBar.Visible then
     FVerticalScrollBar.BringToFront;
@@ -3793,7 +3811,7 @@ end;
 
 procedure TCustomEntryView.HideModernScrollBar;
 begin
-  FVerticalScrollBar.Visible := False;
+//  FVerticalScrollBar.Visible := False;
 end;
 
 procedure TCustomEntryView.CMDesignHitTest(var Message: TCMDesignHitTest);
@@ -3885,6 +3903,7 @@ begin
   inherited;
   HideNativeScrollBars;
   UpdateScrollRange;
+  ShowModernScrollBar;
 end;
 
 procedure TCustomEntryView.WMMouseWheel(var Message: TWMMouseWheel);
@@ -3915,11 +3934,13 @@ var
   P: TPoint;
   R: TRect;
 begin
+  inherited;
+
   P := ScreenToClient(Point(Msg.XPos, Msg.YPos));
   R := ClientRect;
 
   // Right-side fake scrollbar
-  if P.X >= R.Right - 12 then begin
+  if P.X >= R.Right - FVerticalScrollBar.Width then begin
     Msg.Result := HTVSCROLL;
     Exit;
   end;
