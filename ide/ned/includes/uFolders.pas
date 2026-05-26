@@ -40,6 +40,13 @@ type
   );
   TDrawState = set of TDrawStateItem;
 
+  TDrawArrowDirection = (
+    daUp,
+    daDown,
+    daLeft,
+    daRight
+  );
+
   TEntryItem = class;
   TEntryItems = class;
   TCustomEntryView = class;
@@ -381,6 +388,7 @@ type
     procedure CreateHandle; override;
     procedure DoItemClick(Item: TEntryItem); dynamic;
     procedure EnsureItemVisible;
+    //function GetClientRect: TRect; override;
     function ItemFromPoint(X, Y: Integer): TEntryItem;
     function ItemRect(Item: Integer): TRect;
     function ItemAtPos(const Pos: TPoint; Existing: Boolean = False): Integer;
@@ -1185,6 +1193,100 @@ begin
     //
     if Overlay then
       Canvas.Pen.Mode:=spm; // restore old state
+  end;
+end;
+
+// up arrow
+//   | 0 1 2 X
+// -----------
+// 0 |   x
+// 1 | x   x
+// 2 |
+// Y |
+
+// down arrow
+//   | 0 1 2 X
+// -----------
+// 0 | x   x
+// 1 |   x
+// 2 |
+// Y |
+
+// left arrow
+//   | 0 1 2 X
+// -----------
+// 0 |   x
+// 1 | x
+// 2 |   x
+// Y |
+
+// right arrow
+//   | 0 1 2 X
+// -----------
+// 0 | x
+// 1 |   x
+// 2 | x
+// Y |
+
+procedure DrawArrow(const Canvas: TCanvas; const R: TRect; ArrowDirection: TDrawArrowDirection; DrawState: TDrawState; Thickness, Size: Integer);
+const
+  // array points transformed by -1
+  ArrowPoints: Array[TDrawArrowDirection, 0..2] of TPoint = (
+    ((X: -1; Y:  0), (X:  0; Y: -1), (X:  1; Y:  0)), // up
+    ((X: -1; Y: -1), (X:  0; Y:  0), (X:  1; Y: -1)), // down
+    ((X:  0; Y: -1), (X: -1; Y:  0), (X:  0; Y:  1)), // left
+    ((X: -1; Y: -1), (X:  0; Y:  0), (X: -1; Y:  1))  // right
+  );
+var
+  CX, CY, Offset: Integer;
+  I, HalfSize: Integer;
+  P: Array[0..2] of TPoint;
+begin
+  // Clamp values
+  if Thickness < 1 then
+    Thickness := 1;
+
+  if Size < 2 then
+    Size := 2;
+
+  HalfSize := Round(Size * 0.5);
+  Offset := Round(Size / 0.5) div 5;
+
+  // Center of drawing rect
+  CX := (R.Left + R.Right) div 2;
+  CY := (R.Top + R.Bottom) div 2 - Thickness div 2;
+
+  // Pen setup
+  Canvas.Pen.Color := clWindow;
+  if dsSelected in DrawState then
+    Canvas.Pen.Color := clWindowText
+  else if dsHot in DrawState then
+    Canvas.Pen.Color := clCaptionText;
+  Canvas.Pen.Style := psSolid;
+  Canvas.Pen.Width := Thickness;
+
+  // Build arrow geometry
+  for I := 0 to 2 do begin
+    P[I] := Point(CX + ArrowPoints[ArrowDirection, I].X * Size, CY + ArrowPoints[ArrowDirection, I].Y * Size);
+    if (ArrowDirection = daUp) or (ArrowDirection = daDown) then
+      P[I].Offset(-Offset, HalfSize)
+    else if ArrowDirection = daLeft then
+      P[I].Offset(HalfSize - Offset, 0)
+    else if ArrowDirection = daRight then
+      P[I].Offset(HalfSize, 0);
+  end;
+
+  Canvas.Polyline(P);
+
+  // Fixups
+  if Thickness = 1 then begin
+    Canvas.Pixels[P[2].X, P[2].Y] := Canvas.Pen.Color;
+  end
+  else begin
+    if ArrowDirection = daDown then
+      Canvas.Pixels[P[1].X, P[1].Y + 1] := Canvas.Pen.Color
+    else if ArrowDirection > daDown then
+      Canvas.Pixels[P[2].X, P[2].Y] := Canvas.Pen.Color;
   end;
 end;
 
@@ -2159,8 +2261,9 @@ var
 begin
   // paint top thumb
   ThumbRect := CalculateThumbRect(ARect, tbTop);
-  Canvas.Brush.Color := clYellow;
+  Canvas.Brush.Color := clGray;
   Canvas.FillRect(ThumbRect);
+  DrawArrow(ACanvas, ThumbRect, daUp, [], 2, 4);
 
   // paint scroll
   ThumbRect := CalculateThumbRect(ARect, tbScroll);
@@ -2169,8 +2272,9 @@ begin
 
   // paint bottom thumb
   ThumbRect := CalculateThumbRect(ARect, tbBottom);
-  Canvas.Brush.Color := clYellow;
+  Canvas.Brush.Color := clGray;
   Canvas.FillRect(ThumbRect);
+  DrawArrow(ACanvas, ThumbRect, daDown, [], 2, 4);
 end;
 
 { TCustomEntryView }
@@ -2354,6 +2458,15 @@ begin
     TopIndex := ItemIndex - ClientHeight div FEntryHeight + 1;
   end;
 end;
+
+//function TCustomEntryView.GetClientRect: TRect;
+//begin
+//  inherited;
+////  Result.Left := 0;
+////  Result.Top := 0;
+////  Result.Right := Width - IfThen(CanShowScrollBar or FVerticalScrollBar.Visible, FVerticalScrollBar.Width, 0);
+////  Result.Bottom := Height;
+//end;
 
 function TCustomEntryView.ItemFromPoint(X, Y: Integer): TEntryItem;
 var
@@ -3263,30 +3376,10 @@ begin
   DrawCaption(ACanvas, Item.Caption, DrawRect, drLeft);
   // draw expand indicator if item has children
   if Item.Items.Count > 0 then begin
-    ACanvas.Pen.Color := clWindow;
-    if dsSelected in DrawState then
-      ACanvas.Pen.Color := clWindowText
-    else if dsHot in DrawState then
-      ACanvas.Pen.Color := clCaptionText;
-    ACanvas.Pen.Style := psSolid;
-    ACanvas.Pen.Width := 2;
-    //
-    if Item.State = esCollapsed then begin
-      ACanvas.Polyline(
-        [Point(ARect.Right - 20, ARect.Height div 2 - 3),
-         Point(ARect.Right - 15, ARect.Height div 2 + 2),
-         Point(ARect.Right - 10, ARect.Height div 2 - 3)
-        ]
-      );
-    end
-    else begin // esExpanded
-      ACanvas.Polyline(
-        [Point(ARect.Right - 20, ARect.Height div 2 + 3),
-         Point(ARect.Right - 15, ARect.Height div 2 - 2),
-         Point(ARect.Right - 10, ARect.Height div 2 + 3)
-        ]
-      );
-    end;
+    if Item.State = esCollapsed then
+      DrawArrow(ACanvas, Rect(ARect.Right - 20, ARect.Top, ARect.Right, ARect.Bottom), daDown, DrawState, 2, 5)
+    else // esExpanded
+      DrawArrow(ACanvas, Rect(ARect.Right - 20, ARect.Top, ARect.Right, ARect.Bottom), daUp, DrawState, 2, 5);
   end;
 end;
 
