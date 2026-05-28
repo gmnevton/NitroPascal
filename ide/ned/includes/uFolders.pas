@@ -269,7 +269,7 @@ type
     constructor Create(AOwner: TComponent; AKind: TScrollBarKind); reintroduce;
     destructor Destroy; override;
     // methods
-    procedure SetSize(const ARange, APageSize: Integer);
+    procedure SetInfo(const ARange, APageSize, APosition: Integer);
     // properties
     property Range: Integer read FRange write SetRange;
     property PageSize: Integer read FPageSize write SetPageSize;
@@ -389,6 +389,7 @@ type
     procedure DoItemClick(Item: TEntryItem); dynamic;
     procedure EnsureItemVisible;
     //function GetClientRect: TRect; override;
+    function ClientArea: TRect;
     function ItemFromPoint(X, Y: Integer): TEntryItem;
     function ItemRect(Item: Integer): TRect;
     function ItemAtPos(const Pos: TPoint; Existing: Boolean = False): Integer;
@@ -2069,7 +2070,7 @@ begin
 //  FullRepaint := False;
   DoubleBuffered := True;
   ParentBackground := False;
-  ParentColor := False;
+  ParentColor := True;
   // OS scrollbar width and height
   FXYScrollSize.cx := GetSystemMetrics(SM_CXVSCROLL);
   FXYScrollSize.cy := GetSystemMetrics(SM_CYHSCROLL);
@@ -2155,14 +2156,15 @@ begin
     Result := 0;
 end;
 
-procedure TCustomScrollBar.SetSize(const ARange, APageSize: Integer);
+procedure TCustomScrollBar.SetInfo(const ARange, APageSize, APosition: Integer);
 begin
-  if ARange <= 0 then
+  if (ARange < 0) or (APosition < 0) then
     Exit;
   FUpdating := True;
   try
     Range := ARange;
     PageSize := APageSize;
+    Position := APosition;
   finally
     FUpdating := False;
     Invalidate;
@@ -2187,7 +2189,7 @@ end;
 
 procedure TCustomScrollBar.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
-//  Message.Result := 1;
+  Message.Result := 1;
 end;
 
 procedure TCustomScrollBar.WMNCHitTest(var Msg: TWMNCHitTest);
@@ -2202,28 +2204,83 @@ end;
 
 function TCustomScrollBar.CalculateThumbRect(const DrawRect: TRect; const Button: TCustomScrollBarThumbButtonEnum): TRect;
 var
+  ButtonSize: Integer;
+  TrackTop: Integer;
+  TrackBottom: Integer;
   TrackHeight: Integer;
   ThumbHeight: Integer;
   ThumbTop: Integer;
+  DrawWidth: Integer;
+  DrawHeight: Integer;
+  AvailableTrack: Integer;
 begin
+  DrawWidth := DrawRect.Width;
+  DrawHeight := DrawRect.Height;
+
+  ButtonSize := FXYScrollSize.cy;
+
   case Button of
-    tbTop   : Result := Rect(0, 0, DrawRect.Width, FXYScrollSize.cy);
-    tbScroll: begin
-      if FPageSize >= FRange then begin
-        ThumbTop := FXYScrollSize.cy - 1;
-        TrackHeight := DrawRect.Height - FXYScrollSize.cy * 2;
-        ThumbHeight := 0;
-      end
-      else begin
-        ThumbHeight  := MulDiv(DrawRect.Height, FPageSize, FRange);
-        TrackHeight := DrawRect.Height - ThumbHeight;
-        ThumbTop := MulDiv(TrackHeight, FPosition, GetMaxPosition);
-      end;
-//      ThumbSize := Round(ControlSize * ControlSize / SB.Range);
-//      ThumbPos := Round(ControlSize * SB.Position / SB.Range);
-      Result := Rect(0, ThumbTop, DrawRect.Width, ThumbTop + TrackHeight);
+    tbTop: begin
+      Result := Rect(
+        DrawRect.Left,
+        DrawRect.Top,
+        DrawRect.Right,
+        DrawRect.Top + ButtonSize
+      );
     end;
-    tbBottom: Result := Rect(0, DrawRect.Height - FXYScrollSize.cy, DrawRect.Width, DrawRect.Height);
+
+    tbBottom: begin
+      Result := Rect(
+        DrawRect.Left,
+        DrawRect.Bottom - ButtonSize,
+        DrawRect.Right,
+        DrawRect.Bottom
+      );
+    end;
+
+    tbScroll: begin
+        TrackTop := DrawRect.Top + ButtonSize;
+        TrackBottom := DrawRect.Bottom - ButtonSize;
+
+        TrackHeight := TrackBottom - TrackTop;
+
+        // No scrolling needed
+        if (FRange <= 0) or (FPageSize >= FRange) then begin
+          Result := Rect(
+            DrawRect.Left,
+            TrackTop,
+            DrawRect.Right,
+            TrackBottom
+          );
+          Exit;
+        end;
+
+        // Thumb size proportional to visible content
+        ThumbHeight := MulDiv(TrackHeight, FPageSize, FRange);
+
+        // Minimum thumb size
+        if ThumbHeight < 32 then
+          ThumbHeight := 32;
+
+        // Never exceed track
+        if ThumbHeight > TrackHeight then
+          ThumbHeight := TrackHeight;
+
+        // Available movement range
+        AvailableTrack := TrackHeight - ThumbHeight;
+
+        // Thumb position
+        ThumbTop := TrackTop + MulDiv(AvailableTrack, FPosition, GetMaxPosition);
+
+        Result := Rect(
+          DrawRect.Left,
+          ThumbTop,
+          DrawRect.Right,
+          ThumbTop + ThumbHeight
+        );
+      end;
+  else
+    Result := Rect(0, 0, 0, 0);
   end;
 end;
 
@@ -2251,7 +2308,7 @@ end;
 procedure TCustomScrollBar.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
 begin
   // do we really want to paint background ??? how about transparent control
-  Canvas.Brush.Color := clGray;
+  Canvas.Brush.Color := Color;
   Canvas.FillRect(ARect);
 end;
 
@@ -2261,18 +2318,18 @@ var
 begin
   // paint top thumb
   ThumbRect := CalculateThumbRect(ARect, tbTop);
-  Canvas.Brush.Color := clGray;
+  Canvas.Brush.Color := Color;
   Canvas.FillRect(ThumbRect);
   DrawArrow(ACanvas, ThumbRect, daUp, [], 2, 4);
 
   // paint scroll
   ThumbRect := CalculateThumbRect(ARect, tbScroll);
-  Canvas.Brush.Color := clGreen;
+  Canvas.Brush.Color := clGray;
   Canvas.FillRect(ThumbRect);
 
   // paint bottom thumb
   ThumbRect := CalculateThumbRect(ARect, tbBottom);
-  Canvas.Brush.Color := clGray;
+  Canvas.Brush.Color := Color;
   Canvas.FillRect(ThumbRect);
   DrawArrow(ACanvas, ThumbRect, daDown, [], 2, 4);
 end;
@@ -2283,6 +2340,7 @@ constructor TCustomEntryView.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   Color := clAppWorkspace;
+  DoubleBuffered := True;
   Height := 250;
   Width := 150;
   //
@@ -2467,6 +2525,14 @@ end;
 ////  Result.Right := Width - IfThen(CanShowScrollBar or FVerticalScrollBar.Visible, FVerticalScrollBar.Width, 0);
 ////  Result.Bottom := Height;
 //end;
+
+function TCustomEntryView.ClientArea: TRect;
+begin
+  Result.Left := 0;
+  Result.Top := 0;
+  Result.Right := Width - IfThen(CanShowScrollBar or FVerticalScrollBar.Visible, FVerticalScrollBar.Width, 0);
+  Result.Bottom := Height;
+end;
 
 function TCustomEntryView.ItemFromPoint(X, Y: Integer): TEntryItem;
 var
@@ -2972,7 +3038,7 @@ begin
     ScrollInfo.cbSize := SizeOf(TScrollInfo);
     ScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
     ScrollInfo.nMin := 0;
-    ScrollInfo.nMax := count - 1;
+    ScrollInfo.nMax := count;
     ScrollInfo.nPage := ClientHeight div FEntryHeight;
     ScrollInfo.nPos := FTopIndex;
     //
@@ -2980,6 +3046,7 @@ begin
       SetTopIndex(count - Integer(ScrollInfo.nPage));
     // and here is the magic, we let know to OS that we have vertical scrollbar and sets its info, but OS does not render it, we do it ourselfs
     SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
+    FVerticalScrollBar.SetInfo(ScrollInfo.nMax{ * FEntryHeight}, ScrollInfo.nPage, ScrollInfo.nPos);
   end;
 //  with ScrollInfo do begin
 //    ScrollInfo.cbSize := SizeOf(TScrollInfo);
@@ -3028,7 +3095,7 @@ procedure TCustomEntryView.Paint;
 var
   Rect: TRect;
 begin
-  Rect := ClientRect;
+  Rect := ClientArea;
   DrawBackground(Canvas, Rect); // clear background
   DrawItems(Canvas, Rect); //draw items
 end;
@@ -3783,6 +3850,7 @@ begin
     ScrollInfo.fMask := SIF_POS;
     ScrollInfo.nPos := FTopIndex;
     SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
+    FVerticalScrollBar.Position := ScrollInfo.nPos;
     Scroll(Delta);
     InvalidateItem(FItemIndex);
     if FHotTrack then begin
@@ -3794,6 +3862,8 @@ begin
         else
           FHotIndex := -1;
     end;
+//    if FVerticalScrollBar.Visible then
+//      FVerticalScrollBar.Invalidate;
   end;
 end;
 
@@ -3828,7 +3898,7 @@ function TCustomEntryView.GetSelectedRect: TRect;
 var
   I: Integer;
 begin
-  Result := ClientRect;
+  Result := ClientArea;
   if FBorderStyle = bsSingle then
     InflateRect(Result, -GetBorder, -GetBorder);
   if Selected <> Nil then begin
@@ -3873,7 +3943,7 @@ begin
   ScrollBar := FVerticalScrollBar;
   ControlSize := Height;
   //
-  if (ScrollBar.Range = 0) or (ScrollBar.Range <= ControlSize) then
+  if (ScrollBar.Range = 0) or (ScrollBar.Range * FEntryHeight <= ControlSize) then
     Result := False;
 end;
 
@@ -3890,7 +3960,7 @@ begin
   if FVerticalScrollBar.Range = 0 then
     Exit;
 
-  FVerticalScrollBar.SetSize(VisibleEntriesCount * FEntryHeight, ClientHeight div FEntryHeight);
+  FVerticalScrollBar.SetInfo(VisibleEntriesCount, ControlSize div FEntryHeight, FTopIndex);
 end;
 
 procedure TCustomEntryView.ShowModernScrollBar;
@@ -3967,7 +4037,7 @@ begin
   Details := PEntryItemDetails(Message.WParam);
   Details.BorderStyle := BorderStyle;
   Details.Selected := Selected;
-  Details.ClientRect := ClientRect;
+  Details.ClientRect := ClientArea;
   Details.EntryHeight := FEntryHeight;
   //Details.FolderHeight := FFolderHeight;
   Details.TopIndex := FTopIndex;
@@ -4043,13 +4113,13 @@ procedure TCustomEntryView.WMVScroll(var Message: TWMScroll);
 begin
   HideNativeScrollBars;
   case Message.ScrollCode of
+    SB_TOP       : SetTopIndex(0);
     SB_BOTTOM    : SetTopIndex(VisibleEntriesCount - 1);
     SB_LINEDOWN  : SetTopIndex(FTopIndex + 1);
     SB_LINEUP    : SetTopIndex(FTopIndex - 1);
     SB_PAGEDOWN  : SetTopIndex(FTopIndex + ClientHeight div FEntryHeight);
     SB_PAGEUP    : SetTopIndex(FTopIndex - ClientHeight div FEntryHeight);
     SB_THUMBTRACK: SetTopIndex(Message.Pos);
-    SB_TOP       : SetTopIndex(0);
   end;
 end;
 

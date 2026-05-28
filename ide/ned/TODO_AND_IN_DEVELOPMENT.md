@@ -26,7 +26,11 @@
   
   - [x] Speed up lists scrolling
   
-  - [ ] Custom paint scrollbar (in progress)
+  - [x] Custom paint scrollbar
+  
+  - [ ] Fix custom painted scrollbar flickering
+  
+  - [ ] Implement Windows 10 like scrollbar rendering system
   
   - [ ] Implement smooth scroll
   

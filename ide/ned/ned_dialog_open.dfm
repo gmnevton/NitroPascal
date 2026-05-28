@@ -14,7 +14,6 @@ object NEDDialogOpen: TNEDDialogOpen
   Font.Style = []
   KeyPreview = True
   Padding.Left = 1
-  Padding.Top = 1
   Padding.Right = 1
   Padding.Bottom = 1
   OldCreateOrder = True
@@ -28,7 +27,7 @@ object NEDDialogOpen: TNEDDialogOpen
   TextHeight = 13
   object UTitleBar1: TUTitleBar
     Left = 1
-    Top = 1
+    Top = 0
     Width = 598
     Align = alTop
     Color = 4210752
@@ -67,18 +66,20 @@ object NEDDialogOpen: TNEDDialogOpen
   end
   object SplitterEx1: TSplitterEx
     Left = 201
-    Top = 74
+    Top = 73
     Width = 7
-    Height = 291
+    Height = 292
     AssignedControl = UPanel2
     AutoSnap = False
     DrawSpacer = True
     MinSize = 50
     ResizeStyle = rsUpdate
+    ExplicitTop = 74
+    ExplicitHeight = 291
   end
   object UPanel1: TUPanel
     Left = 1
-    Top = 33
+    Top = 32
     Width = 598
     Height = 41
     Align = alTop
@@ -94,6 +95,7 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
+    ExplicitTop = 33
     object txtPath: TUText
       AlignWithMargins = True
       Left = 53
@@ -144,9 +146,9 @@ object NEDDialogOpen: TNEDDialogOpen
   end
   object UPanel2: TUPanel
     Left = 1
-    Top = 74
+    Top = 73
     Width = 200
-    Height = 291
+    Height = 292
     Align = alLeft
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
@@ -160,6 +162,8 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBtnFace
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
+    ExplicitTop = 74
+    ExplicitHeight = 291
   end
   object UPanel3: TUPanel
     Left = 1

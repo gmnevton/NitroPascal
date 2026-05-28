@@ -81,6 +81,9 @@ type
     procedure FolderChanged(Sender: TObject);
     procedure FilesViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum);
     procedure FilesViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean);
+  protected
+    function CanDrawBorder: Boolean; override;
+    procedure DoDrawBorder; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -268,6 +271,21 @@ begin
   FilesView.Free;
   FolderView.Free;
   inherited;
+end;
+
+function TNEDDialogOpen.CanDrawBorder: Boolean;
+begin
+  Result := True;
+end;
+
+procedure TNEDDialogOpen.DoDrawBorder;
+begin
+  UpdateBorderColor;
+  Canvas.Pen.Color := BorderColor;
+  Canvas.MoveTo(0, 0);
+  Canvas.LineTo(0, Height - 1);  // left
+  Canvas.LineTo(Width - 1, Height - 1); // bottom
+  Canvas.LineTo(Width - 1, 0); // right
 end;
 
 procedure TNEDDialogOpen.FormCreate(Sender: TObject);
@@ -784,6 +802,7 @@ begin
     try
       Self.Show;
       Self.BringToFront;
+      Self.Invalidate;
       //Self.SetFocus;
       FilesView.SetFocus;
       //Self.KeyPreview := False;
