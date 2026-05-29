@@ -11,6 +11,7 @@ uses
   Classes,
   Graphics,
   Controls,
+  ExtCtrls,
   Forms,
   ImgList,
   CommCtrl,
@@ -231,6 +232,18 @@ type
 // but need to keep small steps, one after another, so handle basics first
 
   TCustomScrollBarThumbButtonEnum = (tbTop, tbScroll, tbBottom);
+  TCustomScrollBarShowingEnum = (
+    shHidden,
+    shShowing, // shFadeInThin,
+    shVisibleThin,
+    shExpanding,
+    shVisibleFull, //shExpanded,
+    shCollapse,
+    //shVisibleThin
+    shHiding // shFadeOut
+  );
+
+  TCustomScrollBarShowingChangeEvent = procedure (Sender: TObject; State: TCustomScrollBarShowingEnum) of object;
 
   TCustomScrollBar = class(TCustomControl)
   private
@@ -248,15 +261,31 @@ type
     FScrollColorInactive: TColor;
     FScrollColorActive: TColor;
     FScrollColorPressed: TColor;
+    //
+    //
+    FTimer: TTimer;
+    FVisibleState: Boolean;
+    FCurrentWidth: Integer;
+    FTargetWidth: Integer;
+    FCurrentAlpha: Byte;
+    FTargetAlpha: Byte;
+    FThinWidth: Integer;
+    FExpandedWidth: Integer;
+    //
+    FShowing: TCustomScrollBarShowingEnum;
+    FShowingChangeEvent: TCustomScrollBarShowingChangeEvent;
   private
     procedure SetRange(const Value: Integer);
     procedure SetPageSize(const Value: Integer);
     procedure SetPosition(const Value: Integer);
     function GetMaxPosition: Integer;
+    procedure DoShowing(const AState: TCustomScrollBarShowingEnum);
+    procedure AnimationTimer(Sender: TObject);
     // messages
-    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
-    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure CMMouseEnter(var Msg: TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Msg: TMessage); message CM_MOUSELEAVE;
+    procedure CMVisibleChanged(var Msg: TMessage); message CM_VISIBLECHANGED;
+    procedure WMEraseBkgnd(var Msg: TWMEraseBkgnd); message WM_ERASEBKGND;
     procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
   protected
     function  CalculateThumbRect(const DrawRect: TRect; const Button: TCustomScrollBarThumbButtonEnum): TRect;
@@ -270,11 +299,14 @@ type
     destructor Destroy; override;
     // methods
     procedure SetInfo(const ARange, APageSize, APosition: Integer);
+    procedure ShowAnimated;
+    procedure HideAnimated;
     // properties
     property Range: Integer read FRange write SetRange;
     property PageSize: Integer read FPageSize write SetPageSize;
     property Position: Integer read FPosition write SetPosition;
     property MaxPosition: Integer read GetMaxPosition;
+    property OnShowingChange: TCustomScrollBarShowingChangeEvent read FShowingChangeEvent write FShowingChangeEvent;
   end;
 
   TEntryViewScrollBar = class(TCustomScrollBar)
@@ -330,6 +362,7 @@ type
     FShiftIndex: Integer;
     FEntriesCount: Integer;
     FVisibleEntriesCount: Integer;
+    FDrawVerticalScrollBar: Boolean;
     FVerticalScrollBar: TEntryViewScrollBar;
   private // setters
     procedure SetActiveIndex(Value: Integer);
@@ -361,27 +394,29 @@ type
     procedure UpdateModernScrollBar;
     procedure ShowModernScrollBar;
     procedure HideModernScrollBar;
+    procedure InvalidateScrollBarArea;
+    procedure VerticalScrollBarShowingChange(Sender: TObject; State: TCustomScrollBarShowingEnum);
   private // internal methods
     procedure ImagesChange(Sender: TObject);
     procedure OverlayChange(Sender: TObject);
     //
-    procedure CMDesignHitTest(var Message: TCMDesignHitTest); message CM_DESIGNHITTEST;
-    procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
-    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
-    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-    procedure CMEntryImages(var Message: TMessage); message CM_ENTRYIMAGES;
-    //procedure CMItemImages(var Message: TMessage); message CM_ITEMIMAGES;
-    procedure CMItemDetails(var Message: TMessage); message CM_ITEMDETAILS;
-    procedure CNItemClick(var Message: TMessage); message CN_ITEMCLICK;
-    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-    procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
-    procedure WMSize(var Message: TWMSize); message WM_SIZE;
-    procedure WMMouseWheel(var Message: TWMMouseWheel); message WM_MOUSEWHEEL;
-    procedure WMVScroll(var Message: TWMScroll); message WM_VSCROLL;
-    procedure WMHScroll(var Message: TWMScroll); message WM_HSCROLL;
-    procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
-    procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
-    procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+    procedure CMDesignHitTest(var Msg: TCMDesignHitTest); message CM_DESIGNHITTEST;
+    procedure CMFontChanged(var Msg: TMessage); message CM_FONTCHANGED;
+    procedure CMMouseEnter(var Msg: TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Msg: TMessage); message CM_MOUSELEAVE;
+    procedure CMEntryImages(var Msg: TMessage); message CM_ENTRYIMAGES;
+    //procedure CMItemImages(var Msg: TMessage); message CM_ITEMIMAGES;
+    procedure CMItemDetails(var Msg: TMessage); message CM_ITEMDETAILS;
+    procedure CNItemClick(var Msg: TMessage); message CN_ITEMCLICK;
+    procedure WMEraseBkgnd(var Msg: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
+    procedure WMSize(var Msg: TWMSize); message WM_SIZE;
+    procedure WMMouseWheel(var Msg: TWMMouseWheel); message WM_MOUSEWHEEL;
+    procedure WMVScroll(var Msg: TWMScroll); message WM_VSCROLL;
+    procedure WMHScroll(var Msg: TWMScroll); message WM_HSCROLL;
+    procedure WMTimer(var Msg: TWMTimer); message WM_TIMER;
+    procedure WMSetFocus(var Msg: TWMSetFocus); message WM_SETFOCUS;
+    procedure WMKillFocus(var Msg: TWMKillFocus); message WM_KILLFOCUS;
     procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
@@ -390,6 +425,7 @@ type
     procedure EnsureItemVisible;
     //function GetClientRect: TRect; override;
     function ClientArea: TRect;
+    function VerticalScrollBarArea: TRect;
     function ItemFromPoint(X, Y: Integer): TEntryItem;
     function ItemRect(Item: Integer): TRect;
     function ItemAtPos(const Pos: TPoint; Existing: Boolean = False): Integer;
@@ -2061,8 +2097,9 @@ constructor TCustomScrollBar.Create(AOwner: TComponent; AKind: TScrollBarKind);
 begin
   inherited Create(AOwner);
   // inherited properties first
+  ControlStyle := ControlStyle + [csOpaque];
 {$IF CompilerVersion > 29}
-  StyleElements :=[];
+  StyleElements := [];
 {$IFEND}
   BevelEdges := [];
   BevelOuter := bvNone;
@@ -2077,7 +2114,7 @@ begin
   //
   Width := FXYScrollSize.cx;
   //
-  Visible := True;
+  Visible := False;
 
   // our properties
   FRange := -1;
@@ -2093,11 +2130,29 @@ begin
   FScrollColorInactive := $00202020; // xxBBGGRR
   FScrollColorActive   := $00404040;
   FScrollColorPressed  := $00808080;
+  //
+  FShowing := shHidden;
+  FShowingChangeEvent := Nil;
+  //
+  FTimer := TTimer.Create(Self);
+  FTimer.Interval := 15;
+  FTimer.OnTimer := AnimationTimer;
+  FTimer.Enabled := False;
+  //
+  FVisibleState := False;
+  FCurrentWidth := 0;
+  FTargetWidth := Width;
+  FCurrentAlpha := 0;
+  FTargetAlpha := 0;
+  FThinWidth := 1;
+  FExpandedWidth := Width;
 end;
 
 destructor TCustomScrollBar.Destroy;
 begin
-
+  FTimer.OnTimer := Nil;
+  FTimer.Enabled := False;
+  FTimer.Free;
   inherited;
 end;
 
@@ -2156,6 +2211,47 @@ begin
     Result := 0;
 end;
 
+procedure TCustomScrollBar.DoShowing(const AState: TCustomScrollBarShowingEnum);
+begin
+  if FShowing <> AState then begin
+    FShowing := AState;
+    if Assigned(FShowingChangeEvent) then
+      FShowingChangeEvent(Self, AState);
+  end;
+end;
+
+procedure TCustomScrollBar.AnimationTimer(Sender: TObject);
+begin
+  // width interpolation
+  FCurrentWidth := FCurrentWidth + Round((FTargetWidth - FCurrentWidth) * 0.25);
+
+  // alpha interpolation
+  FCurrentAlpha := FCurrentAlpha + Round((FTargetAlpha - FCurrentAlpha) * 0.25);
+
+
+  Invalidate;
+
+  // stop when close enough
+  if Abs(FCurrentWidth - FTargetWidth) < 2 then
+    FCurrentWidth := FTargetWidth;
+
+  if Abs(FCurrentAlpha - FTargetAlpha) < 2 then
+    FCurrentAlpha := FTargetAlpha;
+
+  if (FCurrentWidth = FTargetWidth) and (FCurrentAlpha = FTargetAlpha) then begin
+    FTimer.Enabled := False;
+    case FShowing of
+      shShowing  : DoShowing(shVisibleThin);
+      shExpanding: DoShowing(shVisibleFull);
+      shCollapse : DoShowing(shVisibleThin);
+      shHiding   : begin
+        DoShowing(shHidden);
+        Visible := False;
+      end;
+    end;
+  end;
+end;
+
 procedure TCustomScrollBar.SetInfo(const ARange, APageSize, APosition: Integer);
 begin
   if (ARange < 0) or (APosition < 0) then
@@ -2171,25 +2267,69 @@ begin
   end;
 end;
 
-procedure TCustomScrollBar.CMMouseEnter(var Message: TMessage);
+procedure TCustomScrollBar.ShowAnimated;
 begin
-  inherited;
-//  if not Visible then
-//    Show;
-  Repaint; // ???
+  if not Visible and (FShowing = shHidden) then begin
+    Visible := True;
+
+    FTargetAlpha := 255;
+    FTargetWidth := FThinWidth;
+
+    FTimer.Enabled := True;
+  end;
 end;
 
-procedure TCustomScrollBar.CMMouseLeave(var Message: TMessage);
+procedure TCustomScrollBar.HideAnimated;
 begin
-  inherited;
-//  if Visible then
-//    Hide;
-  Repaint;
+  FTargetAlpha := 0;
+  FTargetWidth := 1;
+
+  FTimer.Enabled := True;
 end;
 
-procedure TCustomScrollBar.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+procedure TCustomScrollBar.CMMouseEnter(var Msg: TMessage);
 begin
-  Message.Result := 1;
+  inherited;
+  FTargetWidth := FExpandedWidth;
+  FTimer.Enabled := True;
+end;
+
+procedure TCustomScrollBar.CMMouseLeave(var Msg: TMessage);
+begin
+  inherited;
+  FTargetWidth := FThinWidth;
+  FTimer.Enabled := True;
+end;
+
+//  shHidden,
+//  shShowing, // shFadeInThin,
+//  shVisibleThin,
+//  shExpanding,
+//  shVisibleFull, //shExpanded,
+//  shCollapse,
+//  //shVisibleThin
+//  shHiding // shFadeOut
+
+procedure TCustomScrollBar.CMVisibleChanged(var Msg: TMessage);
+begin
+  if (Msg.WParam = 0) and (FShowing = shVisibleThin) then
+    DoShowing(shHiding)
+  else if (Msg.WParam = 1) and (FShowing = shHidden) then
+    DoShowing(shShowing);
+  //
+  inherited;
+  //
+//  if (FShowing = shShowing) or (FShowing = shHiding) then begin
+//    if FShowing = shHiding then
+//      DoShowing(shHidden)
+//    else if FShowing = shShowing then
+//      DoShowing(shVisibleThin);
+//  end;
+end;
+
+procedure TCustomScrollBar.WMEraseBkgnd(var Msg: TWMEraseBkgnd);
+begin
+  Msg.Result := 1;
 end;
 
 procedure TCustomScrollBar.WMNCHitTest(var Msg: TWMNCHitTest);
@@ -2302,36 +2442,61 @@ var
 begin
   LRect := ClientRect;
   DrawBackground(Canvas, LRect); // clear background
+  LRect.Left := Width - FTargetWidth;
   DrawButtons(Canvas, LRect); // draw buttons
 end;
 
 procedure TCustomScrollBar.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
 begin
   // do we really want to paint background ??? how about transparent control
-  Canvas.Brush.Color := Color;
-  Canvas.FillRect(ARect);
+  Canvas.Brush.Style := bsSolid;
+  // transparent background simulation
+  Canvas.Brush.Color := TWinControlAccess(Parent).Color;
+  Canvas.FillRect(ClientRect);
+end;
+
+function LerpByte(A, B: Byte; T: Single): Byte;
+begin
+  Result := Round(A + (B - A) * T);
 end;
 
 procedure TCustomScrollBar.DrawButtons(const ACanvas: TCanvas; const ARect: TRect);
 var
   ThumbRect: TRect;
+  BG, FG: COLORREF;
+  R, G, B: Byte;
+  T: Single;
 begin
   // paint top thumb
-  ThumbRect := CalculateThumbRect(ARect, tbTop);
-  Canvas.Brush.Color := Color;
-  Canvas.FillRect(ThumbRect);
-  DrawArrow(ACanvas, ThumbRect, daUp, [], 2, 4);
+  if (FShowing = shExpanding) or (FShowing = shVisibleFull) or (FShowing = shCollapse) then begin
+    ThumbRect := CalculateThumbRect(ARect, tbTop);
+    Canvas.Brush.Color := Color;
+    Canvas.FillRect(ThumbRect);
+    DrawArrow(ACanvas, ThumbRect, daUp, [], 2, 4);
+  end;
 
   // paint scroll
   ThumbRect := CalculateThumbRect(ARect, tbScroll);
-  Canvas.Brush.Color := clGray;
+  // thumb color
+  BG := ColorToRGB(TWinControlAccess(Parent).Color);
+  FG := ColorToRGB(clGray);
+
+  T := FCurrentAlpha / 255.0;
+
+  R := LerpByte(GetRValue(BG), GetRValue(FG), T);
+  G := LerpByte(GetGValue(BG), GetGValue(FG), T);
+  B := LerpByte(GetBValue(BG), GetBValue(FG), T);
+
+  Canvas.Brush.Color := RGB(R, G, B);
   Canvas.FillRect(ThumbRect);
 
   // paint bottom thumb
-  ThumbRect := CalculateThumbRect(ARect, tbBottom);
-  Canvas.Brush.Color := Color;
-  Canvas.FillRect(ThumbRect);
-  DrawArrow(ACanvas, ThumbRect, daDown, [], 2, 4);
+  if (FShowing = shExpanding) or (FShowing = shVisibleFull) or (FShowing = shCollapse) then begin
+    ThumbRect := CalculateThumbRect(ARect, tbBottom);
+    Canvas.Brush.Color := Color;
+    Canvas.FillRect(ThumbRect);
+    DrawArrow(ACanvas, ThumbRect, daDown, [], 2, 4);
+  end;
 end;
 
 { TCustomEntryView }
@@ -2381,6 +2546,9 @@ begin
   FVerticalScrollBar.Parent := Self;
   FVerticalScrollBar.Width := 16;
   FVerticalScrollBar.Align := alRight;
+  FVerticalScrollBar.OnShowingChange := VerticalScrollBarShowingChange;
+  //
+  FDrawVerticalScrollBar := True;
 end;
 
 destructor TCustomEntryView.Destroy;
@@ -2486,6 +2654,8 @@ begin
   // remove OS (windows) painted scrollbars
   // after this we need our own scrollbar component, that will paint them as we want, so with a little help form non-human this task will be faster
   Params.WindowClass.style := Params.WindowClass.style and not (CS_HREDRAW or CS_VREDRAW);
+  // don't repaint areas occupied by child controls
+  Params.Style := Params.Style or WS_CLIPCHILDREN;
 end;
 
 procedure TCustomEntryView.CreateHandle;
@@ -2530,7 +2700,15 @@ function TCustomEntryView.ClientArea: TRect;
 begin
   Result.Left := 0;
   Result.Top := 0;
-  Result.Right := Width - IfThen(CanShowScrollBar or FVerticalScrollBar.Visible, FVerticalScrollBar.Width, 0);
+  Result.Right := Width - IfThen(CanShowScrollBar{ or FVerticalScrollBar.Visible}, FVerticalScrollBar.Width, 0);
+  Result.Bottom := Height;
+end;
+
+function TCustomEntryView.VerticalScrollBarArea: TRect;
+begin
+  Result.Left := Width - IfThen(CanShowScrollBar{ or FVerticalScrollBar.Visible}, FVerticalScrollBar.Width, 0);
+  Result.Top := 0;
+  Result.Right := Width;
   Result.Bottom := Height;
 end;
 
@@ -3093,11 +3271,16 @@ end;
 
 procedure TCustomEntryView.Paint;
 var
-  Rect: TRect;
+  C, SB: TRect;
 begin
-  Rect := ClientArea;
-  DrawBackground(Canvas, Rect); // clear background
-  DrawItems(Canvas, Rect); //draw items
+  C := ClientArea;
+  DrawBackground(Canvas, C); // clear background
+  if FDrawVerticalScrollBar or (not MouseInClient and Focused and not FVerticalScrollBar.Visible) then begin
+    FDrawVerticalScrollBar := False;
+    SB := VerticalScrollBarArea;
+    DrawBackground(Canvas, SB); // clear background
+  end;
+  DrawItems(Canvas, C); //draw items
 end;
 
 procedure TCustomEntryView.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
@@ -3965,8 +4148,9 @@ end;
 
 procedure TCustomEntryView.ShowModernScrollBar;
 begin
-  //FVerticalScrollBar.Visible := CanShowScrollBar;
-  FVerticalScrollBar.Visible := True;
+  //FVerticalScrollBar.Visible := True;
+  if CanShowScrollBar then
+    FVerticalScrollBar.ShowAnimated;
   UpdateModernScrollBar;
   if FVerticalScrollBar.Visible then
     FVerticalScrollBar.BringToFront;
@@ -3974,19 +4158,32 @@ end;
 
 procedure TCustomEntryView.HideModernScrollBar;
 begin
-//  FVerticalScrollBar.Visible := False;
+  FVerticalScrollBar.HideAnimated;
 end;
 
-procedure TCustomEntryView.CMDesignHitTest(var Message: TCMDesignHitTest);
+procedure TCustomEntryView.InvalidateScrollBarArea;
+begin
+  FDrawVerticalScrollBar := True;
+  Invalidate;
+end;
+
+procedure TCustomEntryView.VerticalScrollBarShowingChange(Sender: TObject; State: TCustomScrollBarShowingEnum);
+begin
+  if State = shHidden then begin
+    InvalidateScrollBarArea;
+  end;
+end;
+
+procedure TCustomEntryView.CMDesignHitTest(var Msg: TCMDesignHitTest);
 const
   HitTests: array[Boolean] of Integer = (0, 1);
 begin
   inherited;
-  with Message do
+  with Msg do
     Result := HitTests[EntryFromPoint(XPos, YPos) <> Nil];
 end;
 
-procedure TCustomEntryView.CMFontChanged(var Message: TMessage);
+procedure TCustomEntryView.CMFontChanged(var Msg: TMessage);
 begin
   inherited;
   Canvas.Font := Font;
@@ -3997,7 +4194,7 @@ begin
 //    ImagesChange(FItemImages);
 end;
 
-procedure TCustomEntryView.CMMouseEnter(var Message: TMessage);
+procedure TCustomEntryView.CMMouseEnter(var Msg: TMessage);
 begin
   HideNativeScrollBars;
   ShowModernScrollBar;
@@ -4007,7 +4204,7 @@ begin
   Repaint;
 end;
 
-procedure TCustomEntryView.CMMouseLeave(var Message: TMessage);
+procedure TCustomEntryView.CMMouseLeave(var Msg: TMessage);
 begin
   HideModernScrollBar;
   inherited;
@@ -4020,21 +4217,21 @@ begin
   Repaint;
 end;
 
-procedure TCustomEntryView.CMEntryImages(var Message: TMessage);
+procedure TCustomEntryView.CMEntryImages(var Msg: TMessage);
 begin
-	Message.Result := Integer(FEntryImages);
+	Msg.Result := Integer(FEntryImages);
 end;
 
-//procedure TCustomEntryView.CMItemImages(var Message: TMessage);
+//procedure TCustomEntryView.CMItemImages(var Msg: TMessage);
 //begin
 //	Message.Result := Integer(FItemImages);
 //end;
 
-procedure TCustomEntryView.CMItemDetails(var Message: TMessage);
+procedure TCustomEntryView.CMItemDetails(var Msg: TMessage);
 var
   Details: PEntryItemDetails;
 begin
-  Details := PEntryItemDetails(Message.WParam);
+  Details := PEntryItemDetails(Msg.WParam);
   Details.BorderStyle := BorderStyle;
   Details.Selected := Selected;
   Details.ClientRect := ClientArea;
@@ -4042,26 +4239,26 @@ begin
   //Details.FolderHeight := FFolderHeight;
   Details.TopIndex := FTopIndex;
   //
-  Message.Result := 1;
+  Msg.Result := 1;
 end;
 
-procedure TCustomEntryView.CNItemClick(var Message: TMessage);
+procedure TCustomEntryView.CNItemClick(var Msg: TMessage);
 begin
-  DoItemClick(TEntryItem(Message.WParam));
-  Message.Result := 1;
+  DoItemClick(TEntryItem(Msg.WParam));
+  Msg.Result := 1;
 end;
 
-procedure TCustomEntryView.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+procedure TCustomEntryView.WMEraseBkgnd(var Msg: TWMEraseBkgnd);
 begin
-  Message.Result := 1;
+  Msg.Result := 1;
 end;
 
-procedure TCustomEntryView.WMGetDlgCode(var Message: TWMGetDlgCode);
+procedure TCustomEntryView.WMGetDlgCode(var Msg: TWMGetDlgCode);
 begin
-  Message.Result := DLGC_WANTARROWS or DLGC_WANTCHARS;
+  Msg.Result := DLGC_WANTARROWS or DLGC_WANTCHARS;
 end;
 
-procedure TCustomEntryView.WMSize(var Message: TWMSize);
+procedure TCustomEntryView.WMSize(var Msg: TWMSize);
 begin
   inherited;
   HideNativeScrollBars;
@@ -4069,13 +4266,13 @@ begin
   ShowModernScrollBar;
 end;
 
-procedure TCustomEntryView.WMMouseWheel(var Message: TWMMouseWheel);
+procedure TCustomEntryView.WMMouseWheel(var Msg: TWMMouseWheel);
 var
   Delta: Integer;
   p: TPoint;
 begin
 //  if Selected <> Nil then begin
-    Delta := -Message.WheelDelta div 120;
+    Delta := -Msg.WheelDelta div 120;
 //    if not IsRectEmpty(ButtonRect[fbScrollUp]) and (Delta = -1) then
 //      Selected.TopIndex := Selected.TopIndex - 1
 //    else if not IsRectEmpty(ButtonRect[fbScrollDown]) and (Delta = 1) then
@@ -4109,27 +4306,27 @@ begin
   end;
 end;
 
-procedure TCustomEntryView.WMVScroll(var Message: TWMScroll);
+procedure TCustomEntryView.WMVScroll(var Msg: TWMScroll);
 begin
   HideNativeScrollBars;
-  case Message.ScrollCode of
+  case Msg.ScrollCode of
     SB_TOP       : SetTopIndex(0);
     SB_BOTTOM    : SetTopIndex(VisibleEntriesCount - 1);
     SB_LINEDOWN  : SetTopIndex(FTopIndex + 1);
     SB_LINEUP    : SetTopIndex(FTopIndex - 1);
     SB_PAGEDOWN  : SetTopIndex(FTopIndex + ClientHeight div FEntryHeight);
     SB_PAGEUP    : SetTopIndex(FTopIndex - ClientHeight div FEntryHeight);
-    SB_THUMBTRACK: SetTopIndex(Message.Pos);
+    SB_THUMBTRACK: SetTopIndex(Msg.Pos);
   end;
 end;
 
-procedure TCustomEntryView.WMHScroll(var Message: TWMScroll);
+procedure TCustomEntryView.WMHScroll(var Msg: TWMScroll);
 begin
   // we do not scroll left/right
   HideNativeScrollBars;
 end;
 
-procedure TCustomEntryView.WMTimer(var Message: TWMTimer);
+procedure TCustomEntryView.WMTimer(var Msg: TWMTimer);
 begin
 //  if FButtons = [] then begin
 //    KillTimer(Handle, 1);
@@ -4150,14 +4347,17 @@ begin
 //    KillTimer(Handle, 1);
 end;
 
-procedure TCustomEntryView.WMSetFocus(var Message: TWMSetFocus);
+procedure TCustomEntryView.WMSetFocus(var Msg: TWMSetFocus);
 begin
+  HideNativeScrollBars;
+  ShowModernScrollBar;
   inherited;
   Invalidate;
 end;
 
-procedure TCustomEntryView.WMKillFocus(var Message: TWMKillFocus);
+procedure TCustomEntryView.WMKillFocus(var Msg: TWMKillFocus);
 begin
+  HideModernScrollBar;
   inherited;
 //  FMouseCapture := False;
 //  FDownIndex := -1;
