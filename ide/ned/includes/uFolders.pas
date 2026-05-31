@@ -231,19 +231,20 @@ type
 // this will allow us to receive OS events directly, so mouse enter/leave, mouse move, clicks and potentially gestures are to handle
 // but need to keep small steps, one after another, so handle basics first
 
-  TCustomScrollBarThumbButtonEnum = (tbTop, tbScroll, tbBottom);
-  TCustomScrollBarShowingEnum = (
+  TCustomScrollBarThumbButtonEnum = (tbTop, tbScroll, tbTrack, tbBottom);
+  TCustomScrollBarHitTestEnum = (htNone, htTopButton, htBottomButton, htThumb, htTrack);
+  TCustomScrollBarStateEnum = (
     shHidden,
     shShowing, // shFadeInThin,
     shVisibleThin,
-    shExpanding,
+    shExpand,
     shVisibleFull, //shExpanded,
     shCollapse,
     //shVisibleThin
     shHiding // shFadeOut
   );
 
-  TCustomScrollBarShowingChangeEvent = procedure (Sender: TObject; State: TCustomScrollBarShowingEnum) of object;
+  TCustomScrollBarStateChangeEvent = procedure (Sender: TObject; State: TCustomScrollBarStateEnum) of object;
 
   TCustomScrollBar = class(TCustomControl)
   private
@@ -263,7 +264,8 @@ type
     FScrollColorPressed: TColor;
     //
     //
-    FTimer: TTimer;
+    FAnimationTimer: TTimer;
+    FHoverTimer: TTimer;
     FVisibleState: Boolean;
     FCurrentWidth: Integer;
     FTargetWidth: Integer;
@@ -272,15 +274,26 @@ type
     FThinWidth: Integer;
     FExpandedWidth: Integer;
     //
-    FShowing: TCustomScrollBarShowingEnum;
-    FShowingChangeEvent: TCustomScrollBarShowingChangeEvent;
+    FWantVisible: Boolean;
+    FWantExpanded: Boolean;
+    FState: TCustomScrollBarStateEnum;
+    FStateChangeEvent: TCustomScrollBarStateChangeEvent;
   private
     procedure SetRange(const Value: Integer);
     procedure SetPageSize(const Value: Integer);
     procedure SetPosition(const Value: Integer);
+    procedure SetState(const AState: TCustomScrollBarStateEnum);
     function GetMaxPosition: Integer;
-    procedure DoShowing(const AState: TCustomScrollBarShowingEnum);
+    function GetInteractiveThumbRect: TRect;
+    function HitTest(const P: TPoint): TCustomScrollBarHitTestEnum;
+    procedure UpdateState;
+    procedure DoStateChange(const AState: TCustomScrollBarStateEnum);
+    procedure BeginShowing;
+    procedure BeginHiding;
+    procedure BeginExpand;
+    procedure BeginCollapse;
     procedure AnimationTimer(Sender: TObject);
+    procedure HoverTimer(Sender: TObject);
     // messages
     procedure CMMouseEnter(var Msg: TMessage); message CM_MOUSEENTER;
     procedure CMMouseLeave(var Msg: TMessage); message CM_MOUSELEAVE;
@@ -306,7 +319,7 @@ type
     property PageSize: Integer read FPageSize write SetPageSize;
     property Position: Integer read FPosition write SetPosition;
     property MaxPosition: Integer read GetMaxPosition;
-    property OnShowingChange: TCustomScrollBarShowingChangeEvent read FShowingChangeEvent write FShowingChangeEvent;
+    property OnStateChange: TCustomScrollBarStateChangeEvent read FStateChangeEvent write FStateChangeEvent;
   end;
 
   TEntryViewScrollBar = class(TCustomScrollBar)
@@ -395,7 +408,7 @@ type
     procedure ShowModernScrollBar;
     procedure HideModernScrollBar;
     procedure InvalidateScrollBarArea;
-    procedure VerticalScrollBarShowingChange(Sender: TObject; State: TCustomScrollBarShowingEnum);
+    procedure VerticalScrollBarStateChange(Sender: TObject; State: TCustomScrollBarStateEnum);
   private // internal methods
     procedure ImagesChange(Sender: TObject);
     procedure OverlayChange(Sender: TObject);
@@ -2131,13 +2144,18 @@ begin
   FScrollColorActive   := $00404040;
   FScrollColorPressed  := $00808080;
   //
-  FShowing := shHidden;
-  FShowingChangeEvent := Nil;
+  FState := shHidden;
+  FStateChangeEvent := Nil;
   //
-  FTimer := TTimer.Create(Self);
-  FTimer.Interval := 15;
-  FTimer.OnTimer := AnimationTimer;
-  FTimer.Enabled := False;
+  FAnimationTimer := TTimer.Create(Self);
+  FAnimationTimer.Interval := 15;
+  FAnimationTimer.OnTimer := AnimationTimer;
+  FAnimationTimer.Enabled := False;
+  //
+  FHoverTimer := TTimer.Create(Self);
+  FHoverTimer.Interval := 1500;
+  FHoverTimer.OnTimer := HoverTimer;
+  FHoverTimer.Enabled := False;
   //
   FVisibleState := False;
   FCurrentWidth := 0;
@@ -2150,9 +2168,9 @@ end;
 
 destructor TCustomScrollBar.Destroy;
 begin
-  FTimer.OnTimer := Nil;
-  FTimer.Enabled := False;
-  FTimer.Free;
+  FAnimationTimer.Enabled := False;
+  FAnimationTimer.OnTimer := Nil;
+  FAnimationTimer.Free;
   inherited;
 end;
 
@@ -2203,6 +2221,15 @@ begin
   end;
 end;
 
+procedure TCustomScrollBar.SetState(const AState: TCustomScrollBarStateEnum);
+begin
+  if FState <> AState then begin
+    FState := AState;
+    if Assigned(FStateChangeEvent) then
+      FStateChangeEvent(Self, AState);
+  end;
+end;
+
 function TCustomScrollBar.GetMaxPosition: Integer;
 begin
   Result := FRange - FPageSize;
@@ -2211,44 +2238,206 @@ begin
     Result := 0;
 end;
 
-procedure TCustomScrollBar.DoShowing(const AState: TCustomScrollBarShowingEnum);
+function TCustomScrollBar.GetInteractiveThumbRect: TRect;
 begin
-  if FShowing <> AState then begin
-    FShowing := AState;
-    if Assigned(FShowingChangeEvent) then
-      FShowingChangeEvent(Self, AState);
+  Result := CalculateThumbRect(ClientRect, tbScroll);
+  Result.Left := Result.Right - Round(FCurrentWidth);
+end;
+
+function TCustomScrollBar.HitTest(const P: TPoint): TCustomScrollBarHitTestEnum;
+var
+  CR, AreaRect: TRect;
+begin
+  CR := ClientRect;
+  // htNone, htTopButton, htBottomButton, htThumb, htTrack
+
+  AreaRect := CalculateThumbRect(CR, tbTop);
+  if PtInRect(AreaRect, P) then
+    Exit(htTopButton);
+
+  AreaRect := CalculateThumbRect(CR, tbScroll);
+  if PtInRect(AreaRect, P) then
+    Exit(htThumb);
+  AreaRect := CalculateThumbRect(CR, tbTrack);
+  if PtInRect(AreaRect, P) then
+    Exit(htTrack);
+
+  AreaRect := CalculateThumbRect(CR, tbBottom);
+  if PtInRect(AreaRect, P) then
+    Exit(htBottomButton);
+
+  Result := htNone;
+end;
+
+procedure TCustomScrollBar.UpdateState;
+begin
+  if not FWantVisible then begin
+    if FState <> shHiding then
+      BeginHiding;
+    Exit;
+  end;
+
+  if FState = shHidden then begin
+    BeginShowing;
+    Exit;
+  end;
+
+  if FWantExpanded then begin
+    if not (FState in [shExpand, shVisibleFull]) then
+      BeginExpand;
+    Exit;
+  end;
+
+  if not (FState in [shCollapse, shVisibleThin]) then
+    BeginCollapse;
+end;
+
+procedure TCustomScrollBar.DoStateChange(const AState: TCustomScrollBarStateEnum);
+begin
+  case AState of
+    shHidden: ;
+    shShowing: begin
+      FTargetAlpha := 255;
+      FTargetWidth := FThinWidth;
+      FAnimationTimer.Enabled := True;
+    end;
+    shVisibleThin: begin
+      if not FHoverTimer.Enabled and (FState <> shVisibleThin) then
+        FHoverTimer.Enabled := True
+      else if FState = shExpand then begin
+
+      end;
+    end;
+    shExpand: ;
+    shVisibleFull: begin
+      if not FHoverTimer.Enabled and (FState <> shVisibleFull) then
+        FHoverTimer.Enabled := True
+      else if FState = shCollapse then begin
+
+      end;
+    end;
+    shCollapse: ;
+    shHiding: begin
+      FTargetAlpha := 0;
+      FTargetWidth := 0;
+      FAnimationTimer.Enabled := True;
+    end;
   end;
 end;
 
+procedure TCustomScrollBar.BeginShowing;
+begin
+  if not Visible then
+    Visible := True;
+
+  FState := shShowing;
+
+  FTargetAlpha := 255;
+  FTargetWidth := FThinWidth;
+
+  FAnimationTimer.Enabled := True;
+end;
+
+procedure TCustomScrollBar.BeginHiding;
+begin
+  FState := shHiding;
+
+  FTargetAlpha := 0;
+  FTargetWidth := 0;
+
+  FAnimationTimer.Enabled := True;
+end;
+
+procedure TCustomScrollBar.BeginExpand;
+begin
+  FState := shExpand;
+
+  FTargetWidth := FExpandedWidth;
+  FTargetAlpha := 255;
+
+  FAnimationTimer.Enabled := True;
+end;
+
+procedure TCustomScrollBar.BeginCollapse;
+begin
+  FState := shCollapse;
+
+  FTargetWidth := FThinWidth;
+  FTargetAlpha := 255;
+
+  FAnimationTimer.Enabled := True;
+end;
+
 procedure TCustomScrollBar.AnimationTimer(Sender: TObject);
+const
+  mulby: Single = 0.2;
+  lesseq: Integer = 2; // mulby * 10;
 begin
   // width interpolation
-  FCurrentWidth := FCurrentWidth + Round((FTargetWidth - FCurrentWidth) * 0.25);
+  FCurrentWidth := FCurrentWidth + Round((FTargetWidth - FCurrentWidth) * mulby);
 
   // alpha interpolation
-  FCurrentAlpha := FCurrentAlpha + Round((FTargetAlpha - FCurrentAlpha) * 0.25);
-
+  FCurrentAlpha := FCurrentAlpha + Round((FTargetAlpha - FCurrentAlpha) * mulby);
 
   Invalidate;
 
   // stop when close enough
-  if Abs(FCurrentWidth - FTargetWidth) < 2 then
+  if Abs(FCurrentWidth - FTargetWidth) <= lesseq then
     FCurrentWidth := FTargetWidth;
 
-  if Abs(FCurrentAlpha - FTargetAlpha) < 2 then
+  if Abs(FCurrentAlpha - FTargetAlpha) <= lesseq then
     FCurrentAlpha := FTargetAlpha;
 
   if (FCurrentWidth = FTargetWidth) and (FCurrentAlpha = FTargetAlpha) then begin
-    FTimer.Enabled := False;
-    case FShowing of
-      shShowing  : DoShowing(shVisibleThin);
-      shExpanding: DoShowing(shVisibleFull);
-      shCollapse : DoShowing(shVisibleThin);
-      shHiding   : begin
-        DoShowing(shHidden);
+    FAnimationTimer.Enabled := False;
+//    case FState of
+//      shShowing    : SetState(shVisibleThin);
+//      shVisibleThin: begin
+//        if (FTargetWidth = 0) or (FTargetAlpha = 0) then begin // hiding scrollbar
+//          SetState(shHiding);
+//          Visible := False;
+//        end;
+//      end;
+//      shExpand     : SetState(shVisibleFull);
+//      shCollapse   : SetState(shVisibleThin);
+//      shHiding     : begin
+//        SetState(shHidden);
+//        Visible := False;
+//      end;
+//    end;
+
+    case FState of
+      shShowing: begin
+        if FWantExpanded then
+          BeginExpand
+        else
+          FState := shVisibleThin;
+      end;
+
+      shExpand: FState := shVisibleFull;
+
+      shCollapse: FState := shVisibleThin;
+
+      shHiding: begin
         Visible := False;
+        FState := shHidden;
       end;
     end;
+  end;
+end;
+
+procedure TCustomScrollBar.HoverTimer(Sender: TObject);
+begin
+  FHoverTimer.Enabled := False;
+  if FState <> shVisibleFull then begin
+    FTargetWidth := FExpandedWidth;
+    SetState(shExpand);
+    FAnimationTimer.Enabled := True;
+  end
+  else if FState <> shVisibleThin then begin
+    FTargetWidth := FThinWidth;
+    SetState(shCollapse);
+    FAnimationTimer.Enabled := True;
   end;
 end;
 
@@ -2269,36 +2458,35 @@ end;
 
 procedure TCustomScrollBar.ShowAnimated;
 begin
-  if not Visible and (FShowing = shHidden) then begin
+  if not Visible and (FState = shHidden) then begin
     Visible := True;
-
-    FTargetAlpha := 255;
-    FTargetWidth := FThinWidth;
-
-    FTimer.Enabled := True;
+    FWantVisible := True;
+    UpdateState;
+//    DoStateChange(shShowing);
   end;
 end;
 
 procedure TCustomScrollBar.HideAnimated;
 begin
-  FTargetAlpha := 0;
-  FTargetWidth := 1;
-
-  FTimer.Enabled := True;
+  FWantVisible := False;
+  UpdateState;
+//  DoStateChange(shHiding);
 end;
 
 procedure TCustomScrollBar.CMMouseEnter(var Msg: TMessage);
 begin
   inherited;
-  FTargetWidth := FExpandedWidth;
-  FTimer.Enabled := True;
+  FWantExpanded := True;
+  UpdateState;
+//  DoStateChange(shVisibleFull);
 end;
 
 procedure TCustomScrollBar.CMMouseLeave(var Msg: TMessage);
 begin
   inherited;
-  FTargetWidth := FThinWidth;
-  FTimer.Enabled := True;
+  FWantExpanded := False;
+  UpdateState;
+//  DoStateChange(shVisibleThin);
 end;
 
 //  shHidden,
@@ -2312,18 +2500,19 @@ end;
 
 procedure TCustomScrollBar.CMVisibleChanged(var Msg: TMessage);
 begin
-  if (Msg.WParam = 0) and (FShowing = shVisibleThin) then
-    DoShowing(shHiding)
-  else if (Msg.WParam = 1) and (FShowing = shHidden) then
-    DoShowing(shShowing);
+  if (Msg.WParam = 1) and (FState = shHidden) then
+    SetState(shShowing);
   //
   inherited;
   //
+  if (Msg.WParam = 0) and (FState = shHiding) then
+    SetState(shHidden)
+
 //  if (FShowing = shShowing) or (FShowing = shHiding) then begin
 //    if FShowing = shHiding then
-//      DoShowing(shHidden)
+//      SetState(shHidden)
 //    else if FShowing = shShowing then
-//      DoShowing(shVisibleThin);
+//      SetState(shVisibleThin);
 //  end;
 end;
 
@@ -2333,13 +2522,27 @@ begin
 end;
 
 procedure TCustomScrollBar.WMNCHitTest(var Msg: TWMNCHitTest);
-//var
-//  P: TPoint;
-//  R: TRect;
+var
+  P: TPoint;
 begin
   inherited;
   // this should make entire control transparent when mouse clicking
-  Msg.Result := HTTRANSPARENT;
+  P := ScreenToClient(Point(Msg.XPos, Msg.YPos));
+
+  case HitTest(P) of
+    htTopButton,
+    htBottomButton,
+    htThumb: Msg.Result := HTCLIENT;
+    htTrack: begin
+      Msg.Result := HTCLIENT;
+//      if FState = shVisibleFull then
+//        Msg.Result := HTCLIENT
+//      else
+//        Msg.Result := HTTRANSPARENT;
+    end;
+  else
+    Msg.Result := HTTRANSPARENT;
+  end;
 end;
 
 function TCustomScrollBar.CalculateThumbRect(const DrawRect: TRect; const Button: TCustomScrollBarThumbButtonEnum): TRect;
@@ -2379,46 +2582,55 @@ begin
     end;
 
     tbScroll: begin
-        TrackTop := DrawRect.Top + ButtonSize;
-        TrackBottom := DrawRect.Bottom - ButtonSize;
+      TrackTop := DrawRect.Top + ButtonSize;
+      TrackBottom := DrawRect.Bottom - ButtonSize;
 
-        TrackHeight := TrackBottom - TrackTop;
+      TrackHeight := TrackBottom - TrackTop;
 
-        // No scrolling needed
-        if (FRange <= 0) or (FPageSize >= FRange) then begin
-          Result := Rect(
-            DrawRect.Left,
-            TrackTop,
-            DrawRect.Right,
-            TrackBottom
-          );
-          Exit;
-        end;
-
-        // Thumb size proportional to visible content
-        ThumbHeight := MulDiv(TrackHeight, FPageSize, FRange);
-
-        // Minimum thumb size
-        if ThumbHeight < 32 then
-          ThumbHeight := 32;
-
-        // Never exceed track
-        if ThumbHeight > TrackHeight then
-          ThumbHeight := TrackHeight;
-
-        // Available movement range
-        AvailableTrack := TrackHeight - ThumbHeight;
-
-        // Thumb position
-        ThumbTop := TrackTop + MulDiv(AvailableTrack, FPosition, GetMaxPosition);
-
+      // No scrolling needed
+      if (FRange <= 0) or (FPageSize >= FRange) then begin
         Result := Rect(
           DrawRect.Left,
-          ThumbTop,
+          TrackTop,
           DrawRect.Right,
-          ThumbTop + ThumbHeight
+          TrackBottom
         );
+        Exit;
       end;
+
+      // Thumb size proportional to visible content
+      ThumbHeight := MulDiv(TrackHeight, FPageSize, FRange);
+
+      // Minimum thumb size
+      if ThumbHeight < 32 then
+        ThumbHeight := 32;
+
+      // Never exceed track
+      if ThumbHeight > TrackHeight then
+        ThumbHeight := TrackHeight;
+
+      // Available movement range
+      AvailableTrack := TrackHeight - ThumbHeight;
+
+      // Thumb position
+      ThumbTop := TrackTop + MulDiv(AvailableTrack, FPosition, GetMaxPosition);
+
+      Result := Rect(
+        DrawRect.Left,
+        ThumbTop,
+        DrawRect.Right,
+        ThumbTop + ThumbHeight
+      );
+    end;
+
+    tbTrack: begin
+      Result := Rect(
+        DrawRect.Left,
+        ButtonSize,
+        DrawRect.Right,
+        DrawRect.Bottom - ButtonSize
+      );
+    end;
   else
     Result := Rect(0, 0, 0, 0);
   end;
@@ -2442,7 +2654,7 @@ var
 begin
   LRect := ClientRect;
   DrawBackground(Canvas, LRect); // clear background
-  LRect.Left := Width - FTargetWidth;
+  LRect.Left := Width - FCurrentWidth;
   DrawButtons(Canvas, LRect); // draw buttons
 end;
 
@@ -2468,7 +2680,7 @@ var
   T: Single;
 begin
   // paint top thumb
-  if (FShowing = shExpanding) or (FShowing = shVisibleFull) or (FShowing = shCollapse) then begin
+  if (FState = shExpand) or (FState = shVisibleFull) or (FState = shCollapse) then begin
     ThumbRect := CalculateThumbRect(ARect, tbTop);
     Canvas.Brush.Color := Color;
     Canvas.FillRect(ThumbRect);
@@ -2491,7 +2703,7 @@ begin
   Canvas.FillRect(ThumbRect);
 
   // paint bottom thumb
-  if (FShowing = shExpanding) or (FShowing = shVisibleFull) or (FShowing = shCollapse) then begin
+  if (FState = shExpand) or (FState = shVisibleFull) or (FState = shCollapse) then begin
     ThumbRect := CalculateThumbRect(ARect, tbBottom);
     Canvas.Brush.Color := Color;
     Canvas.FillRect(ThumbRect);
@@ -2546,7 +2758,7 @@ begin
   FVerticalScrollBar.Parent := Self;
   FVerticalScrollBar.Width := 16;
   FVerticalScrollBar.Align := alRight;
-  FVerticalScrollBar.OnShowingChange := VerticalScrollBarShowingChange;
+  FVerticalScrollBar.OnStateChange := VerticalScrollBarStateChange;
   //
   FDrawVerticalScrollBar := True;
 end;
@@ -4167,7 +4379,7 @@ begin
   Invalidate;
 end;
 
-procedure TCustomEntryView.VerticalScrollBarShowingChange(Sender: TObject; State: TCustomScrollBarShowingEnum);
+procedure TCustomEntryView.VerticalScrollBarStateChange(Sender: TObject; State: TCustomScrollBarStateEnum);
 begin
   if State = shHidden then begin
     InvalidateScrollBarArea;
@@ -4176,7 +4388,7 @@ end;
 
 procedure TCustomEntryView.CMDesignHitTest(var Msg: TCMDesignHitTest);
 const
-  HitTests: array[Boolean] of Integer = (0, 1);
+  HitTests: Array[Boolean] of Integer = (0, 1);
 begin
   inherited;
   with Msg do

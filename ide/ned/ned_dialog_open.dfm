@@ -30,7 +30,7 @@ object NEDDialogOpen: TNEDDialogOpen
     Top = 0
     Width = 598
     Align = alTop
-    Color = 4210752
+    Color = 2829099
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
     Font.Height = -11
@@ -38,9 +38,16 @@ object NEDDialogOpen: TNEDDialogOpen
     Font.Style = []
     ParentColor = False
     ParentFont = False
+    BackColors.Enabled = False
+    BackColors.Color = clBlack
+    BackColors.LightColor = 15921906
+    BackColors.DarkColor = 2829099
+    BackColors.FocusedLightColor = 14120960
+    BackColors.FocusedDarkColor = 1525760
     DoubleClick = False
     DragMovement = False
     EnableSystemMenu = False
+    UseSystemCaptionColor = True
     Caption = 'Open...'
     ExplicitLeft = 168
     ExplicitTop = 64
@@ -95,7 +102,6 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitTop = 33
     object txtPath: TUText
       AlignWithMargins = True
       Left = 53
@@ -162,8 +168,6 @@ object NEDDialogOpen: TNEDDialogOpen
     BackColor.Color = clBtnFace
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-    ExplicitTop = 74
-    ExplicitHeight = 291
   end
   object UPanel3: TUPanel
     Left = 1

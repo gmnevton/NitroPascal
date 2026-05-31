@@ -282,7 +282,7 @@ procedure TNEDDialogOpen.DoDrawBorder;
 begin
   UpdateBorderColor;
   Canvas.Pen.Color := BorderColor;
-  Canvas.MoveTo(0, 0);
+  Canvas.MoveTo(0, 1);
   Canvas.LineTo(0, Height - 1);  // left
   Canvas.LineTo(Width - 1, Height - 1); // bottom
   Canvas.LineTo(Width - 1, 0); // right
@@ -761,7 +761,8 @@ begin
       Self.Align := alCustom;
       //
       // @TODO: make TitleBar background color setable by user
-      //UTitleBar1.Color := SelectAccentColor(GetCommonThemeManager, $00404040);
+      UTitleBar1.BackColors.DarkColor := SelectAccentColor(GetCommonThemeManager, $00404040);
+      UTitleBar1.BackColors.LightColor := SelectAccentColor(GetCommonThemeManager, $00404040);
       //
       GetDesktopIcons;
       //
@@ -852,7 +853,7 @@ begin
       if IDL <> Nil then begin
         FPath := LPath;
         txtPath.Caption := FPath;
-        TrySelectMatchingFolder;
+        //TrySelectMatchingFolder;
         GetFilesList;
       end;
     end;
