@@ -176,6 +176,7 @@ implementation
 
 uses
   Windows,
+  Dialogs,
   ned_home_page,
   ned_source_editor,
   ned_dialog_open;
@@ -327,7 +328,7 @@ begin
   FModalForm := open;
   try
     if open.Execute() then begin
-
+      ShowMessage(open.FileName);
     end;
   finally
     FModalForm := Nil;

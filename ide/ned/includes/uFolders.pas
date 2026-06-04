@@ -246,6 +246,17 @@ type
 
   TCustomScrollBarStateChangeEvent = procedure (Sender: TObject; State: TCustomScrollBarStateEnum) of object;
 
+  TCustomScrollBarActionEnum = (
+    saLineUp,
+    saLineDown,
+    saPageUp,
+    saPageDown,
+    saThumbTrack,
+    saThumbPosition
+  );
+
+  TCustomScrollBarScrollEvent = procedure (Sender: TObject; const Action: TCustomScrollBarActionEnum; const Position: Integer) of object;
+
   TCustomScrollBar = class(TCustomControl)
   private
     FRange: Integer; // total content size
@@ -278,22 +289,32 @@ type
     FWantExpanded: Boolean;
     FState: TCustomScrollBarStateEnum;
     FStateChangeEvent: TCustomScrollBarStateChangeEvent;
+    //
+    FDragging: Boolean;
+    FDragStartY: Integer;
+    FDragStartPosition: Integer;
+    FPressedPart: TCustomScrollBarHitTestEnum;
+    FRepeatTimer: TTimer;
+    FScrollEvent: TCustomScrollBarScrollEvent;
   private
     procedure SetRange(const Value: Integer);
     procedure SetPageSize(const Value: Integer);
     procedure SetPosition(const Value: Integer);
     procedure SetState(const AState: TCustomScrollBarStateEnum);
+    procedure SetParentControlPosition;
     function GetMaxPosition: Integer;
     function GetInteractiveThumbRect: TRect;
     function HitTest(const P: TPoint): TCustomScrollBarHitTestEnum;
     procedure UpdateState;
     procedure DoStateChange(const AState: TCustomScrollBarStateEnum);
+    procedure DoScroll(const AAction: TCustomScrollBarActionEnum; const APosition: Integer);
     procedure BeginShowing;
     procedure BeginHiding;
     procedure BeginExpand;
     procedure BeginCollapse;
     procedure AnimationTimer(Sender: TObject);
     procedure HoverTimer(Sender: TObject);
+    procedure RepeatTimer(Sender: TObject);
     // messages
     procedure CMMouseEnter(var Msg: TMessage); message CM_MOUSEENTER;
     procedure CMMouseLeave(var Msg: TMessage); message CM_MOUSELEAVE;
@@ -304,6 +325,7 @@ type
     function  CalculateThumbRect(const DrawRect: TRect; const Button: TCustomScrollBarThumbButtonEnum): TRect;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure Paint; override;
     procedure DrawBackground(const ACanvas: TCanvas; var ARect: TRect); virtual;
     procedure DrawButtons(const ACanvas: TCanvas; const ARect: TRect); virtual;
@@ -320,6 +342,7 @@ type
     property Position: Integer read FPosition write SetPosition;
     property MaxPosition: Integer read GetMaxPosition;
     property OnStateChange: TCustomScrollBarStateChangeEvent read FStateChangeEvent write FStateChangeEvent;
+    property OnScroll: TCustomScrollBarScrollEvent read FScrollEvent write FScrollEvent;
   end;
 
   TEntryViewScrollBar = class(TCustomScrollBar)
@@ -366,6 +389,7 @@ type
     FOnItemClick: TEntryItemEvent;
     FOnItemSelection: TEntryItemSelectionEvent;
     FOnItemGetType: TEntryItemGetTypeEvent;
+    //FOnItemGoUpDirectory: TEntryItemEvent;
   private // internal fields
     FTextHeight: Integer;
     FTopIndex: Integer;
@@ -408,7 +432,10 @@ type
     procedure ShowModernScrollBar;
     procedure HideModernScrollBar;
     procedure InvalidateScrollBarArea;
-    procedure VerticalScrollBarStateChange(Sender: TObject; State: TCustomScrollBarStateEnum);
+    procedure ItemSelection(const Entry: TEntryItem);
+    // events
+    procedure VerticalScrollBarStateChange(Sender: TObject; State: TCustomScrollBarStateEnum); // event
+    procedure VerticalScrollBarScroll(Sender: TObject; const Action: TCustomScrollBarActionEnum; const Position: Integer); // event
   private // internal methods
     procedure ImagesChange(Sender: TObject);
     procedure OverlayChange(Sender: TObject);
@@ -492,6 +519,7 @@ type
     property OnItemClick: TEntryItemEvent read FOnItemClick write FOnItemClick;
     property OnItemSelection: TEntryItemSelectionEvent read FOnItemSelection write FOnItemSelection;
     property OnItemGetType: TEntryItemGetTypeEvent read FOnItemGetType write FOnItemGetType;
+    //property OnItemGoUpDirectory: TEntryItemEvent read FOnItemGoUpDirectory write FOnItemGoUpDirectory;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -1319,7 +1347,7 @@ begin
   for I := 0 to 2 do begin
     P[I] := Point(CX + ArrowPoints[ArrowDirection, I].X * Size, CY + ArrowPoints[ArrowDirection, I].Y * Size);
     if (ArrowDirection = daUp) or (ArrowDirection = daDown) then
-      P[I].Offset(-Offset, HalfSize)
+      P[I].Offset(0{-Offset}, HalfSize)
     else if ArrowDirection = daLeft then
       P[I].Offset(HalfSize - Offset, 0)
     else if ArrowDirection = daRight then
@@ -2148,14 +2176,14 @@ begin
   FStateChangeEvent := Nil;
   //
   FAnimationTimer := TTimer.Create(Self);
+  FAnimationTimer.Enabled := False;
   FAnimationTimer.Interval := 15;
   FAnimationTimer.OnTimer := AnimationTimer;
-  FAnimationTimer.Enabled := False;
   //
   FHoverTimer := TTimer.Create(Self);
+  FHoverTimer.Enabled := False;
   FHoverTimer.Interval := 1500;
   FHoverTimer.OnTimer := HoverTimer;
-  FHoverTimer.Enabled := False;
   //
   FVisibleState := False;
   FCurrentWidth := 0;
@@ -2164,6 +2192,16 @@ begin
   FTargetAlpha := 0;
   FThinWidth := 1;
   FExpandedWidth := Width;
+  //
+  FRepeatTimer := TTimer.Create(Self);
+  FRepeatTimer.Enabled := False;
+  FRepeatTimer.Interval := 50;
+  FRepeatTimer.OnTimer := RepeatTimer;
+  //
+  FDragging := False;
+  FDragStartY := -1;
+  FDragStartPosition := -1;
+  FPressedPart := htNone;
 end;
 
 destructor TCustomScrollBar.Destroy;
@@ -2171,6 +2209,14 @@ begin
   FAnimationTimer.Enabled := False;
   FAnimationTimer.OnTimer := Nil;
   FAnimationTimer.Free;
+  //
+  FHoverTimer.Enabled := False;
+  FHoverTimer.OnTimer := Nil;
+  FHoverTimer.Free;
+  //
+  FRepeatTimer.Enabled := False;
+  FRepeatTimer.OnTimer := Nil;
+  FRepeatTimer.Free;
   inherited;
 end;
 
@@ -2228,6 +2274,19 @@ begin
     if Assigned(FStateChangeEvent) then
       FStateChangeEvent(Self, AState);
   end;
+end;
+
+procedure TCustomScrollBar.SetParentControlPosition;
+var
+  Code: Word;
+begin
+  if FScrollBarKind = sbHorizontal then
+    Code := SB_HORZ
+  else
+    Code := SB_VERT;
+
+  if FlatSB_GetScrollPos(TWinControl(Owner).Handle, Code) <> FPosition then
+    FlatSB_SetScrollPos(TWinControl(Owner).Handle, Code, FPosition, True);
 end;
 
 function TCustomScrollBar.GetMaxPosition: Integer;
@@ -2290,6 +2349,12 @@ begin
 
   if not (FState in [shCollapse, shVisibleThin]) then
     BeginCollapse;
+end;
+
+procedure TCustomScrollBar.DoScroll(const AAction: TCustomScrollBarActionEnum; const APosition: Integer);
+begin
+  if Assigned(FScrollEvent) then
+    FScrollEvent(Self, AAction, APosition);
 end;
 
 procedure TCustomScrollBar.DoStateChange(const AState: TCustomScrollBarStateEnum);
@@ -2439,6 +2504,39 @@ begin
     SetState(shCollapse);
     FAnimationTimer.Enabled := True;
   end;
+end;
+
+procedure TCustomScrollBar.RepeatTimer(Sender: TObject);
+var
+  Action: TCustomScrollBarActionEnum;
+  P: TPoint;
+begin
+  case FPressedPart of
+    htTopButton   : begin
+      Action := saLineUp;
+      Position := Position - 1;
+    end;
+    htBottomButton: begin
+      Action := saLineDown;
+      Position := Position + 1;
+    end;
+    htTrack: begin
+      GetCursorPos(P);
+      P := ScreenToClient(P);
+      if P.Y < CalculateThumbRect(ClientRect, tbScroll).Top then begin
+        Action := saPageUp;
+        Position := Position - PageSize;
+      end
+      else if P.Y > CalculateThumbRect(ClientRect, tbScroll).Bottom then begin
+        Action := saPageDown;
+        Position := Position + PageSize;
+      end
+      else
+        Action := saThumbPosition;
+    end;
+  end;
+  if Action <> saThumbPosition then
+    DoScroll(Action, Position);
 end;
 
 procedure TCustomScrollBar.SetInfo(const ARange, APageSize, APosition: Integer);
@@ -2637,15 +2735,105 @@ begin
 end;
 
 procedure TCustomScrollBar.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Action: TCustomScrollBarActionEnum;
 begin
   inherited;
 
+  if Button <> mbLeft then
+    Exit;
+
+  FPressedPart := HitTest(Point(X, Y));
+
+  case FPressedPart of
+    htThumb: begin
+      FDragging := True;
+
+      FDragStartY := Y;
+      FDragStartPosition := Position;
+
+      MouseCapture := True;
+    end;
+
+    htTrack: begin
+      if Y < CalculateThumbRect(ClientRect, tbScroll).Top then begin
+        Action := saPageUp;
+        Position := Position - PageSize;
+      end
+      else begin
+        Action := saPageDown;
+        Position := Position + PageSize;
+      end;
+
+      DoScroll(Action, Position);
+
+      MouseCapture := True;
+      FRepeatTimer.Enabled := True;
+    end;
+
+    htTopButton: begin
+      Position := Position - 1;
+
+      DoScroll(saLineUp, Position);
+
+      FRepeatTimer.Enabled := True;
+    end;
+
+    htBottomButton: begin
+      Position := Position + 1;
+
+      DoScroll(saLineDown, Position);
+
+      FRepeatTimer.Enabled := True;
+    end;
+  end;
+  SetParentControlPosition;
 end;
 
 procedure TCustomScrollBar.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  DeltaPixels: Integer;
+  TrackHeight: Integer;
+  ThumbHeight: Integer;
+  AvailableTrack: Integer;
+  NewPos: Integer;
+//  Action: TCustomScrollBarActionEnum;
 begin
   inherited;
 
+  if not FDragging then
+    Exit;
+
+  DeltaPixels := Y - FDragStartY;
+
+  ThumbHeight := CalculateThumbRect(ClientRect, tbScroll).Height;
+  TrackHeight := ClientHeight;
+
+  AvailableTrack := TrackHeight - ThumbHeight;
+
+  if AvailableTrack <= 0 then
+    Exit;
+
+  NewPos := FDragStartPosition + MulDiv(DeltaPixels, GetMaxPosition, AvailableTrack);
+
+  Position := EnsureRange(NewPos, 0, GetMaxPosition);
+  SetParentControlPosition;
+
+  DoScroll(saThumbTrack, Position);
+end;
+
+procedure TCustomScrollBar.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  inherited;
+
+  if Button <> mbLeft then
+    Exit;
+
+  FDragging := False;
+  MouseCapture := False;
+  FRepeatTimer.Enabled := False;
+  FPressedPart := htNone;
+  DoScroll(saThumbPosition, Position);
 end;
 
 procedure TCustomScrollBar.Paint;
@@ -2759,6 +2947,7 @@ begin
   FVerticalScrollBar.Width := 16;
   FVerticalScrollBar.Align := alRight;
   FVerticalScrollBar.OnStateChange := VerticalScrollBarStateChange;
+  FVerticalScrollBar.OnScroll := VerticalScrollBarScroll;
   //
   FDrawVerticalScrollBar := True;
 end;
@@ -2781,8 +2970,6 @@ procedure TCustomEntryView.DblClick;
 var
   MousePoint: TPoint;
   Entry: TEntryItem;
-  EntryType: TEntryItemTypeEnum;
-  IsSubDirectory: Boolean;
 begin
   MousePoint := Mouse.CursorPos;
   MousePoint := Self.ScreenToClient(MousePoint);
@@ -2795,24 +2982,7 @@ begin
       end;
     end
     else begin // Entry has no children, if it is a sub-directory - open it, else - select Entry and fire OnSelection event
-      // now i can't just assume that i know what is inside Entries list, so i need to ask user to tell me what is inside
-      // the user responds with:
-      // - sub-directory
-      // - file
-      if Assigned(FOnItemGetType) then begin
-        EntryType := etUnknown;
-        FOnItemGetType(Self, Entry, EntryType);
-        //
-        case EntryType of
-          etUnknown: ;
-          etSubDirectory,
-          etFile: begin
-            IsSubDirectory := EntryType = etSubDirectory;
-            if Assigned(FOnItemSelection) then
-              FOnItemSelection(Self, Entry, IsSubDirectory);
-          end;
-        end;
-      end;
+      ItemSelection(Entry);
     end;
   end;
   inherited;
@@ -3064,6 +3234,9 @@ begin
   Result := Nil;
   idx := 0;
 
+  if (Index < 0) or (Index > FVisibleEntriesCount) then
+    Exit;
+
   // select item knowing only its index on the list, from items that have children, so we need to enter those lists if needed
   // i could do it by recursion, but linear solutin is an option here
 
@@ -3146,8 +3319,21 @@ begin
 end;
 
 procedure TCustomEntryView.KeyDown(var Key: Word; Shift: TShiftState);
+var
+  Entry: TEntryItem;
 begin
   inherited KeyDown(Key, Shift);
+  case Key of
+    VK_HOME,
+    VK_END,
+    VK_NEXT,
+    VK_PRIOR,
+//    VK_LEFT,
+//    VK_RIGHT: ;
+    VK_UP,
+    VK_DOWN: ShowModernScrollBar;
+  end;
+
   case Key of
     VK_HOME: ItemIndex := 0;
     VK_END: ItemIndex := VisibleEntriesCount - 1;
@@ -3164,6 +3350,28 @@ begin
       if (Selected <> Nil) and (Selected.TreeIndex < VisibleEntriesCount - 1) then
         Selected := ItemFromIndex(Selected.TreeIndex + 1);
       Key := 0;
+    end;
+    VK_RETURN: begin // ENTER
+      Key := 0;
+      Entry := Selected;
+      if Entry <> Nil then begin
+        if Entry.Items.Count > 0 then begin // collapse or expand as default behavior when Entry has children; so for now it can't be selected by double click
+          case Entry.State of
+            esCollapsed: Entry.State := esExpanded;
+            esExpanded : Entry.State := esCollapsed;
+          end;
+        end
+        else begin // Entry has no children, if it is a sub-directory - open it, else - select Entry and fire OnSelection event
+          ItemSelection(Entry);
+          Exit;
+        end;
+      end;
+    end;
+    VK_BACK: begin // BACKSPACE
+//      Key := 0;
+//      if Assigned(FOnItemGoUpDirectory) then
+//        FOnItemGoUpDirectory(Self, Selected);
+      Exit;
     end;
   end;
   EnsureItemVisible;
@@ -4088,7 +4296,7 @@ begin
       ScrollToSelection;
       if PriorIndex <> FItemIndex then begin
         InvalidateItem(FItemIndex);
-        if FMultiSelect and (FItemIndex > -1) then
+        if FMultiSelect and (FItemIndex > -1) then begin
           if ssShift in FShift then begin
 //            if (FShiftIndex > -1) and (FShiftIndex < Length(FSelectItems)) then
 //              WasSelected := FSelectItems[FShiftIndex]
@@ -4143,6 +4351,10 @@ begin
 //            FSelectItems[FItemIndex] := True;
             Invalidate;
           end;
+        end
+        else begin
+          Selected := ItemFromIndex(FItemIndex);
+        end;
       end;
       if not (ssShift in FShift) then
         FShiftIndex := FItemIndex;
@@ -4379,11 +4591,42 @@ begin
   Invalidate;
 end;
 
+procedure TCustomEntryView.ItemSelection(const Entry: TEntryItem);
+var
+  EntryType: TEntryItemTypeEnum;
+  IsSubDirectory: Boolean;
+begin
+  // now i can't just assume that i know what is inside Entries list, so i need to ask user to tell me what is inside
+  // the user responds with:
+  // - sub-directory
+  // - file
+  if Assigned(FOnItemGetType) then begin
+    EntryType := etUnknown;
+    FOnItemGetType(Self, Entry, EntryType);
+    //
+    case EntryType of
+      etUnknown: ;
+      etSubDirectory,
+      etFile: begin
+        IsSubDirectory := EntryType = etSubDirectory;
+        if Assigned(FOnItemSelection) then
+          FOnItemSelection(Self, Entry, IsSubDirectory);
+      end;
+    end;
+  end;
+end;
+
 procedure TCustomEntryView.VerticalScrollBarStateChange(Sender: TObject; State: TCustomScrollBarStateEnum);
 begin
   if State = shHidden then begin
     InvalidateScrollBarArea;
   end;
+end;
+
+procedure TCustomEntryView.VerticalScrollBarScroll(Sender: TObject; const Action: TCustomScrollBarActionEnum; const Position: Integer);
+begin
+  FTopIndex := Position;
+  Invalidate;
 end;
 
 procedure TCustomEntryView.CMDesignHitTest(var Msg: TCMDesignHitTest);
@@ -4417,8 +4660,13 @@ begin
 end;
 
 procedure TCustomEntryView.CMMouseLeave(var Msg: TMessage);
+var
+  P: TPoint;
 begin
-  HideModernScrollBar;
+  GetCursorPos(P);
+  P := ScreenToClient(P);
+  if not PtInRect(ClientRect, P) then
+    HideModernScrollBar;
   inherited;
   if MouseCapture then
     FMouseItem := CaptureItem
@@ -4512,9 +4760,9 @@ begin
   R := ClientRect;
 
   // Right-side fake scrollbar
-  if P.X >= R.Right - FVerticalScrollBar.Width then begin
-    Msg.Result := HTVSCROLL;
-    Exit;
+  if (P.X >= R.Right - FVerticalScrollBar.Width) and not FVerticalScrollBar.Visible then begin
+    //Msg.Result := HTVSCROLL;
+    FVerticalScrollBar.ShowAnimated;
   end;
 end;
 

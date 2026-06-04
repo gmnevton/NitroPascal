@@ -73,14 +73,19 @@ type
     procedure GetFolderIcon(const IDL: PItemIDList; Item: TEntryItem);
     procedure GetItemIcon(const IDL: PItemIDList; Item: TEntryItem);
     function GetItemAttributes(const IDL: PItemIDList; var Info: TSHFileInfo): Boolean;
+    function GetItemType(const Item: TEntryItem): TEntryItemTypeEnum;
     procedure GetChildren(ShellFolder: IShellFolder; const IDL: PItemIDList; Entry: TEntryItem);
     function GetPathFromPIDL(const IDL: PItemIDList): String;
     function GetPIDLFromPath(const Path: String): PItemIDList;
     function GetDirFromSpecialFolder(const Folder: Integer): String;
     procedure TrySelectMatchingFolder;
-    procedure FolderChanged(Sender: TObject);
-    procedure FilesViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum);
-    procedure FilesViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean);
+    // FolderView events
+    procedure FolderChanged(Sender: TObject); // event
+    // FilesView events
+    procedure FilesViewChanged(Sender: TObject); // event
+    procedure FilesViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum); // event
+    procedure FilesViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean); // event
+    //procedure ItemGoUpDirectory(Sender: TObject; Item: TEntryItem); // event
   protected
     function CanDrawBorder: Boolean; override;
     procedure DoDrawBorder; override;
@@ -254,6 +259,7 @@ begin
   FilesView.EntryImages := ImageList1;
   //FilesView.ItemImages := ImageList1;
   FilesView.TabStop := True;
+  FilesView.OnChange := FilesViewChanged;
   FilesView.OnItemGetType := FilesViewItemGetType;
   FilesView.OnItemSelection := FilesViewItemSelection;
 //  FilesView.Show;
@@ -300,6 +306,11 @@ end;
 
 procedure TNEDDialogOpen.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
+  if Key = VK_BACK then begin
+    Key := 0;
+    btnUpDirectoryClick(Nil);
+    Exit;
+  end;
   if Key = VK_ESCAPE then begin
     Key := 0; // prevent default handling
     FExecutionResult := mrCancel;
@@ -547,6 +558,24 @@ begin
     Result := False;
 end;
 
+function TNEDDialogOpen.GetItemType(const Item: TEntryItem): TEntryItemTypeEnum;
+var
+  IDL: PItemIDList;
+  FileInfo: TSHFileInfo;
+begin
+  Result := etUnknown;
+  if not Assigned(Item) then
+    Exit;
+  //
+  IDL := Item.Data;
+  if GetItemAttributes(IDL, FileInfo) then begin
+    if FileInfo.dwAttributes and SFGAO_FOLDER = SFGAO_FOLDER then
+      Result := etSubDirectory
+    else
+      Result := etFile;
+  end;
+end;
+
 function TNEDDialogOpen.GetPathFromPIDL(const IDL: PItemIDList): String;
 begin
   Result := '';
@@ -622,6 +651,18 @@ begin
   end;
 end;
 
+procedure TNEDDialogOpen.FilesViewChanged(Sender: TObject);
+begin
+  if FilesView.Selected <> Nil then begin
+    if (GetItemType(FilesView.Selected) <> etFile) then
+      btnOpen.Enabled := False
+    else
+      btnOpen.Enabled := True;
+  end
+  else
+    btnOpen.Enabled := False;
+end;
+
 procedure TNEDDialogOpen.FilesViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum);
 var
   IDL: PItemIDList;
@@ -650,6 +691,9 @@ begin
       txtPath.Caption := FPath;
       GetFilesList;
     end;
+  end
+  else begin
+    btnOpenClick(Nil);
   end;
 end;
 
@@ -814,8 +858,12 @@ begin
         Application.HandleMessage;
       until FCanClose or Application.Terminated;
     finally
+      Self.Hide;
       FMainForm.OverlayType := otNone;
+      Application.ProcessMessages;
       Result := FExecutionResult = mrOk;
+      if Result and (FilesView.Selected <> Nil) then
+        FPath := FPath + FilesView.Selected.Caption;
     end;
   finally
     FMainForm.OnResize := FOldMainFormResizeEvent;
@@ -834,9 +882,11 @@ begin
   FCanClose := True;
 end;
 
-
 procedure TNEDDialogOpen.btnOpenClick(Sender: TObject);
 begin
+  if (FilesView.Selected <> Nil) and (GetItemType(FilesView.Selected) <> etFile) then
+    Exit;
+  //
   FExecutionResult := mrOk;
   FCanClose := True;
 end;

@@ -6,18 +6,16 @@
 
 - Open file dialog / folder view:
   
-  - [ ] ---> Implement Windows 10 like scrollbar rendering system <---
-  
-  - [ ] Implement smooth scroll
-  
   - [ ] Implement showing date/time and/or size for file entries, and only date/time for sub-directories
   
   - [ ] Implement file list entries sort options (later)
-
+  
   - [ ] Implement hide selection feature (later)
   
   - [ ] Speed up lists loading (later)
-
+  
+  - [ ] Implement smooth scroll (later)
+  
   - [x] (left pane) Selection of folder changes files list
   
   - [x] (right pane) Double click on file list entry opens a sub-directory or selects file, depending on what entry was double clicked
@@ -37,6 +35,8 @@
   - [x] Custom paint scrollbar
   
   - [x] Fix custom painted scrollbar flickering
+  
+  - [x] Implement Windows 10 like scrollbar rendering system
 
 ## TODO
 
