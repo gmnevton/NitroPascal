@@ -1,4 +1,14 @@
-﻿unit uFolders;
+﻿//
+// Nitro EDitor
+// version 1.0
+//
+// Author: Grzegorz Molenda
+// Created: 2024-12-27
+// Modified: 2026-06
+// All rights reserved.
+//
+
+unit uFolders;
 
 {$WRITEABLECONST ON}
 

@@ -4,6 +4,8 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
+// Modified: 2026-06
+// All rights reserved.
 //
 
 program ned;
@@ -17,7 +19,8 @@ uses
   ned_source_editor in 'ned_source_editor.pas' {NEDEditorForm},
   ned_home_page in 'ned_home_page.pas' {NEDHomeForm},
   ned_settings in 'ned_settings.pas' {NEDSettingsForm},
-  ned_dialog_open in 'ned_dialog_open.pas' {NEDDialogOpen: TFrame};
+  ned_dialog_open in 'ned_dialog_open.pas' {NEDDialogOpen: TFrame},
+  ned_editor_buffer in 'ned_editor_buffer.pas';
 
 {$R *.res}
 

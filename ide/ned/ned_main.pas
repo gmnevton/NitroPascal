@@ -4,6 +4,8 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
+// Modified: 2026-06
+// All rights reserved.
 //
 
 unit ned_main;

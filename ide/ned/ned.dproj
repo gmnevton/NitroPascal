@@ -124,7 +124,9 @@
         <DCCReference Include="ned_dialog_open.pas">
             <Form>NEDDialogOpen</Form>
             <FormType>dfm</FormType>
+            <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="ned_editor_buffer.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

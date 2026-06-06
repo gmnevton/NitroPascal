@@ -4,6 +4,19 @@
 
 ## In Development
 
+- Editor backbuffer class (editor backend engine)
+- Editor component (TSynEdit component rework)
+
+
+
+## TODO
+
+- Save file dialog / folder view
+
+
+
+## LATER
+
 - Open file dialog / folder view:
   
   - [ ] Implement showing date/time and/or size for file entries, and only date/time for sub-directories
@@ -37,9 +50,3 @@
   - [x] Fix custom painted scrollbar flickering
   
   - [x] Implement Windows 10 like scrollbar rendering system
-
-## TODO
-
-- Save file dialog / folder view
-- Editor backbuffer class (editor backend engine)
-- TSynEdit component rework
