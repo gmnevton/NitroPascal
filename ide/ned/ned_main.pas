@@ -159,6 +159,7 @@ type
     procedure FormResize(Sender: TObject);
     procedure btnShowHideToolboxClick(Sender: TObject);
     procedure btnHomeClick(Sender: TObject);
+    procedure btnProjectClick(Sender: TObject);
   private
     FModalForm: TForm;
     //
@@ -337,6 +338,17 @@ begin
     btnHome.Enabled := True;
     open.Free;
   end;
+end;
+
+procedure TNEDMainForm.btnProjectClick(Sender: TObject);
+var
+  NEDEditorForm: TNEDEditorForm;
+begin
+  NEDEditorForm := TNEDEditorForm.Create(Self);
+  NEDEditorForm.Parent := pnlWorkSpace;
+  NEDEditorForm.Align := alClient;
+  NEDEditorForm.Show;
+  NEDEditorForm.BringToFront;
 end;
 
 end.

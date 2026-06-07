@@ -167,8 +167,11 @@ type
   end;
 
   TNEDTextPosition = record
+  public
     Line: Integer;
     Column: Integer;
+    //
+    class function LineColumn(const ALine, AColumn: Integer): TNEDTextPosition; static;
   end;
 
   TNEDTextRange = record
@@ -263,7 +266,7 @@ type
     Kind: TNEDDocumentChangeKindEnum;
 
     // character positions
-    Position: Integer;
+    Position: TNEDTextPosition;
     DeletedLength: Integer;
     InsertedLength: Integer;
 
@@ -275,14 +278,20 @@ type
     Sender: TObject;
   end;
 
+  TNEDCustomDocument = class;
+
 { TNEDDocumentObserver }
+
+  TNEDDocumentChangedEvent = procedure (const Change: TNEDDocumentChangeInfo) of object;
 
   // base observer class
   // editor views, syntax engines, minimaps, code explorers and parsers can derive from it
   TNEDDocumentObserver = class
   private
+    FDocument: TNEDCustomDocument;
     FEnabled: Boolean;
     FUpdateLock: Integer;
+    FOnDocumentChanged: TNEDDocumentChangedEvent;
   protected
     // character-level change
     procedure DoDocumentChanged(const Change: TNEDDocumentChangeInfo); virtual;
@@ -294,7 +303,7 @@ type
     procedure DoDocumentReloaded; virtual;
     procedure DoDocumentReset; virtual;
   public
-    constructor Create;
+    constructor Create(const ADocument: TNEDCustomDocument); reintroduce;
     destructor Destroy; override;
     // multiple changes can be grouped between BeginUpdate / EndUpdate
     procedure BeginUpdate;
@@ -304,6 +313,7 @@ type
     //
     // main notification entry point
     procedure DocumentChanged(Position: Integer; DeletedLength: Integer; InsertedLength: Integer); overload; virtual;
+    procedure DocumentChanged(const LineColumn: TNEDTextPosition; DeletedLength: Integer; InsertedLength: Integer); overload; virtual;
     procedure DocumentChanged(const Change: TNEDDocumentChangeInfo); overload; virtual;
     //
     // line notifications
@@ -316,13 +326,17 @@ type
     procedure DocumentReset; virtual;
     //
     property Enabled: Boolean read FEnabled write FEnabled;
+    property OnDocumentChanged: TNEDDocumentChangedEvent read FOnDocumentChanged write FOnDocumentChanged;
   end;
 
-{ TNEDDocument }
+{ TNEDCustomDocument }
 
-  TNEDDocument = class
+  TNEDCustomDocument = class
   private
     FFilePath: String;
+    FFileCreateDateTime: TDateTime;
+    FFileModifyDateTime: TDateTime;
+    FFileSize: UInt64;
     FLines: TNEDStringList; // logical lines
     FInputBuffer: String; // piece table add buffer
     FObservers: TList<TNEDDocumentObserver>; // attached views/services.
@@ -331,13 +345,15 @@ type
     FRedo: TStack<TNEDEditOperation>;
     FInUndoRedo: Boolean;
     //
+    FEmptyLineCreate: Boolean;
     // modification state
     FModified: Boolean;
     FUpdateCount: Integer; // update lock
     FLength: Integer; // cached document length
     FLineCount: Integer; // cached line count
   protected
-    procedure NotifyObservers(Position: Integer; DeletedLen: Integer; InsertedLen: Integer);
+    procedure NotifyObservers(Position: Integer; DeletedLen: Integer; InsertedLen: Integer); overload;
+    procedure NotifyObservers(const LineColumn: TNEDTextPosition; DeletedLen: Integer; InsertedLen: Integer); overload;
     //
     procedure NotifyLineInserted(LineIndex: Integer);
     procedure NotifyLineDeleted(LineIndex: Integer);
@@ -382,9 +398,17 @@ type
     procedure RemoveObserver(const Observer: TNEDDocumentObserver);
     //
     // editing
-    procedure Insert(const Position: Integer; const Text: String);
-    procedure Delete(const Position: Integer; const Count: Integer);
-    procedure Replace(const Position: Integer; const Count: Integer; const Text: String);
+    procedure Insert(const Position: Integer; const Text: String); overload;
+    procedure Insert(const LineColumn: TNEDTextPosition; const Text: String); overload;
+    procedure Insert(const Line, Column: Integer; const Text: String); overload;
+    //
+    procedure Delete(const Position: Integer; const Count: Integer); overload;
+    procedure Delete(const LineColumn: TNEDTextPosition; const Count: Integer); overload;
+    procedure Delete(const Line, Column: Integer; const Count: Integer); overload;
+    //
+    procedure Replace(const Position: Integer; const Count: Integer; const Text: String); overload;
+    procedure Replace(const LineColumn: TNEDTextPosition; const Count: Integer; const Text: String); overload;
+    procedure Replace(const Line, Column: Integer; const Count: Integer; const Text: String); overload;
     //
     // undo / redo
     procedure Undo;
@@ -395,7 +419,8 @@ type
     // queries
     function GetLength: Integer;
     function GetText: String;
-    function GetTextRange(Position: Integer; Count: Integer): String;
+    function GetTextRange(Position: Integer; Count: Integer): String; overload;
+    function GetTextRange(Line, Column: Integer; Count: Integer): String; overload;
     function GetOriginalLineText(LineIndex: Integer): String;
     function GetLineText(LineIndex: Integer): String;
     function GetChar(Index: Integer): Char;
@@ -419,6 +444,8 @@ type
     property Modified: Boolean read FModified;
     property Lines[Index: Integer]: TNEDLineProperties read GetLine;
   end;
+
+  TNEDEditorBuffer = class(TNEDCustomDocument);
 
 implementation
 
@@ -780,6 +807,14 @@ begin
   UpdateLength;
 end;
 
+{ TNEDTextPosition }
+
+class function TNEDTextPosition.LineColumn(const ALine, AColumn: Integer): TNEDTextPosition;
+begin
+  Result.Line := ALine;
+  Result.Column := AColumn;
+end;
+
 { TNEDStringList }
 
 function TNEDStringList.GetObject(Index: Integer): TNEDLineProperties;
@@ -835,22 +870,24 @@ end;
 
 { TNEDDocumentObserver }
 
-constructor TNEDDocumentObserver.Create;
+constructor TNEDDocumentObserver.Create(const ADocument: TNEDCustomDocument);
 begin
   inherited Create;
-
+  FDocument := ADocument;
   FEnabled := True;
   FUpdateLock := 0;
 end;
 
 destructor TNEDDocumentObserver.Destroy;
 begin
+  FDocument := Nil;
   inherited;
 end;
 
 procedure TNEDDocumentObserver.DoDocumentChanged(const Change: TNEDDocumentChangeInfo);
 begin
-  // default implementation
+  if Assigned(FOnDocumentChanged) then
+    FOnDocumentChanged(Change);
 end;
 
 procedure TNEDDocumentObserver.DoLineInserted(LineIndex: Integer);
@@ -897,12 +934,32 @@ end;
 procedure TNEDDocumentObserver.DocumentChanged(Position, DeletedLength, InsertedLength: Integer);
 var
   Change: TNEDDocumentChangeInfo;
+  LineColumn: TNEDTextPosition;
+begin
+  FillChar(Change, SizeOf(Change), 0);
+
+  if not Assigned(FDocument) then
+    Exit;
+
+  if not FDocument.PositionToLineColumn(Position, LineColumn) then
+    Exit;
+
+  Change.Kind := dcUnknown;
+  Change.Position := LineColumn;
+  Change.DeletedLength := DeletedLength;
+  Change.InsertedLength := InsertedLength;
+
+  DocumentChanged(Change);
+end;
+
+procedure TNEDDocumentObserver.DocumentChanged(const LineColumn: TNEDTextPosition; DeletedLength, InsertedLength: Integer);
+var
+  Change: TNEDDocumentChangeInfo;
 begin
   FillChar(Change, SizeOf(Change), 0);
 
   Change.Kind := dcUnknown;
-
-  Change.Position := Position;
+  Change.Position := LineColumn;
   Change.DeletedLength := DeletedLength;
   Change.InsertedLength := InsertedLength;
 
@@ -975,9 +1032,9 @@ begin
   DoDocumentReset;
 end;
 
-{ TNEDDocument }
+{ TNEDCustomDocument }
 
-constructor TNEDDocument.Create;
+constructor TNEDCustomDocument.Create;
 var
   Line: TNEDLineProperties;
 begin
@@ -1003,11 +1060,12 @@ begin
   // always keep at least one line
   Line := CreateLine;
   FLines.AddObject('', Line);
+  FEmptyLineCreate := True;
 
   RebuildCaches;
 end;
 
-destructor TNEDDocument.Destroy;
+destructor TNEDCustomDocument.Destroy;
 var
   I: Integer;
 begin
@@ -1026,7 +1084,20 @@ begin
   inherited;
 end;
 
-procedure TNEDDocument.NotifyObservers(Position, DeletedLen, InsertedLen: Integer);
+procedure TNEDCustomDocument.NotifyObservers(Position, DeletedLen, InsertedLen: Integer);
+var
+  LineColumn: TNEDTextPosition;
+begin
+  if IsUpdating then
+    Exit;
+
+  if not PositionToLineColumn(Position, LineColumn) then
+    Exit;
+
+  NotifyObservers(LineColumn, DeletedLen, InsertedLen);
+end;
+
+procedure TNEDCustomDocument.NotifyObservers(const LineColumn: TNEDTextPosition; DeletedLen, InsertedLen: Integer);
 var
   Observer: TNEDDocumentObserver;
 begin
@@ -1034,10 +1105,10 @@ begin
     Exit;
 
   for Observer in FObservers do
-    Observer.DocumentChanged(Position, DeletedLen, InsertedLen);
+    Observer.DocumentChanged(LineColumn, DeletedLen, InsertedLen);
 end;
 
-procedure TNEDDocument.NotifyLineInserted(LineIndex: Integer);
+procedure TNEDCustomDocument.NotifyLineInserted(LineIndex: Integer);
 var
   Observer: TNEDDocumentObserver;
 begin
@@ -1048,7 +1119,7 @@ begin
     Observer.LineInserted(LineIndex);
 end;
 
-procedure TNEDDocument.NotifyLineDeleted(LineIndex: Integer);
+procedure TNEDCustomDocument.NotifyLineDeleted(LineIndex: Integer);
 var
   Observer: TNEDDocumentObserver;
 begin
@@ -1059,7 +1130,7 @@ begin
     Observer.LineDeleted(LineIndex);
 end;
 
-procedure TNEDDocument.NotifyLineChanged(LineIndex: Integer);
+procedure TNEDCustomDocument.NotifyLineChanged(LineIndex: Integer);
 var
   Observer: TNEDDocumentObserver;
 begin
@@ -1070,7 +1141,7 @@ begin
     Observer.LineChanged(LineIndex);
 end;
 
-function TNEDDocument.FindLine(Position: Integer; out LineIndex, Column: Integer): Boolean;
+function TNEDCustomDocument.FindLine(Position: Integer; out LineIndex, Column: Integer): Boolean;
 var
   I: Integer;
   CurrentPos: Integer;
@@ -1106,12 +1177,12 @@ begin
   end;
 end;
 
-function TNEDDocument.GetLine(Index: Integer): TNEDLineProperties;
+function TNEDCustomDocument.GetLine(Index: Integer): TNEDLineProperties;
 begin
   Result := FLines.Objects[Index];
 end;
 
-procedure TNEDDocument.RebuildCaches;
+procedure TNEDCustomDocument.RebuildCaches;
 var
   I: Integer;
 begin
@@ -1130,7 +1201,7 @@ begin
   FLineCount := FLines.Count;
 end;
 
-procedure TNEDDocument.RebuildLineNumbers;
+procedure TNEDCustomDocument.RebuildLineNumbers;
 var
   I: Integer;
 begin
@@ -1138,22 +1209,22 @@ begin
     Lines[I].LineNo := I;
 end;
 
-procedure TNEDDocument.MarkModified;
+procedure TNEDCustomDocument.MarkModified;
 begin
   FModified := True;
 end;
 
-function TNEDDocument.InternalLineLength(LineIndex: Integer): Integer;
+function TNEDCustomDocument.InternalLineLength(LineIndex: Integer): Integer;
 begin
 
 end;
 
-function TNEDDocument.CreateLine: TNEDLineProperties;
+function TNEDCustomDocument.CreateLine: TNEDLineProperties;
 begin
   Result := TNEDLineProperties.Create;
 end;
 
-procedure TNEDDocument.InsertLine(LineIndex: Integer; Line: TNEDLineProperties);
+procedure TNEDCustomDocument.InsertLine(LineIndex: Integer; Line: TNEDLineProperties);
 begin
   FLines.InsertObject(LineIndex, '', Line);
 
@@ -1163,7 +1234,7 @@ begin
   NotifyLineInserted(LineIndex);
 end;
 
-procedure TNEDDocument.DeleteLine(LineIndex: Integer);
+procedure TNEDCustomDocument.DeleteLine(LineIndex: Integer);
 begin
   if (LineIndex < 0) or (LineIndex >= FLines.Count) then
     Exit;
@@ -1177,7 +1248,7 @@ begin
   NotifyLineDeleted(LineIndex);
 end;
 
-procedure TNEDDocument.MergeLines(FirstLine, SecondLine: Integer);
+procedure TNEDCustomDocument.MergeLines(FirstLine, SecondLine: Integer);
 var
   A: TNEDLineProperties;
   B: TNEDLineProperties;
@@ -1205,7 +1276,7 @@ begin
   DeleteLine(SecondLine);
 end;
 
-procedure TNEDDocument.Clear;
+procedure TNEDCustomDocument.Clear;
 var
   I: Integer;
   Line: TNEDLineProperties;
@@ -1222,8 +1293,10 @@ begin
     FUndo.Clear;
     FRedo.Clear;
     //
-    Line := CreateLine;
-    FLines.AddObject('', Line);
+    if FEmptyLineCreate then begin
+      Line := CreateLine;
+      FLines.AddObject('', Line);
+    end;
     //
     FModified := False;
     RebuildCaches;
@@ -1232,61 +1305,60 @@ begin
   end;
 end;
 
-procedure TNEDDocument.LoadFromFile(const FileName: String);
+procedure TNEDCustomDocument.LoadFromFile(const FileName: String);
 var
-  Source: TStringList;
   LineObj: TNEDLineProperties;
   Piece: TNEDPiece;
   I: Integer;
-  Offset: Integer;
+//  Offset: Integer;
 begin
   BeginUpdate;
   try
-    Clear;
-    //
-    Source := TStringList.Create;
+    FEmptyLineCreate := False;
     try
-      Source.LoadFromFile(FileName);
-      FFilePath := FileName;
-      //
-      // keep original file contents untouched
-      //FOriginalBuffer := Source.Text;
-      //
-      // remove automatically created empty line
-      if FLines.Count = 1 then begin
-        FLines.Objects[0].Free;
-        FLines.Clear;
-      end;
-
-      Offset := 0;
-      for I := 0 to Source.Count - 1 do begin
-        LineObj := CreateLine;
-        // make default piece for non-empty line
-        if Source[I] <> '' then begin
-          Piece.Buffer := pbOriginal;
-          Piece.Offset := Offset;
-          Piece.Length := Length(Source[I]);
-
-          LineObj.Pieces.Add(Piece);
-        end;
-
-        LineObj.UpdateLength;
-
-        FLines.AddObject(Source[I], LineObj);
-
-        Inc(Offset, Length(Source[I]));
-
-        //
-        // original file buffer contains CRLF.
-        Inc(Offset, 2);
-      end;
-
-      if FLines.Count = 0 then
-        FLines.AddObject('', CreateLine);
-
+      Clear;
     finally
-      Source.Free;
+      FEmptyLineCreate := True;
     end;
+    //
+    FLines.LoadFromFile(FileName);
+    FFilePath := FileName;
+    //
+    // keep original file contents untouched
+    //FOriginalBuffer := Source.Text;
+    //
+    // remove automatically created empty line
+//    if FLines.Count = 1 then begin
+//      FLines.Objects[0].Free;
+//      FLines.Clear;
+//    end;
+
+//    Offset := 0;
+    for I := 0 to FLines.Count - 1 do begin
+      LineObj := CreateLine;
+      // make default piece for non-empty line
+      if FLines[I] <> '' then begin
+        Piece.Buffer := pbOriginal;
+        Piece.Offset := 0; //Offset;
+        Piece.Length := Length(FLines[I]);
+
+        LineObj.Pieces.Add(Piece);
+      end;
+
+      LineObj.UpdateLength;
+
+      //FLines.AddObject(Source[I], LineObj);
+      FLines.Objects[I] := LineObj;
+
+//      Inc(Offset, Length(Source[I]));
+
+      //
+      // original file buffer contains CRLF.
+//      Inc(Offset, 2);
+    end;
+
+    if FLines.Count = 0 then
+      FLines.AddObject('', CreateLine);
 
     FModified := False;
 
@@ -1297,7 +1369,7 @@ begin
   end;
 end;
 
-procedure TNEDDocument.SaveToFile;
+procedure TNEDCustomDocument.SaveToFile;
 var
   Stream: TStringList;
 begin
@@ -1311,13 +1383,13 @@ begin
   end;
 end;
 
-procedure TNEDDocument.SaveToFileAs(const FileName: String);
+procedure TNEDCustomDocument.SaveToFileAs(const FileName: String);
 begin
   FFilePath := FileName;
   SaveToFile;
 end;
 
-function TNEDDocument.TryMergeUndo(const Op: TNEDEditOperation): Boolean;
+function TNEDCustomDocument.TryMergeUndo(const Op: TNEDEditOperation): Boolean;
 var
   TopOp: TNEDEditOperation;
 begin
@@ -1392,38 +1464,58 @@ begin
   end;
 end;
 
-procedure TNEDDocument.BeginUpdate;
+procedure TNEDCustomDocument.BeginUpdate;
 begin
   Inc(FUpdateCount);
 end;
 
-procedure TNEDDocument.EndUpdate;
+procedure TNEDCustomDocument.EndUpdate;
 begin
   if FUpdateCount > 0 then
     Dec(FUpdateCount);
 end;
 
-function TNEDDocument.IsUpdating: Boolean;
+function TNEDCustomDocument.IsUpdating: Boolean;
 begin
   Result := FUpdateCount > 0;
 end;
 
-procedure TNEDDocument.AddObserver(const Observer: TNEDDocumentObserver);
+procedure TNEDCustomDocument.AddObserver(const Observer: TNEDDocumentObserver);
 begin
   if FObservers.IndexOf(Observer) < 0 then
     FObservers.Add(Observer);
 end;
 
-procedure TNEDDocument.RemoveObserver(const Observer: TNEDDocumentObserver);
+procedure TNEDCustomDocument.RemoveObserver(const Observer: TNEDDocumentObserver);
 begin
   FObservers.Remove(Observer);
 end;
 
-procedure TNEDDocument.Insert(const Position: Integer; const Text: String);
+procedure TNEDCustomDocument.Insert(const Position: Integer; const Text: String);
 var
   LineIndex: Integer;
   Column: Integer;
-  Line: TNEDLineProperties;
+begin
+  if Text = '' then
+    Exit;
+
+  if not FindLine(Position, LineIndex, Column) then
+    Exit;
+
+  Insert(LineIndex, Column, Text);
+end;
+
+procedure TNEDCustomDocument.Insert(const LineColumn: TNEDTextPosition; const Text: String);
+begin
+  if Text = '' then
+    Exit;
+
+  Insert(LineColumn.Line, LineColumn.Column, Text);
+end;
+
+procedure TNEDCustomDocument.Insert(const Line, Column: Integer; const Text: String);
+var
+  LineProperties: TNEDLineProperties;
   Piece: TNEDPiece;
   AddOffset: Integer;
   Parts: TStringList;
@@ -1434,14 +1526,12 @@ begin
   if Text = '' then
     Exit;
 
-  if not FindLine(Position, LineIndex, Column) then
-    Exit;
-
   // record user edit
   if not FInUndoRedo then begin
     UndoOp.Kind := opInsert;
-    PositionToLineColumn(Position, UndoOp.Position);
+    UndoOp.Position := TNEDTextPosition.LineColumn(Line, Column);
     UndoOp.Text := Text;
+    UndoOp.Length := Length(Text);
 
     if not TryMergeUndo(UndoOp) then
       FUndo.Push(UndoOp);
@@ -1452,7 +1542,7 @@ begin
   AddOffset := Length(FInputBuffer);
   FInputBuffer := FInputBuffer + Text;
 
-  Line := Lines[LineIndex];
+  LineProperties := Lines[Line];
 
   // fast path: no line breaks.
   if Pos(#10, Text) = 0 then begin
@@ -1460,13 +1550,13 @@ begin
     Piece.Offset := AddOffset;
     Piece.Length := Length(Text);
 
-    Line.InsertPiece(Column, Piece);
-    Line.UpdateLength;
+    LineProperties.InsertPiece(Column, Piece);
+    LineProperties.UpdateLength;
 
     MarkModified;
     RebuildCaches;
 
-    NotifyObservers(Position, 0, Length(Text));
+    NotifyObservers(TNEDTextPosition.LineColumn(Line, Column), 0, Length(Text));
 
     Exit;
   end;
@@ -1480,7 +1570,7 @@ begin
     Piece.Offset := AddOffset;
     Piece.Length := Length(Parts[0]);
 
-    Line.InsertPiece(Column, Piece);
+    LineProperties.InsertPiece(Column, Piece);
 
     Inc(AddOffset, Piece.Length + 2); // CRLF
 
@@ -1499,7 +1589,7 @@ begin
 
       NewLine.UpdateLength;
 
-      InsertLine(LineIndex + I, NewLine);
+      InsertLine(Line + I, NewLine);
     end;
   finally
     Parts.Free;
@@ -1508,10 +1598,29 @@ begin
   MarkModified;
   RebuildCaches;
 
-  NotifyObservers(Position, 0, Length(Text));
+  NotifyObservers(TNEDTextPosition.LineColumn(Line, Column), 0, Length(Text));
 end;
 
-procedure TNEDDocument.Delete(const Position, Count: Integer);
+procedure TNEDCustomDocument.Delete(const Position, Count: Integer);
+var
+  StartLine: Integer;
+  StartColumn: Integer;
+begin
+  if Count <= 0 then
+    Exit;
+
+  if not FindLine(Position, StartLine, StartColumn) then
+    Exit;
+
+  Delete(StartLine, StartColumn, Count);
+end;
+
+procedure TNEDCustomDocument.Delete(const LineColumn: TNEDTextPosition; const Count: Integer);
+begin
+  Delete(LineColumn.Line, LineColumn.Column, Count);
+end;
+
+procedure TNEDCustomDocument.Delete(const Line, Column, Count: Integer);
 var
   StartLine: Integer;
   StartColumn: Integer;
@@ -1520,23 +1629,20 @@ var
   UndoOp: TNEDEditOperation;
   DeletedText: String;
 begin
-  if Count <= 0 then
-    Exit;
-
-  if not FindLine(Position, StartLine, StartColumn) then
-    Exit;
-
-  if not FindLine(Position + Count, EndLine, EndColumn) then
+  StartLine := Line;
+  StartColumn := Column;
+  if not FindLine(LineColumnToPosition(Line, Column) + Count, EndLine, EndColumn) then
     Exit;
 
   // capture text before deletion
-  DeletedText := GetTextRange(Position, Count);
+  DeletedText := GetTextRange(Line, Column, Count);
 
   // record user edit
   if not FInUndoRedo then begin
     UndoOp.Kind := opDelete;
-    PositionToLineColumn(Position, UndoOp.Position);
+    UndoOp.Position := TNEDTextPosition.LineColumn(Line, Column);
     UndoOp.Text := DeletedText;
+    UndoOp.Length := Length(DeletedText);
 
     if not TryMergeUndo(UndoOp) then
       FUndo.Push(UndoOp);
@@ -1576,16 +1682,28 @@ begin
   MarkModified;
   RebuildCaches;
 
-  NotifyObservers(Position, Count, 0);
+  NotifyObservers(TNEDTextPosition.LineColumn(Line, Column), Count, 0);
 end;
 
-procedure TNEDDocument.Replace(const Position, Count: Integer; const Text: String);
+procedure TNEDCustomDocument.Replace(const Position, Count: Integer; const Text: String);
 begin
   Delete(Position, Count);
   Insert(Position, Text);
 end;
 
-procedure TNEDDocument.Undo;
+procedure TNEDCustomDocument.Replace(const LineColumn: TNEDTextPosition; const Count: Integer; const Text: String);
+begin
+  Delete(LineColumn, Count);
+  Insert(LineColumn, Text);
+end;
+
+procedure TNEDCustomDocument.Replace(const Line, Column, Count: Integer; const Text: String);
+begin
+  Delete(Line, Column, Count);
+  Insert(Line, Column, Text);
+end;
+
+procedure TNEDCustomDocument.Undo;
 var
   Op: TNEDEditOperation;
 begin
@@ -1607,7 +1725,7 @@ begin
   FRedo.Push(Op);
 end;
 
-procedure TNEDDocument.Redo;
+procedure TNEDCustomDocument.Redo;
 var
   Op: TNEDEditOperation;
 begin
@@ -1629,22 +1747,22 @@ begin
   FUndo.Push(Op);
 end;
 
-function TNEDDocument.CanUndo: Boolean;
+function TNEDCustomDocument.CanUndo: Boolean;
 begin
   Result := FUndo.Count > 0;
 end;
 
-function TNEDDocument.CanRedo: Boolean;
+function TNEDCustomDocument.CanRedo: Boolean;
 begin
   Result := FRedo.Count > 0;
 end;
 
-function TNEDDocument.GetLength: Integer;
+function TNEDCustomDocument.GetLength: Integer;
 begin
   Result := FLength;
 end;
 
-function TNEDDocument.GetText: String;
+function TNEDCustomDocument.GetText: String;
 var
   SB: TStringBuilder;
   I: Integer;
@@ -1664,7 +1782,7 @@ begin
   end;
 end;
 
-function TNEDDocument.GetTextRange(Position, Count: Integer): String;
+function TNEDCustomDocument.GetTextRange(Position, Count: Integer): String;
 var
   S: String;
 begin
@@ -1682,7 +1800,44 @@ begin
   Result := Copy(S, Position + 1, Count);
 end;
 
-function TNEDDocument.GetOriginalLineText(LineIndex: Integer): String;
+function TNEDCustomDocument.GetTextRange(Line, Column: Integer; Count: Integer): String;
+var
+  S: String;
+begin
+  Result := '';
+
+  if Line < 0 then
+    Line := 0;
+
+  if Column < 0 then
+    Column := 0;
+
+  if Count < 0 then
+    Count := 0;
+
+  S := GetLineText(Line);
+  if (Length(S) - Column) > Count then
+    Result := Copy(S, Column + 1, Count)
+  else begin
+    Result := Copy(S, Column + 1, Length(S) - Column) + #13#10; // CRLF
+    Dec(Count, Length(Result) + 2);
+    Inc(Line);
+    while (Count > 0) and (Line < LineCount) do begin
+      S := GetLineText(Line);
+      if Length(S) > Count then begin
+        Result := Result + Copy(S, 1, Count);
+        Break;
+      end
+      else begin
+        Result := Result + S + #13#10; // CRLF
+        Dec(Count, Length(S) + 2);
+        Inc(Line);
+      end;
+    end;
+  end;
+end;
+
+function TNEDCustomDocument.GetOriginalLineText(LineIndex: Integer): String;
 begin
   Result := '';
 
@@ -1692,7 +1847,7 @@ begin
   Result := FLines.Strings[LineIndex];
 end;
 
-function TNEDDocument.GetLineText(LineIndex: Integer): String;
+function TNEDCustomDocument.GetLineText(LineIndex: Integer): String;
 var
   Line: TNEDLineProperties;
   Piece: TNEDPiece;
@@ -1722,7 +1877,7 @@ begin
   end;
 end;
 
-function TNEDDocument.GetChar(Index: Integer): Char;
+function TNEDCustomDocument.GetChar(Index: Integer): Char;
 var
   S: String;
 begin
@@ -1734,17 +1889,17 @@ begin
   Result := S[Index + 1];
 end;
 
-function TNEDDocument.PositionToLineColumn(Position: Integer; out Line, Column: Integer): Boolean;
+function TNEDCustomDocument.PositionToLineColumn(Position: Integer; out Line, Column: Integer): Boolean;
 begin
   Result := FindLine(Position, Line, Column);
 end;
 
-function TNEDDocument.PositionToLineColumn(Position: Integer; out LineColumn: TNEDTextPosition): Boolean;
+function TNEDCustomDocument.PositionToLineColumn(Position: Integer; out LineColumn: TNEDTextPosition): Boolean;
 begin
   Result := FindLine(Position, LineColumn.Line, LineColumn.Column);
 end;
 
-function TNEDDocument.LineColumnToPosition(Line, Column: Integer): Integer;
+function TNEDCustomDocument.LineColumnToPosition(Line, Column: Integer): Integer;
 var
   I: Integer;
 begin
@@ -1760,22 +1915,22 @@ begin
   Inc(Result, Column);
 end;
 
-function TNEDDocument.LineColumnToPosition(LineColumn: TNEDTextPosition): Integer;
+function TNEDCustomDocument.LineColumnToPosition(LineColumn: TNEDTextPosition): Integer;
 begin
   Result := LineColumnToPosition(LineColumn.Line, LineColumn.Column);
 end;
 
-function TNEDDocument.LineCount: Integer;
+function TNEDCustomDocument.LineCount: Integer;
 begin
   Result := FLineCount;
 end;
 
-function TNEDDocument.LastLine: Integer;
+function TNEDCustomDocument.LastLine: Integer;
 begin
   Result := FLineCount - 1;
 end;
 
-function TNEDDocument.IsModified: Boolean;
+function TNEDCustomDocument.IsModified: Boolean;
 begin
   Result := FModified;
 end;

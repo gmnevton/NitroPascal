@@ -3881,7 +3881,7 @@ begin
     DrawState := [];
     if Focused and (FTopIndex + I = ItemIndex) then // draw focused only Entry that is active
       Include(DrawState, dsFocused);
-    if FTopIndex + I = ItemIndex then begin // ok, ItemIndex is not set at all, it returns -1, this is not right
+    if FTopIndex + I = ItemIndex then begin
       if FMultiSelect then
         Include(DrawState, dsDefaulted)
       else

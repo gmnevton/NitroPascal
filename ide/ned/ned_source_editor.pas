@@ -27,24 +27,46 @@ uses
   UCL.PopupMenu,
   SynEditHighlighter,
   SynHighlighterGeneral,
-  SynEdit;
+  SynEdit,
+  ned_editor_view;
 
 type
   TNEDEditorForm = class(TUForm)
-    SynEdit1: TSynEdit;
+    SynEdit1: TSynEdit; // this will be removed
     SynGeneralSyn1: TSynGeneralSyn;
     UPanel4: TUPanel;
     UScrollBox1: TUScrollBox;
     USymbolButton1: TUSymbolButton;
     UPopupMenu1: TUPopupMenu;
     USymbolButton2: TUSymbolButton;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormShow(Sender: TObject);
   private
+    Editor: TNEDEditorView;
   public
   end;
 
 implementation
 
 {$R *.dfm}
+
+procedure TNEDEditorForm.FormCreate(Sender: TObject);
+begin
+  Editor := TNEDEditorView.Create(Self);
+  Editor.Parent := Self;
+  Editor.Align := alClient;
+end;
+
+procedure TNEDEditorForm.FormDestroy(Sender: TObject);
+begin
+  Editor.Free;
+end;
+
+procedure TNEDEditorForm.FormShow(Sender: TObject);
+begin
+//
+end;
 
 end.
 

@@ -4,8 +4,8 @@
 
 ## In Development
 
-- Editor backbuffer class (editor backend engine)
-- Editor component (TSynEdit component rework)
+- Editor backbuffer class (editor backend engine) - already done; fixes only
+- Visual editor component from scratch (~~TSynEdit component rework~~)
 
 
 

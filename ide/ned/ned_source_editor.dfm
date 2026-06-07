@@ -13,14 +13,16 @@ object NEDEditorForm: TNEDEditorForm
   Font.Style = []
   KeyPreview = True
   OldCreateOrder = False
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
   object SynEdit1: TSynEdit
-    Left = 0
-    Top = 40
-    Width = 1404
-    Height = 760
-    Align = alClient
+    Left = 24
+    Top = 536
+    Width = 401
+    Height = 246
     Color = 2039583
     Ctl3D = True
     ParentCtl3D = False
@@ -31,6 +33,7 @@ object NEDEditorForm: TNEDEditorForm
     Font.Style = []
     Font.Quality = fqClearTypeNatural
     TabOrder = 0
+    Visible = False
     CodeFolding.ShowCollapsedLine = True
     UseCodeFolding = False
     BorderStyle = bsNone
@@ -492,8 +495,8 @@ object NEDEditorForm: TNEDEditorForm
     PreprocessorAttri.Foreground = clLime
     StringAttri.Foreground = clAqua
     SymbolAttri.Foreground = clWhite
-    Left = 343
-    Top = 16
+    Left = 471
+    Top = 632
   end
   object UPopupMenu1: TUPopupMenu
     AniSet.AniKind = akOut
@@ -501,7 +504,7 @@ object NEDEditorForm: TNEDEditorForm
     AniSet.DelayStartTime = 0
     AniSet.Duration = 120
     AniSet.Step = 20
-    Left = 430
-    Top = 16
+    Left = 542
+    Top = 8
   end
 end

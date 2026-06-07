@@ -386,13 +386,13 @@ object NEDMainForm: TNEDMainForm
         Height = 40
         Hint = 'Project'
         Align = alTop
-        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
+        OnClick = btnProjectClick
         BackColors.Enabled = False
         BackColors.Color = clBlack
         BackColors.LightColor = 13619151
@@ -446,7 +446,7 @@ object NEDMainForm: TNEDMainForm
       Left = 8
       Top = 4
       Width = 44
-      Height = 17
+      Height = 24
       Margins.Left = 8
       Margins.Top = 4
       Margins.Right = 0
@@ -460,6 +460,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
       Left = 52
@@ -475,7 +476,7 @@ object NEDMainForm: TNEDMainForm
       Left = 72
       Top = 4
       Width = 34
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -489,6 +490,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
       Left = 106
@@ -502,7 +504,7 @@ object NEDMainForm: TNEDMainForm
       Left = 126
       Top = 4
       Width = 28
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -516,6 +518,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
       Left = 154
@@ -530,7 +533,7 @@ object NEDMainForm: TNEDMainForm
       Left = 174
       Top = 4
       Width = 32
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -544,6 +547,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
       Left = 206
@@ -557,7 +561,7 @@ object NEDMainForm: TNEDMainForm
       Left = 226
       Top = 4
       Width = 118
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -571,6 +575,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
       Left = 344
@@ -586,7 +591,7 @@ object NEDMainForm: TNEDMainForm
       Left = 364
       Top = 4
       Width = 15
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -601,6 +606,7 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
+      ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
       Left = 578
