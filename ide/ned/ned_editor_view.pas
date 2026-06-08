@@ -4,6 +4,7 @@ interface
 
 uses
   SysUtils,
+  Messages,
   Classes,
   Controls,
   Graphics,
@@ -185,6 +186,25 @@ type
     FTopIndex: Integer;
     FVisibleLinesCount: Integer;
     FActiveLineIndex: Integer;
+  private
+    procedure CMDesignHitTest(var Msg: TCMDesignHitTest); message CM_DESIGNHITTEST;
+    procedure CMFontChanged(var Msg: TMessage); message CM_FONTCHANGED;
+    procedure CMMouseEnter(var Msg: TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Msg: TMessage); message CM_MOUSELEAVE;
+//    procedure CMEntryImages(var Msg: TMessage); message CM_ENTRYIMAGES;
+//    //procedure CMItemImages(var Msg: TMessage); message CM_ITEMIMAGES;
+//    procedure CMItemDetails(var Msg: TMessage); message CM_ITEMDETAILS;
+//    procedure CNItemClick(var Msg: TMessage); message CN_ITEMCLICK;
+    procedure WMEraseBkgnd(var Msg: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
+    procedure WMSize(var Msg: TWMSize); message WM_SIZE;
+    procedure WMMouseWheel(var Msg: TWMMouseWheel); message WM_MOUSEWHEEL;
+    procedure WMVScroll(var Msg: TWMScroll); message WM_VSCROLL;
+    procedure WMHScroll(var Msg: TWMScroll); message WM_HSCROLL;
+    procedure WMTimer(var Msg: TWMTimer); message WM_TIMER;
+    procedure WMSetFocus(var Msg: TWMSetFocus); message WM_SETFOCUS;
+    procedure WMKillFocus(var Msg: TWMKillFocus); message WM_KILLFOCUS;
+    procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure CreateHandle; override;
@@ -198,7 +218,7 @@ type
     procedure Paint; override;
     procedure DrawBackground(const ACanvas: TCanvas; var ARect: TRect); virtual;
     procedure DrawLines(const ACanvas: TCanvas; const ARect: TRect); virtual;
-    procedure DrawLine(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect);
+    procedure DrawLine(const ACanvas: TCanvas; const LineIdx: Integer; const ARect: TRect); virtual;
     //
     procedure SetDocument(const DocumentBuffer: TNEDEditorBuffer);
     procedure SetObserver(const DocumentObserver: TNEDDocumentObserver);
@@ -253,13 +273,17 @@ begin
   asciiResult := ToAscii(Key, MapVirtualKey(Key, 0), keyboardState, @aResult[1], 0);
   case asciiResult of
     0: aResult := '';
-    1: SetLength(aResult, 1);
-    2: aResult := '';
-    else
-      aResult := '';
+    1: begin
+      SetLength(aResult, 1);
+      if Length(aResult) > 0 then
+        Result := aResult[1];
+    end;
+    2: begin
+      if Length(aResult) > 0 then
+        Result := aResult[1];
+    end;
   end;
-  if Length(aResult) > 0 then
-    Result := aResult[1];
+  aResult := '';
 end;
 
 { TNEDEditorGutter }
@@ -574,6 +598,21 @@ end;
 constructor TNEDCustomEditorView.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  ControlStyle := ControlStyle + [csOpaque];
+//  ControlStyle := ControlStyle + [csOpaque, csSetCaption, csNeedsBorderPaint];
+{$IF CompilerVersion > 29}
+  StyleElements := [];
+{$IFEND}
+  BevelEdges := [];
+  BevelOuter := bvNone;
+  BevelInner := bvNone;
+//  FullRepaint := False;
+  DoubleBuffered := True;
+  ParentBackground := False;
+  ParentColor := False;
+  TabStop := True;
+  Cursor := crIBeam;
+  //
   FDocument := Nil;
   FObserver := Nil;
   FGutter := TNEDEditorGutter.Create(Self);
@@ -623,7 +662,7 @@ begin
   // after this we need our own scrollbars renderer, that will paint them as we want
   Params.WindowClass.style := Params.WindowClass.style and not (CS_HREDRAW or CS_VREDRAW);
   // don't repaint areas occupied by child controls - not sure for now, if this is usefull
-  //Params.Style := Params.Style or WS_CLIPCHILDREN;
+  Params.Style := Params.Style or WS_CLIPCHILDREN;
 end;
 
 procedure TNEDCustomEditorView.CreateHandle;
@@ -640,6 +679,169 @@ procedure TNEDCustomEditorView.Loaded;
 begin
   inherited;
 
+end;
+
+procedure TNEDCustomEditorView.CMDesignHitTest(var Msg: TCMDesignHitTest);
+begin
+  inherited;
+  Msg.Result := 1;
+end;
+
+procedure TNEDCustomEditorView.CMFontChanged(var Msg: TMessage);
+begin
+  inherited;
+  Canvas.Font := Font;
+  //FTextHeight := Canvas.TextHeight(' ');
+end;
+
+procedure TNEDCustomEditorView.CMMouseEnter(var Msg: TMessage);
+begin
+//  HideNativeScrollBars;
+//  ShowModernScrollBar;
+  inherited;
+//  CaptureItem := FMouseItem;
+//  FMouseItem := Nil;
+  Repaint;
+end;
+
+procedure TNEDCustomEditorView.CMMouseLeave(var Msg: TMessage);
+var
+  P: TPoint;
+begin
+  GetCursorPos(P);
+  P := ScreenToClient(P);
+//  if not PtInRect(ClientRect, P) then
+//    HideModernScrollBar;
+  inherited;
+//  if MouseCapture then
+//    FMouseItem := CaptureItem
+//  else
+//    FMouseItem := Nil;
+//  CaptureItem := Nil;
+//  FHotIndex := -1;
+  Repaint;
+end;
+
+procedure TNEDCustomEditorView.WMEraseBkgnd(var Msg: TWMEraseBkgnd);
+begin
+  Msg.Result := 1;
+end;
+
+procedure TNEDCustomEditorView.WMGetDlgCode(var Msg: TWMGetDlgCode);
+begin
+  inherited;
+  Msg.Result := DLGC_WANTARROWS or DLGC_WANTTAB or DLGC_WANTALLKEYS or DLGC_WANTCHARS;
+//  Msg.Result := Msg.Result or DLGC_WANTARROWS or DLGC_WANTCHARS;
+//  if fWantTabs then
+//    Msg.Result := Msg.Result or DLGC_WANTTAB;
+//  if fWantReturns then
+//    Msg.Result := Msg.Result or DLGC_WANTALLKEYS;
+end;
+
+procedure TNEDCustomEditorView.WMSize(var Msg: TWMSize);
+begin
+  inherited;
+//  HideNativeScrollBars;
+//  UpdateScrollRange;
+//  ShowModernScrollBar;
+end;
+
+procedure TNEDCustomEditorView.WMMouseWheel(var Msg: TWMMouseWheel);
+var
+  Delta: Integer;
+  p: TPoint;
+begin
+//  if Selected <> Nil then begin
+    Delta := -Msg.WheelDelta div 120;
+//    if not IsRectEmpty(ButtonRect[fbScrollUp]) and (Delta = -1) then
+//      Selected.TopIndex := Selected.TopIndex - 1
+//    else if not IsRectEmpty(ButtonRect[fbScrollDown]) and (Delta = 1) then
+//      Selected.TopIndex := Selected.TopIndex + 1;
+//    if not MouseCapture then begin
+//      p := ScreenToClient(Point(Message.XPos, Message.YPos));
+//      CaptureItem := ItemFromPoint(p.X, p.Y);
+//    end;
+//  end;
+//  if delta > 0 then
+//    SetTopIndex(FTopIndex + 1)
+//  else
+//    SetTopIndex(FTopIndex - 1);
+  inherited;
+end;
+
+procedure TNEDCustomEditorView.WMVScroll(var Msg: TWMScroll);
+begin
+//  HideNativeScrollBars;
+//  case Msg.ScrollCode of
+//    SB_TOP       : SetTopIndex(0);
+//    SB_BOTTOM    : SetTopIndex(VisibleEntriesCount - 1);
+//    SB_LINEDOWN  : SetTopIndex(FTopIndex + 1);
+//    SB_LINEUP    : SetTopIndex(FTopIndex - 1);
+//    SB_PAGEDOWN  : SetTopIndex(FTopIndex + ClientHeight div FEntryHeight);
+//    SB_PAGEUP    : SetTopIndex(FTopIndex - ClientHeight div FEntryHeight);
+//    SB_THUMBTRACK: SetTopIndex(Msg.Pos);
+//  end;
+end;
+
+procedure TNEDCustomEditorView.WMHScroll(var Msg: TWMScroll);
+begin
+  // we do not scroll left/right
+//  HideNativeScrollBars;
+end;
+
+procedure TNEDCustomEditorView.WMTimer(var Msg: TWMTimer);
+begin
+//  if FButtons = [] then begin
+//    KillTimer(Handle, 1);
+//    Exit;
+//  end;
+//  with Selected do
+//    if fbScrollUp in FButtons then begin
+//      TopIndex := TopIndex - 1;
+//      if IsRectEmpty(ButtonRect[fbScrollUp]) then
+//        FButtons := [];
+//    end
+//    else begin
+//      TopIndex := TopIndex + 1;
+//      if IsRectEmpty(ButtonRect[fbScrollDown]) then
+//        FButtons := [];
+//    end;
+//  if FButtons = [] then
+//    KillTimer(Handle, 1);
+end;
+
+procedure TNEDCustomEditorView.WMSetFocus(var Msg: TWMSetFocus);
+begin
+//  HideNativeScrollBars;
+//  ShowModernScrollBar;
+  inherited;
+  Invalidate;
+end;
+
+procedure TNEDCustomEditorView.WMKillFocus(var Msg: TWMKillFocus);
+begin
+//  HideModernScrollBar;
+  inherited;
+//  FMouseCapture := False;
+//  FDownIndex := -1;
+  Invalidate;
+end;
+
+procedure TNEDCustomEditorView.WMNCHitTest(var Msg: TWMNCHitTest);
+var
+  P: TPoint;
+  R: TRect;
+begin
+  inherited;
+
+  P := ScreenToClient(Point(Msg.XPos, Msg.YPos));
+  R := ClientRect;
+
+  // Right-side fake scrollbar
+//  if (P.X >= R.Right - FVerticalScrollBar.Width) and not FVerticalScrollBar.Visible then begin
+//    //Msg.Result := HTVSCROLL;
+//    FVerticalScrollBar.ShowAnimated;
+//  end;
 end;
 
 procedure TNEDCustomEditorView.KeyDown(var Key: Word; Shift: TShiftState);
@@ -714,27 +916,63 @@ end;
 
 procedure TNEDCustomEditorView.Notification(AComponent: TComponent; Operation: TOperation);
 begin
-  inherited;
-
+  inherited Notification(AComponent, Operation);
+  if (Operation = opRemove) and (AComponent <> Nil) then begin
+//    if AComponent = FEntryImages then
+//      UpdateImages(FEntryImages, Nil);
+//    else if AComponent = FItemImages then
+//      UpdateImages(FItemImages, Nil);
+  end;
 end;
 
 procedure TNEDCustomEditorView.Paint;
+var
+  LinesR, SB: TRect;
 begin
-  inherited;
-
+  LinesR := GetLinesArea;
+  DrawBackground(Canvas, LinesR); // clear background
+//  if FDrawVerticalScrollBar or (not MouseInClient and Focused and not FVerticalScrollBar.Visible) then begin
+//    FDrawVerticalScrollBar := False;
+//    SB := VerticalScrollBarArea;
+//    DrawBackground(Canvas, SB); // clear background
+//  end;
+  //
+  if FGutter.Visible and (FGutter.GetWidth > 0) then
+    FGutter.Paint(Canvas, GetGutterArea);
+  //
+  DrawLines(Canvas, LinesR); //draw items
+  //
+//  if FMinimap.Visible then
+//    FMinimap.Paint(Canvas, GetMinimapArea);
+  //
+//  if FHorizontalScrollBar.Visible then
+//    FHorizontalScrollBar.Paint(Canvas, GetHorizontalScrollbarArea);
+//  if FVerticalScrollBar.Visible then
+//    FVerticalScrollBar.Paint(Canvas, GetVerticalScrollbarArea);
 end;
 
 procedure TNEDCustomEditorView.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
 begin
-
+  ACanvas.Brush.Style := bsSolid;
+  ACanvas.Brush.Color := ColorToRGB(Color);
+  ACanvas.FillRect(ARect);
+  //
+//  if FBorderStyle = bsSingle then begin
+//    DrawThemeBorder(ACanvas.Handle, Color, ARect, []);
+//    InflateRect(ARect, -GetBorder, -GetBorder);
+//    //SelectClipRect(DC, Rect, RGN_AND);
+//  end;
 end;
 
 procedure TNEDCustomEditorView.DrawLines(const ACanvas: TCanvas; const ARect: TRect);
+var
+  ClipR: TRect;
 begin
+  ClipR := ACanvas.ClipRect;
 
 end;
 
-procedure TNEDCustomEditorView.DrawLine(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect);
+procedure TNEDCustomEditorView.DrawLine(const ACanvas: TCanvas; const LineIdx: Integer; const ARect: TRect);
 begin
 
 end;
@@ -821,11 +1059,20 @@ begin
     Exit;
 
   Result := Rect(0, 0, FGutter.GetWidth, Self.Height);
+//  if FHorizontalScrollBar.Visible then
+//    Result.Bottom := Result.Bottom - FHorizontalScrollBar.Size;
 end;
 
 function TNEDCustomEditorView.GetLinesArea: TRect;
+var
+  Gutter: TRect;
 begin
-  // @TODO
+  Gutter := GetGutterArea;
+  Result := Rect(Gutter.Width, 0, Self.Width, Self.Height);
+//  if FVerticalScrollBar.Visible then
+//    Result.Right := Result.Right - FVerticalScrollBar.Size;
+//  if FHorizontalScrollBar.Visible then
+//    Result.Bottom := Result.Bottom - FHorizontalScrollBar.Size;
 end;
 
 function TNEDCustomEditorView.GetMinimapArea: TRect;
