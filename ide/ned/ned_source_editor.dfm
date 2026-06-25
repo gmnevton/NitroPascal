@@ -506,5 +506,18 @@ object NEDEditorForm: TNEDEditorForm
     AniSet.Step = 20
     Left = 542
     Top = 8
+    object _mnuShowNonVisibleLines: TMenuItem
+      AutoCheck = True
+      Caption = 'Show non-visible lines'
+    end
+  end
+  object PopupMenu1: TPopupMenu
+    Left = 640
+    Top = 8
+    object mnuShowNonVisibleLines: TMenuItem
+      AutoCheck = True
+      Caption = 'Show non-visible lines'
+      OnClick = mnuShowNonVisibleLinesClick
+    end
   end
 end

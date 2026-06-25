@@ -1,19 +1,42 @@
 # NED: TODO and in DEVELOPMENT
 
+Compiler: https://github.com/gmnevton/NitroPascal
+
+Code Editor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
+
 ---
 
 ## In Development
 
 - Editor backbuffer class (editor backend engine) - already done; fixes only
+
 - Visual editor component from scratch (~~TSynEdit component rework~~)
-
-
+  
+  - [ ] Keyboard input handling
+    
+    - [ ] DELETE key
+    
+    - [ ] BACKSPACE key
+    
+    - [ ] TAB key
+  
+  - [x] Mouse click sets cursor location (and right click also)
+  
+  - [ ] Render scroll bars
+  
+  - [ ] Handle scrolling
+  
+  - [ ] Handle selection
+  
+  - [ ] Handle code highlighting
+  
+  - [ ] Fully integrate with application
+  
+  - [ ] Test multi-edit/view on a single document
 
 ## TODO
 
 - Save file dialog / folder view
-
-
 
 ## LATER
 

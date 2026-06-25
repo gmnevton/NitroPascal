@@ -463,7 +463,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
-      Left = 52
+      Left = 118
       Top = 0
       Height = 32
       Align = alLeft
@@ -473,7 +473,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileEncoding: TUText
       AlignWithMargins = True
-      Left = 72
+      Left = 138
       Top = 4
       Width = 34
       Height = 24
@@ -490,10 +490,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 72
       ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
-      Left = 106
+      Left = 172
       Top = 0
       Height = 32
       Align = alLeft
@@ -501,7 +502,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileLineBreaks: TUText
       AlignWithMargins = True
-      Left = 126
+      Left = 192
       Top = 4
       Width = 28
       Height = 24
@@ -518,10 +519,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 126
       ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
-      Left = 154
+      Left = 220
       Top = 0
       Height = 32
       Align = alLeft
@@ -530,7 +532,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileEditMode: TUText
       AlignWithMargins = True
-      Left = 174
+      Left = 240
       Top = 4
       Width = 32
       Height = 24
@@ -547,10 +549,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 174
       ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
-      Left = 206
+      Left = 272
       Top = 0
       Height = 32
       Align = alLeft
@@ -558,7 +561,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileEditPosition: TUText
       AlignWithMargins = True
-      Left = 226
+      Left = 292
       Top = 4
       Width = 118
       Height = 24
@@ -575,10 +578,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 226
       ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
-      Left = 344
+      Left = 410
       Top = 0
       Height = 32
       Align = alLeft
@@ -588,7 +592,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtStatus: TUText
       AlignWithMargins = True
-      Left = 364
+      Left = 430
       Top = 4
       Width = 15
       Height = 24
@@ -606,6 +610,7 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
+      ExplicitLeft = 364
       ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
@@ -648,13 +653,42 @@ object NEDMainForm: TNEDMainForm
       BackColors.DarkColor = 3947580
       ButtonStyle = qbsNone
       Caption = #59555
-      ExplicitLeft = 1151
+      ExplicitTop = -8
+    end
+    object txtFileType: TUText
+      AlignWithMargins = True
+      Left = 72
+      Top = 4
+      Width = 46
+      Height = 24
+      Margins.Left = 0
+      Margins.Top = 4
+      Margins.Right = 0
+      Margins.Bottom = 4
+      Align = alLeft
+      Caption = 'FileType'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clBlack
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
+      Font.Style = []
+      ParentFont = False
+      Layout = tlCenter
+      ExplicitHeight = 17
+    end
+    object USeparator7: TUSeparator
+      Left = 52
+      Top = 0
+      Height = 32
+      Align = alLeft
+      ExplicitLeft = 51
+      ExplicitTop = 6
     end
     object barStatus: TUProgressBar
       AlignWithMargins = True
-      Left = 387
+      Left = 453
       Top = 12
-      Width = 191
+      Width = 125
       Height = 8
       Margins.Left = 8
       Margins.Top = 12
@@ -678,6 +712,8 @@ object NEDMainForm: TNEDMainForm
       FillColor.DarkColor = 3355443
       Value = 0
       Orientation = oHorizontal
+      ExplicitLeft = 387
+      ExplicitWidth = 191
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True

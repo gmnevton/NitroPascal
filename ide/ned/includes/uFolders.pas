@@ -3872,9 +3872,9 @@ begin
     R := Row;
     R.Top := R.Top + I * FEntryHeight;
     R.Height := FEntryHeight;
-    if R.Bottom <= Clip.Top then // if we are ouside of client-area, go to next entry
+    if R.Bottom <= Clip.Top then // if we are ouside of cliping-area, go to next entry
       Continue;
-    if R.Top >= Clip.Bottom then // if we are ouside of client-area, go to next entry
+    if R.Top >= Clip.Bottom then // if we are ouside of cliping-area, go to next entry
       Continue;
     //
     // set render state

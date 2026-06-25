@@ -42,7 +42,8 @@ uses
   SynHighlighterGeneral,
   SynEdit,
   VirtualTrees,
-  SplitEx;
+  SplitEx,
+  ned_editor_view;
 
 type
   TNEDMainForm = class(TUForm)
@@ -145,6 +146,8 @@ type
     barSearch: TUTitleBar;
     vstSearch: TVirtualStringTree;
     splLeft: TSplitterEx;
+    txtFileType: TUText;
+    USeparator7: TUSeparator;
     //
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -164,6 +167,7 @@ type
     FModalForm: TForm;
     //
     procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
+    procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
@@ -200,6 +204,7 @@ begin
   NEDHomeForm.Align := alClient;
   //
   txtFilePath.Caption := '---';
+  txtFileType.Caption := '---';
   txtFileEncoding.Caption := '---';
   txtFileLineBreaks.Caption := '---';
   txtFileEditMode.Caption := '---';
@@ -212,23 +217,6 @@ begin
   FModalForm := Nil;
 end;
 
-procedure TNEDMainForm.CMDialogKey(var Message: TCMDialogKey);
-begin
-  if GetKeyState(VK_MENU) >= 0 then begin
-    case Message.CharCode of
-      VK_TAB: begin
-//        if GetKeyState(VK_CONTROL) >= 0 then begin
-//          SelectNext(FActiveControl, GetKeyState(VK_SHIFT) >= 0, True);
-//          Result := 1;
-//          Exit;
-//        end;
-        Exit;
-      end;
-    end;
-  end;
-  inherited;
-end;
-
 procedure TNEDMainForm.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
@@ -239,13 +227,6 @@ end;
 procedure TNEDMainForm.FormDestroy(Sender: TObject);
 begin
   NEDHomeForm.Free;
-end;
-
-procedure TNEDMainForm.WMGetDlgCode(var Msg: TWMGetDlgCode);
-begin
-  inherited;
-  // inform Windows that this form wants navigation keys
-  Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS;
 end;
 
 procedure TNEDMainForm.FormShow(Sender: TObject);
@@ -308,6 +289,57 @@ end;
 procedure TNEDMainForm.FormResize(Sender: TObject);
 begin
 //
+end;
+
+procedure TNEDMainForm.CMDialogKey(var Message: TCMDialogKey);
+begin
+  if GetKeyState(VK_MENU) >= 0 then begin
+    case Message.CharCode of
+      VK_TAB: begin
+//        if GetKeyState(VK_CONTROL) >= 0 then begin
+//          SelectNext(FActiveControl, GetKeyState(VK_SHIFT) >= 0, True);
+//          Result := 1;
+//          Exit;
+//        end;
+        Exit;
+      end;
+    end;
+  end;
+  inherited;
+end;
+
+procedure TNEDMainForm.NEDEditorInfoDetails(var Msg: TMessage);
+var
+  EditorInfoDetails: PNEDEditorInfoDetails;
+begin
+  if Msg.WParam = 0 then begin
+    txtFilePath.Caption := '---';
+    txtFileType.Caption := '---';
+    txtFileEncoding.Caption := '---';
+    txtFileLineBreaks.Caption := '---';
+    txtFileEditMode.Caption := '---';
+    txtFileEditPosition.Caption := '---';
+    txtStatus.Caption := '---';
+  end
+  else begin
+    EditorInfoDetails := PNEDEditorInfoDetails(Msg.LParam);
+    //
+    txtFilePath.Caption := EditorInfoDetails.FilePath;
+    txtFileType.Caption := EditorInfoDetails.FileType;
+    txtFileEncoding.Caption := EditorInfoDetails.FileEncodingType;
+    txtFileLineBreaks.Caption := EditorInfoDetails.FileLineBreakType;
+    txtFileEditMode.Caption := EditorInfoDetails.FileInsertType;
+    txtFileEditPosition.Caption := 'Line: ' + IntToStr(EditorInfoDetails.Line) + ' / ' + IntToStr(EditorInfoDetails.Lines) + ', Column: ' + IntToStr(EditorInfoDetails.Column);
+    txtStatus.Caption := EditorInfoDetails.Status;
+  end;
+  Msg.Result := 1;
+end;
+
+procedure TNEDMainForm.WMGetDlgCode(var Msg: TWMGetDlgCode);
+begin
+  inherited;
+  // inform Windows that this form wants navigation keys
+  Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS;
 end;
 
 procedure TNEDMainForm.btnShowHideToolboxClick(Sender: TObject);
