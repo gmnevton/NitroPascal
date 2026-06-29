@@ -13,6 +13,7 @@ object NEDEditorForm: TNEDEditorForm
   Font.Style = []
   KeyPreview = True
   OldCreateOrder = False
+  StyleElements = []
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnShow = FormShow
@@ -367,51 +368,52 @@ object NEDEditorForm: TNEDEditorForm
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
       ScrollOrientation = oHorizontal
-      object USymbolButton1: TUSymbolButton
-        Left = 0
-        Top = 0
-        Align = alLeft
-        ParentColor = False
-        TabOrder = 1
-        SymbolFont.Charset = DEFAULT_CHARSET
-        SymbolFont.Color = clWindowText
-        SymbolFont.Height = -16
-        SymbolFont.Name = 'Segoe MDL2 Assets'
-        SymbolFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        SymbolChar = #61440
-        Text = 'FileName'
-        Detail = 'FileType'
-        IsToggleButton = True
-        KeepOrginalColor = False
-      end
-      object USymbolButton2: TUSymbolButton
-        Left = 250
-        Top = 0
-        Align = alLeft
-        ParentColor = False
-        TabOrder = 2
-        SymbolFont.Charset = DEFAULT_CHARSET
-        SymbolFont.Color = clWindowText
-        SymbolFont.Height = -16
-        SymbolFont.Name = 'Segoe MDL2 Assets'
-        SymbolFont.Style = []
-        DetailFont.Charset = DEFAULT_CHARSET
-        DetailFont.Color = clWindowText
-        DetailFont.Height = -11
-        DetailFont.Name = 'Tahoma'
-        DetailFont.Style = []
-        SymbolChar = #59715
-        Text = 'FileName'
-        Detail = 'FileType'
-        IsToggleButton = True
-        KeepOrginalColor = False
-      end
     end
+  end
+  object USymbolButton1: TUSymbolButton
+    Left = 8
+    Top = 56
+    ParentColor = False
+    TabOrder = 2
+    Visible = False
+    StyleElements = []
+    SymbolFont.Charset = DEFAULT_CHARSET
+    SymbolFont.Color = clWindowText
+    SymbolFont.Height = -16
+    SymbolFont.Name = 'Segoe MDL2 Assets'
+    SymbolFont.Style = []
+    DetailFont.Charset = DEFAULT_CHARSET
+    DetailFont.Color = clWindowText
+    DetailFont.Height = -11
+    DetailFont.Name = 'Tahoma'
+    DetailFont.Style = []
+    SymbolChar = #61440
+    Text = 'FileName'
+    Detail = 'FileType'
+    IsToggleButton = True
+    KeepOrginalColor = False
+  end
+  object USymbolButton2: TUSymbolButton
+    Left = 8
+    Top = 102
+    ParentColor = False
+    TabOrder = 3
+    Visible = False
+    SymbolFont.Charset = DEFAULT_CHARSET
+    SymbolFont.Color = clWindowText
+    SymbolFont.Height = -16
+    SymbolFont.Name = 'Segoe MDL2 Assets'
+    SymbolFont.Style = []
+    DetailFont.Charset = DEFAULT_CHARSET
+    DetailFont.Color = clWindowText
+    DetailFont.Height = -11
+    DetailFont.Name = 'Tahoma'
+    DetailFont.Style = []
+    SymbolChar = #59715
+    Text = 'FileName'
+    Detail = 'FileType'
+    IsToggleButton = True
+    KeepOrginalColor = False
   end
   object SynGeneralSyn1: TSynGeneralSyn
     CommentAttri.Foreground = clGray

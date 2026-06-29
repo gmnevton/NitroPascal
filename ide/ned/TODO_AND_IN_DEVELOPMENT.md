@@ -2,7 +2,7 @@
 
 Compiler: https://github.com/gmnevton/NitroPascal
 
-Code Editor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
+NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
 
 ---
 
@@ -19,6 +19,8 @@ Code Editor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
     - [ ] BACKSPACE key
     
     - [ ] TAB key
+    
+    - [ ] and any CTRL / ALT / SHIFT combinations
   
   - [x] Mouse click sets cursor location (and right click also)
   
@@ -31,6 +33,14 @@ Code Editor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
   - [ ] Handle code highlighting
   
   - [ ] Fully integrate with application
+    
+    - [x] Open any code file using open dialog
+    
+    - [x] Open any code file in a split view
+    
+    - [ ] Open the same code file multiple times in a split view
+    
+    - [ ] Handle thumbstone (header button) interactions
   
   - [ ] Test multi-edit/view on a single document
 

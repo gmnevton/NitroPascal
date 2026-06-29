@@ -91,6 +91,7 @@
         <VerInfo_Locale>1033</VerInfo_Locale>
         <DCC_Define>madExcept;$(DCC_Define)</DCC_Define>
         <DCC_MapFile>3</DCC_MapFile>
+        <Debugger_CWD>d:\Borland Librarys\NitroPascal\compiler\tests\simple_project\</Debugger_CWD>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -128,6 +129,11 @@
         </DCCReference>
         <DCCReference Include="ned_editor_buffer.pas"/>
         <DCCReference Include="ned_editor_view.pas"/>
+        <DCCReference Include="ned_splitview_manager.pas"/>
+        <DCCReference Include="ned_source_view.pas">
+            <Form>NEDViewForm</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

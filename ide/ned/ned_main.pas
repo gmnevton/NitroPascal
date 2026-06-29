@@ -43,7 +43,8 @@ uses
   SynEdit,
   VirtualTrees,
   SplitEx,
-  ned_editor_view;
+  ned_editor_view,
+  ned_source_view;
 
 type
   TNEDMainForm = class(TUForm)
@@ -148,6 +149,11 @@ type
     splLeft: TSplitterEx;
     txtFileType: TUText;
     USeparator7: TUSeparator;
+    View1: TMenuItem;
+    Spliteditortoright1: TMenuItem;
+    Spliteditortobottom1: TMenuItem;
+    Openandsplittoright1: TMenuItem;
+    Openandsplittobottom1: TMenuItem;
     //
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -160,14 +166,41 @@ type
     procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormResize(Sender: TObject);
+    //
     procedure btnShowHideToolboxClick(Sender: TObject);
     procedure btnHomeClick(Sender: TObject);
     procedure btnProjectClick(Sender: TObject);
+    //
+    procedure New1Click(Sender: TObject);
+    procedure Open1Click(Sender: TObject);
+    procedure Save1Click(Sender: TObject);
+    procedure Saveas1Click(Sender: TObject);
+    procedure Saveall1Click(Sender: TObject);
+    procedure Close1Click(Sender: TObject);
+    procedure Closeall1Click(Sender: TObject);
+    procedure Exit1Click(Sender: TObject);
+    procedure Undo1Click(Sender: TObject);
+    procedure Redo1Click(Sender: TObject);
+    procedure Cut1Click(Sender: TObject);
+    procedure Copy1Click(Sender: TObject);
+    procedure Paste1Click(Sender: TObject);
+    procedure Find1Click(Sender: TObject);
+    procedure Findfile1Click(Sender: TObject);
+    procedure Replace1Click(Sender: TObject);
+    procedure Repeatsearch1Click(Sender: TObject);
+    procedure Spliteditortoright1Click(Sender: TObject);
+    procedure Spliteditortobottom1Click(Sender: TObject);
+    procedure NEDprojectwebsite1Click(Sender: TObject);
+    procedure NitroPascalwebsite1Click(Sender: TObject);
+    procedure AboutNED1Click(Sender: TObject);
   private
     FModalForm: TForm;
+    FLastOpenedPath: String;
     //
     procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
+  private
+    NEDViewForm: TNEDViewForm;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
@@ -186,7 +219,8 @@ uses
   Dialogs,
   ned_home_page,
   ned_source_editor,
-  ned_dialog_open;
+  ned_dialog_open,
+  ned_splitview_manager;
 
 type
   TWinControlAccess = class(TWinControl);
@@ -215,6 +249,7 @@ begin
   boxProject.BringToFront;
   //
   FModalForm := Nil;
+  FLastOpenedPath := '';
 end;
 
 procedure TNEDMainForm.CreateParams(var Params: TCreateParams);
@@ -322,15 +357,18 @@ begin
     txtStatus.Caption := '---';
   end
   else begin
-    EditorInfoDetails := PNEDEditorInfoDetails(Msg.LParam);
-    //
-    txtFilePath.Caption := EditorInfoDetails.FilePath;
-    txtFileType.Caption := EditorInfoDetails.FileType;
-    txtFileEncoding.Caption := EditorInfoDetails.FileEncodingType;
-    txtFileLineBreaks.Caption := EditorInfoDetails.FileLineBreakType;
-    txtFileEditMode.Caption := EditorInfoDetails.FileInsertType;
-    txtFileEditPosition.Caption := 'Line: ' + IntToStr(EditorInfoDetails.Line) + ' / ' + IntToStr(EditorInfoDetails.Lines) + ', Column: ' + IntToStr(EditorInfoDetails.Column);
-    txtStatus.Caption := EditorInfoDetails.Status;
+    try
+      EditorInfoDetails := PNEDEditorInfoDetails(Msg.LParam);
+      //
+      txtFilePath.Caption := EditorInfoDetails.FilePath;
+      txtFileType.Caption := EditorInfoDetails.FileType;
+      txtFileEncoding.Caption := EditorInfoDetails.FileEncodingType;
+      txtFileLineBreaks.Caption := EditorInfoDetails.FileLineBreakType;
+      txtFileEditMode.Caption := EditorInfoDetails.FileInsertType;
+      txtFileEditPosition.Caption := 'Line: ' + IntToStr(EditorInfoDetails.Line) + ' / ' + IntToStr(EditorInfoDetails.Lines) + ', Column: ' + IntToStr(EditorInfoDetails.Column);
+      txtStatus.Caption := EditorInfoDetails.Status;
+    except
+    end;
   end;
   Msg.Result := 1;
 end;
@@ -339,7 +377,7 @@ procedure TNEDMainForm.WMGetDlgCode(var Msg: TWMGetDlgCode);
 begin
   inherited;
   // inform Windows that this form wants navigation keys
-  Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS;
+  Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS or DLGC_WANTALLKEYS;
 end;
 
 procedure TNEDMainForm.btnShowHideToolboxClick(Sender: TObject);
@@ -355,32 +393,157 @@ begin
 end;
 
 procedure TNEDMainForm.btnHomeClick(Sender: TObject);
-var
-  open: TNEDDialogOpen;
 begin
   btnHome.Enabled := False;
-  open := TNEDDialogOpen.Create(Application);
-  FModalForm := open;
   try
-    if open.Execute() then begin
-      ShowMessage(open.FileName);
-    end;
+    // empty for now
   finally
-    FModalForm := Nil;
     btnHome.Enabled := True;
-    open.Free;
   end;
 end;
 
 procedure TNEDMainForm.btnProjectClick(Sender: TObject);
-var
-  NEDEditorForm: TNEDEditorForm;
 begin
-  NEDEditorForm := TNEDEditorForm.Create(Self);
-  NEDEditorForm.Parent := pnlWorkSpace;
-  NEDEditorForm.Align := alClient;
-  NEDEditorForm.Show;
-  NEDEditorForm.BringToFront;
+// empty for now
+end;
+
+procedure TNEDMainForm.New1Click(Sender: TObject);
+begin
+  //
+end;
+
+procedure TNEDMainForm.Open1Click(Sender: TObject);
+var
+  open: TNEDDialogOpen;
+begin
+  if FModalForm <> Nil then
+    Exit;
+  //
+  open := TNEDDialogOpen.Create(Application);
+  FModalForm := open;
+  try
+    if open.Execute(FLastOpenedPath) then begin
+      if NEDViewForm = Nil then begin
+        NEDViewForm := TNEDViewForm.Create(Application);
+        NEDViewForm.Parent := pnlWorkSpace;
+        NEDViewForm.Align := alClient;
+        NEDViewForm.Show;
+        NEDViewForm.BringToFront;
+      end;
+      //
+      FLastOpenedPath := ExtractFilePath(open.FileName);
+      if Sender = Open1 then
+        NEDViewForm.OpenFile(open.FileName)
+      else if Sender = Openandsplittoright1 then
+        NEDViewForm.OpenFile(open.FileName, True, stSplitV)
+      else if Sender = Openandsplittobottom1 then
+        NEDViewForm.OpenFile(open.FileName, True, stSplitH);
+    end;
+  finally
+    FModalForm := Nil;
+    open.Free;
+    open := Nil;
+  end;
+end;
+
+procedure TNEDMainForm.Save1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Saveas1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Saveall1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Close1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Closeall1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Exit1Click(Sender: TObject);
+begin
+  Application.Terminate;
+end;
+
+procedure TNEDMainForm.Undo1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Redo1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Cut1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Copy1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Paste1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Find1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Findfile1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Replace1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Repeatsearch1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Spliteditortoright1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.Spliteditortobottom1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.NEDprojectwebsite1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.NitroPascalwebsite1Click(Sender: TObject);
+begin
+//
+end;
+
+procedure TNEDMainForm.AboutNED1Click(Sender: TObject);
+begin
+//
 end;
 
 end.

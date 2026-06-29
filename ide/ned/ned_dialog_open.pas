@@ -72,6 +72,7 @@ type
     //
     FPath: String;
     FFileExtension: String;
+    FSettingPath: Boolean;
     //
     procedure MainFormResize(Sender: TObject);
     function GetInterfaceForObj(const IDL: pItemIDList): IUnknown;
@@ -276,6 +277,7 @@ begin
 
   FPath := '';
   FFileExtension := '';
+  FSettingPath := False;
 end;
 
 destructor TNEDDialogOpen.Destroy;
@@ -648,6 +650,9 @@ var
   IDL: PItemIDList;
   LPath: String;
 begin
+  if FSettingPath then
+    Exit;
+  //
   LPath := '';
   Item := FolderView.Selected;
   if Item <> Nil then begin
@@ -831,10 +836,12 @@ begin
       else
         FFileExtension := '.*'; // get all files as default if none was specified
       //
+      FSettingPath := True;
+      TrySelectMatchingFolder;
+      //
       txtPath.Caption := FPath;
       GetFilesList;
-      //
-      TrySelectMatchingFolder;
+      FSettingPath := False;
       //
       FMainForm.OverlayType := otTransparent;
       //

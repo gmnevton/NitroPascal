@@ -61,7 +61,6 @@ object NEDMainForm: TNEDMainForm
     MenuController.ButtonWidth = 54
     MenuController.ButtonHeight = 40
     MenuController.PosX = 180
-    MenuController.Enabled = False
     MenuController.Transparent = False
     MenuController.Font.Charset = DEFAULT_CHARSET
     MenuController.Font.Color = clWindowText
@@ -446,7 +445,7 @@ object NEDMainForm: TNEDMainForm
       Left = 8
       Top = 4
       Width = 44
-      Height = 24
+      Height = 17
       Margins.Left = 8
       Margins.Top = 4
       Margins.Right = 0
@@ -460,7 +459,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
       Left = 118
@@ -476,7 +474,7 @@ object NEDMainForm: TNEDMainForm
       Left = 138
       Top = 4
       Width = 34
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -490,8 +488,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 72
-      ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
       Left = 172
@@ -505,7 +501,7 @@ object NEDMainForm: TNEDMainForm
       Left = 192
       Top = 4
       Width = 28
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -519,8 +515,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 126
-      ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
       Left = 220
@@ -535,7 +529,7 @@ object NEDMainForm: TNEDMainForm
       Left = 240
       Top = 4
       Width = 32
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -549,8 +543,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 174
-      ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
       Left = 272
@@ -564,7 +556,7 @@ object NEDMainForm: TNEDMainForm
       Left = 292
       Top = 4
       Width = 118
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -578,8 +570,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 226
-      ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
       Left = 410
@@ -595,7 +585,7 @@ object NEDMainForm: TNEDMainForm
       Left = 430
       Top = 4
       Width = 15
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -610,8 +600,6 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
-      ExplicitLeft = 364
-      ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
       Left = 578
@@ -660,7 +648,7 @@ object NEDMainForm: TNEDMainForm
       Left = 72
       Top = 4
       Width = 46
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -674,7 +662,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator7: TUSeparator
       Left = 52
@@ -712,8 +699,6 @@ object NEDMainForm: TNEDMainForm
       FillColor.DarkColor = 3355443
       Value = 0
       Orientation = oHorizontal
-      ExplicitLeft = 387
-      ExplicitWidth = 191
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True
@@ -922,10 +907,22 @@ object NEDMainForm: TNEDMainForm
       object New1: TMenuItem
         Caption = 'New...'
         ShortCut = 16462
+        OnClick = New1Click
       end
       object Open1: TMenuItem
         Caption = 'Open...'
         ShortCut = 16463
+        OnClick = Open1Click
+      end
+      object Openandsplittoright1: TMenuItem
+        Caption = 'Open and split to right...'
+        ShortCut = 49231
+        OnClick = Open1Click
+      end
+      object Openandsplittobottom1: TMenuItem
+        Caption = 'Open and split to bottom...'
+        ShortCut = 57423
+        OnClick = Open1Click
       end
       object History1: TMenuItem
         Caption = 'History'
@@ -939,13 +936,16 @@ object NEDMainForm: TNEDMainForm
       object Save1: TMenuItem
         Caption = 'Save'
         ShortCut = 16467
+        OnClick = Save1Click
       end
       object Saveas1: TMenuItem
         Caption = 'Save as...'
+        OnClick = Saveas1Click
       end
       object Saveall1: TMenuItem
         Caption = 'Save all'
         ShortCut = 49235
+        OnClick = Saveall1Click
       end
       object N2: TMenuItem
         Caption = '-'
@@ -953,10 +953,12 @@ object NEDMainForm: TNEDMainForm
       object Close1: TMenuItem
         Caption = 'Close'
         ShortCut = 16472
+        OnClick = Close1Click
       end
       object Closeall1: TMenuItem
         Caption = 'Close all'
         ShortCut = 49240
+        OnClick = Closeall1Click
       end
       object N3: TMenuItem
         Caption = '-'
@@ -964,6 +966,7 @@ object NEDMainForm: TNEDMainForm
       object Exit1: TMenuItem
         Caption = 'Exit'
         ShortCut = 16465
+        OnClick = Exit1Click
       end
     end
     object Edit1: TMenuItem
@@ -972,10 +975,12 @@ object NEDMainForm: TNEDMainForm
       object Undo1: TMenuItem
         Caption = 'Undo'
         ShortCut = 16474
+        OnClick = Undo1Click
       end
       object Redo1: TMenuItem
         Caption = 'Redo'
         ShortCut = 24666
+        OnClick = Redo1Click
       end
       object N4: TMenuItem
         Caption = '-'
@@ -983,14 +988,17 @@ object NEDMainForm: TNEDMainForm
       object Cut1: TMenuItem
         Caption = 'Cut'
         ShortCut = 16472
+        OnClick = Cut1Click
       end
       object Copy1: TMenuItem
         Caption = 'Copy'
         ShortCut = 16451
+        OnClick = Copy1Click
       end
       object Paste1: TMenuItem
         Caption = 'Paste'
         ShortCut = 16470
+        OnClick = Paste1Click
       end
     end
     object Search1: TMenuItem
@@ -999,14 +1007,17 @@ object NEDMainForm: TNEDMainForm
       object Find1: TMenuItem
         Caption = 'Find...'
         ShortCut = 16454
+        OnClick = Find1Click
       end
       object Findfile1: TMenuItem
         Caption = 'Find file...'
         ShortCut = 24646
+        OnClick = Findfile1Click
       end
       object Replace1: TMenuItem
         Caption = 'Replace...'
         ShortCut = 16456
+        OnClick = Replace1Click
       end
       object N5: TMenuItem
         Caption = '-'
@@ -1014,6 +1025,21 @@ object NEDMainForm: TNEDMainForm
       object Repeatsearch1: TMenuItem
         Caption = 'Repeat search'
         ShortCut = 114
+        OnClick = Repeatsearch1Click
+      end
+    end
+    object View1: TMenuItem
+      AutoHotkeys = maManual
+      Caption = 'View'
+      object Spliteditortoright1: TMenuItem
+        Caption = 'Split editor to right'
+        ShortCut = 49191
+        OnClick = Spliteditortoright1Click
+      end
+      object Spliteditortobottom1: TMenuItem
+        Caption = 'Split editor to bottom'
+        ShortCut = 49192
+        OnClick = Spliteditortobottom1Click
       end
     end
     object Project1: TMenuItem
@@ -1100,15 +1126,18 @@ object NEDMainForm: TNEDMainForm
       Caption = 'Help'
       object NEDprojectwebsite1: TMenuItem
         Caption = 'NED project webpage...'
+        OnClick = NEDprojectwebsite1Click
       end
       object NitroPascalwebsite1: TMenuItem
         Caption = 'NitroPascal webpage...'
+        OnClick = NitroPascalwebsite1Click
       end
       object N9: TMenuItem
         Caption = '-'
       end
       object AboutNED1: TMenuItem
         Caption = 'About NED...'
+        OnClick = AboutNED1Click
       end
     end
   end

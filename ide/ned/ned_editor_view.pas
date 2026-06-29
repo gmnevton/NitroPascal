@@ -509,6 +509,7 @@ type
     property VisibleLineCount: Integer read FVisibleLineCount;
     property ActiveLineIndex: Integer read FActiveLineIndex write SetActiveLineIndex;
     property CaretPosition: TNEDCaretPosition read GetCaretPosition;
+    property EditorFileType: String read GetEditorFileTypeStr;
   end;
 
   TNEDEditorView = class(TNEDCustomEditorView)
@@ -758,6 +759,7 @@ begin
   Result := 1;
   while (LineNumbers div Trunc(Power(10, Result))) > 0 do
     Inc(Result);
+  Inc(Result);
 end;
 
 function TNEDEditorGutter.GetLineNumbersLength(const LineNumbers: Integer): Integer;
@@ -1730,7 +1732,7 @@ var
   EditorInfoDetails: TNEDEditorInfoDetails;
   LineColumn: TNEDTextPosition;
 begin
-  Form := GetParentForm(Self);
+  Form := GetParentForm(Self, False);
   if Form <> Nil then begin
     with EditorInfoDetails do begin
       FilePath := Document.FilePath;
@@ -2360,7 +2362,7 @@ begin
   try
 
   finally
-    ReportEditorInfo;
+//    ReportEditorInfo;
   end;
 end;
 
