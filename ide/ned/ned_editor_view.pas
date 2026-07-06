@@ -13,6 +13,48 @@ uses
   ned_editor_buffer;
 
 type
+  TNEDCommandShortCut = Low(LongWord)..High(LongWord); // 2 words 0..32767 + 0..32767
+  TNEDCommandIDType = 0..High(Word); // 0..32767
+  TNEDUserCommandIDType = 1000..High(Word);
+
+const
+  // cursor specific commands
+  cmdCursorLeft            = 1;    // Move cursor left one char
+  cmdCursorRight           = 2;    // Move cursor right one char
+  cmdCursorUp              = 3;    // Move cursor up one line
+  cmdCursorDown            = 4;    // Move cursor down one line
+  cmdCursorLineStart       = 5;    // Move cursor to beginning of line
+  cmdCursorLineEnd         = 6;    // Move cursor to end of line
+  //
+  cmdCursorPageUp          = 7;    // Move cursor up one page
+  cmdCursorPageDown        = 8;    // Move cursor down one page
+  cmdCursorPageLeft        = 9;    // Move cursor left one page
+  cmdCursorPageRight       = 10;   // Move cursor right one page
+  cmdCursorPageTop         = 11;   // Move cursor to top of page
+  cmdCursorPageBottom      = 12;   // Move cursor to bottom of page
+  cmdCursorEditorTop       = 13;   // Move cursor to absolute beginning
+  cmdCursorEditorBottom    = 14;   // Move cursor to absolute end
+  //
+  cmdCursorWordLeft        = 15;   // Move cursor left one word
+  cmdCursorWordRight       = 16;   // Move cursor right one word
+  //
+  cmdCursorGotoXY          = 17;   // Move cursor to specific coordinates, Data = PPoint
+
+  // edit commands
+  cmdEditDelete            = 51;   // Delete last char (i.e. backspace key)
+  cmdEditDeleteInPlace     = 52;   // Delete char at cursor (i.e. delete key)
+  cmdEditDeleteWholeWord   = 53;   // Delete Word from cursor
+  cmdEditDeleteBOWord      = 54;   // Delete from cursor to start of word
+  cmdEditDeleteEOWord      = 55;   // Delete from cursor to end of word
+  cmdEditDeleteBOL         = 56;   // Delete from cursor to beginning of line
+  cmdEditDeleteEOL         = 57;   // Delete from cursor to end of line
+  cmdEditDeleteLine        = 58;   // Delete current line
+  cmdEditClearAll          = 59;   // Delete everything
+  cmdEditLineBreak         = 60;   // Break line at current position, move caret to new line
+  cmdEditInsertLine        = 61;   // Break line at current position, leave caret
+  cmdEditChar              = 62;   // Insert a character at current position
+
+type
   TNEDCustomEditorView = class;
 
   TNEDEditorGutterNumberingTypeEnum = (
@@ -345,6 +387,57 @@ type
     property RightMarginColor: TColor read FRightMarginColor write SetRightMarginColor;
   end;
 
+  TNEDEditorCommand = class;
+  TNEDCommandInvokeFunction = procedure (Sender: TNEDEditorCommand; const CommandID: TNEDCommandIDType; var Handled: Boolean) of object;
+
+  TNEDEditorCommand = class
+  private
+    FEditorControl: TNEDCustomEditorView;
+    //
+    FCommandID: TNEDCommandIDType;
+    FIsComplexCommand: Boolean;
+    FIsFullKeyMap: Boolean;
+    FDisplayName: String;
+    FDisplayHint: String;
+    FInvokeFunction: TNEDCommandInvokeFunction;
+  protected
+  public
+    constructor Create(const CommandID: TNEDCommandIDType; DisplayName, DisplayHint: String; const InvokeFunction: TNEDCommandInvokeFunction);
+    destructor Destroy; override;
+    //
+    function InvokeCommand: Boolean;
+    //
+    property IsComplexCommand: Boolean read FIsComplexCommand;
+    property DisplayName: String read FDisplayName;
+    property DisplayHint: String read FDisplayHint;
+  end;
+
+  // this should be O(1) search not O(n) as in SynEdit
+  TNEDEditorKeyboardMap = class(TPersistent)
+  private
+    FEditorControl: TNEDCustomEditorView;
+    //
+    // TNEDCommandShortCut = Low(LongWord)..High(LongWord) translated from
+    // VK_xxx + CTRL/ALT/SHIFT using Menus.ShortCut function
+    // and than converted into EditorCommand
+    FEditorKeyboardMap: TObjectDictionary<TNEDCommandShortCut, TNEDEditorCommand>;
+  protected
+  public
+    constructor Create(const AParentControl: TNEDCustomEditorView); reintroduce;
+    destructor Destroy; override;
+    //
+    procedure AddSimpleMapping(const Key: Word; const Shift: TShiftState; const Command: TNEDEditorCommand); // Key = VK_xxx virtual key code
+    procedure AddComplexMapping(const Key1: Word; const Shift1: TShiftState; const Key2: Word; const Shift2: TShiftState; const Command: TNEDEditorCommand); // Key = VK_xxx virtual key code
+    function IsComplexCommand(const Key: Word; const Shift: TShiftState): Boolean;
+    function GetCommand(const Key: Word; const Shift: TShiftState): TNEDEditorCommand; overload;
+    function GetCommand(const Key1: Word; const Shift1: TShiftState; const Key2: Word; const Shift2: TShiftState): TNEDEditorCommand; overload;
+  end;
+
+  TNEDEditorKeyMap = record
+    Key: Word;
+    Shift: TShiftState;
+  end;
+
   TNEDEditorInfoDetails = record
     FilePath: String;
     FileCreation: TDateTime;
@@ -403,6 +496,7 @@ type
     //
     FOptions: TNEDEditorOptions;
     FColors: TNEDEditorColors;
+    FKeyboardMap: TNEDEditorKeyboardMap;
   private
     FModified: Boolean;
     FCommentLineCount: Integer;
@@ -414,6 +508,9 @@ type
     FVisibleLineCount: Integer;
     FActiveLineIndex: Integer;
     //
+    FProcessNextKeyMap: Boolean;
+    FPreviousKeyMap: TNEDEditorKeyMap;
+    //
     // setters
 
     //
@@ -421,6 +518,8 @@ type
     function GetCaretPosition: TNEDCaretPosition;
     //
     // internal functions
+    procedure InitializeKeyboardMappings;
+    procedure DoInternalCommand(Sender: TNEDEditorCommand; const CommandID: TNEDCommandIDType; var Handled: Boolean);
     procedure ReportEditorInfo;
     function GetEditorEncodingStr: String;
     function GetEditorLineBreakStr: String;
@@ -528,6 +627,7 @@ implementation
 uses
   Windows,
   Forms,
+  Menus,
   Character,
   Imm,
   Math;
@@ -1616,6 +1716,127 @@ begin
   end;
 end;
 
+{ TNEDEditorCommand }
+
+constructor TNEDEditorCommand.Create(const CommandID: TNEDCommandIDType; DisplayName, DisplayHint: String; const InvokeFunction: TNEDCommandInvokeFunction);
+begin
+  FEditorControl := Nil; // set by TNEDEditorKeyboardMap
+  FCommandID := CommandID;
+  FIsComplexCommand := False;
+  FIsFullKeyMap := True;
+  FDisplayName := DisplayName;
+  FDisplayHint := DisplayHint;
+  FInvokeFunction := InvokeFunction;
+end;
+
+destructor TNEDEditorCommand.Destroy;
+begin
+  FEditorControl := Nil;
+  FCommandID := 0;
+  FDisplayName := '';
+  FDisplayHint := '';
+  FInvokeFunction := Nil;
+  inherited;
+end;
+
+function TNEDEditorCommand.InvokeCommand: Boolean;
+begin
+  Result := False;
+  if FEditorControl = Nil then
+    Exit;
+  if not Assigned(FInvokeFunction) then
+    Exit;
+  //
+  FInvokeFunction(Self, FCommandID, Result);
+end;
+
+{ TNEDEditorKeyboardMap }
+
+constructor TNEDEditorKeyboardMap.Create(const AParentControl: TNEDCustomEditorView);
+begin
+  FEditorControl := AParentControl;
+  //
+  FEditorKeyboardMap := TObjectDictionary<TNEDCommandShortCut, TNEDEditorCommand>.Create([doOwnsValues]);
+end;
+
+destructor TNEDEditorKeyboardMap.Destroy;
+begin
+  FEditorKeyboardMap.Free;
+  inherited;
+end;
+
+procedure TNEDEditorKeyboardMap.AddSimpleMapping(const Key: Word; const Shift: TShiftState; const Command: TNEDEditorCommand);
+var
+  ShortCutKeyMap: TNEDCommandShortCut;
+begin
+  if Command = Nil then
+    Exit;
+
+  Command.FEditorControl := FEditorControl;
+  ShortCutKeyMap := Menus.ShortCut(Key, Shift);
+
+  if not FEditorKeyboardMap.ContainsKey(ShortCutKeyMap) then
+    FEditorKeyboardMap.Add(ShortCutKeyMap, Command);
+end;
+
+procedure TNEDEditorKeyboardMap.AddComplexMapping(const Key1: Word; const Shift1: TShiftState; const Key2: Word; const Shift2: TShiftState; const Command: TNEDEditorCommand);
+var
+  ShortCutKeyMap1: TShortCut;
+  ShortCutKeyMap2: TShortCut;
+  ShortCutKeyMap: TNEDCommandShortCut;
+begin
+  if Command = Nil then
+    Exit;
+
+  Command.FEditorControl := FEditorControl;
+  Command.FIsComplexCommand := True;
+  Command.FIsFullKeyMap := False;
+
+  ShortCutKeyMap1 := Menus.ShortCut(Key1, Shift1);
+  ShortCutKeyMap2 := Menus.ShortCut(Key2, Shift2);
+  ShortCutKeyMap := (ShortCutKeyMap1 shl 16) or (ShortCutKeyMap2 and $FFFF); // combine shortcut1 with shortcut2
+
+  if not FEditorKeyboardMap.ContainsKey(ShortCutKeyMap1 shl 16) then
+    FEditorKeyboardMap.Add(ShortCutKeyMap1 shl 16, Command);
+  Command.FIsFullKeyMap := True;
+  if not FEditorKeyboardMap.ContainsKey(ShortCutKeyMap) then
+    FEditorKeyboardMap.Add(ShortCutKeyMap, Command);
+end;
+
+function TNEDEditorKeyboardMap.IsComplexCommand(const Key: Word; const Shift: TShiftState): Boolean;
+var
+  ShortCutKeyMap: TNEDCommandShortCut;
+begin
+  ShortCutKeyMap := Menus.ShortCut(Key, Shift);
+  ShortCutKeyMap := ShortCutKeyMap shl 16;
+
+  Result := FEditorKeyboardMap.ContainsKey(ShortCutKeyMap);
+end;
+
+function TNEDEditorKeyboardMap.GetCommand(const Key: Word; const Shift: TShiftState): TNEDEditorCommand;
+var
+  ShortCutKeyMap: TNEDCommandShortCut;
+begin
+  ShortCutKeyMap := Menus.ShortCut(Key, Shift);
+
+  if not FEditorKeyboardMap.TryGetValue(ShortCutKeyMap, Result) then
+    Result := Nil;
+end;
+
+function TNEDEditorKeyboardMap.GetCommand(const Key1: Word; const Shift1: TShiftState; const Key2: Word; const Shift2: TShiftState): TNEDEditorCommand;
+var
+  ShortCutKeyMap1: TShortCut;
+  ShortCutKeyMap2: TShortCut;
+  ShortCutKeyMap: TNEDCommandShortCut;
+begin
+  ShortCutKeyMap1 := Menus.ShortCut(Key1, Shift1);
+  ShortCutKeyMap2 := Menus.ShortCut(Key2, Shift2);
+  ShortCutKeyMap := (ShortCutKeyMap1 shl 16) or (ShortCutKeyMap2 and $FFFF); // combine shortcut1 with shortcut2
+
+  if not FEditorKeyboardMap.TryGetValue(ShortCutKeyMap, Result) then
+    Result := Nil;
+end;
+
 { TNEDCustomEditorView }
 
 constructor TNEDCustomEditorView.Create(AOwner: TComponent);
@@ -1654,6 +1875,10 @@ begin
   //
   FOptions := TNEDEditorOptions.Create(Self);
   FColors := TNEDEditorColors.Create(Self);
+  FKeyboardMap := TNEDEditorKeyboardMap.Create(Self);
+  FProcessNextKeyMap := True;
+  FPreviousKeyMap.Key := 0;
+  FPreviousKeyMap.Shift := [];
   //
   //
   FModified := False;
@@ -1667,6 +1892,8 @@ begin
   FActiveLineIndex := 0;
 //  FCaretPos.Line := 1;
 //  FCaretPos.Column := 1;
+  //
+  InitializeKeyboardMappings;
 end;
 
 destructor TNEDCustomEditorView.Destroy;
@@ -1680,6 +1907,7 @@ begin
   FVerticalScrollBar.Free;
   FOptions.Free;
   FColors.Free;
+  FKeyboardMap.Free;
   inherited;
 end;
 
@@ -1724,6 +1952,252 @@ end;
 function TNEDCustomEditorView.GetCaretPosition: TNEDCaretPosition;
 begin
   Result := FCaret.CaretPosition;
+end;
+
+procedure TNEDCustomEditorView.InitializeKeyboardMappings;
+begin
+  FKeyboardMap.AddSimpleMapping(VK_LEFT,  [], TNEDEditorCommand.Create(cmdCursorLeft,      'CursorLeft', 'Move cursor left one char', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_RIGHT, [], TNEDEditorCommand.Create(cmdCursorRight,     'CursorRight', 'Move cursor right one char', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_UP,    [], TNEDEditorCommand.Create(cmdCursorUp,        'CursorUp', 'Move cursor up one line', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_DOWN,  [], TNEDEditorCommand.Create(cmdCursorDown,      'CursorDown', 'Move cursor down one line', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_HOME,  [], TNEDEditorCommand.Create(cmdCursorLineStart, 'CursorLineStart', 'Move cursor to beginning of line', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_END,   [], TNEDEditorCommand.Create(cmdCursorLineEnd,   'CursorLineEnd', 'Move cursor to end of line', DoInternalCommand));
+  //
+  FKeyboardMap.AddSimpleMapping(VK_PRIOR, [], TNEDEditorCommand.Create(cmdCursorPageUp,    'CursorPageUp', '', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_NEXT,  [], TNEDEditorCommand.Create(cmdCursorPageDown,  'CursorPageDown', '', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_LEFT,  [ssAlt],  TNEDEditorCommand.Create(cmdCursorPageLeft,     'CursorPageLeft', 'Move cursor left one page', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_RIGHT, [ssAlt],  TNEDEditorCommand.Create(cmdCursorPageRight,    'CursorPageRight', 'Move cursor right one page', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_PRIOR, [ssCtrl], TNEDEditorCommand.Create(cmdCursorPageTop,      'CursorPageTop', 'Move cursor to top of page', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_NEXT,  [ssCtrl], TNEDEditorCommand.Create(cmdCursorPageBottom,   'CursorPageBottom', 'Move cursor to bottom of page', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_HOME,  [ssCtrl], TNEDEditorCommand.Create(cmdCursorEditorTop,    'CursorEditorTop', 'Move cursor to absolute beginning', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_END,   [ssCtrl], TNEDEditorCommand.Create(cmdCursorEditorBottom, 'CursorEditorBottom', 'Move cursor to absolute end', DoInternalCommand));
+  //
+  FKeyboardMap.AddSimpleMapping(VK_LEFT,  [ssCtrl], TNEDEditorCommand.Create(cmdCursorWordLeft,  'CursorWordLeft', 'Move cursor left one word', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_RIGHT, [ssCtrl], TNEDEditorCommand.Create(cmdCursorWordRight, 'CursorWordRight', 'Move cursor right one word', DoInternalCommand));
+//  FKeyboardMap.AddSimpleMapping(VK_, [], TNEDEditorCommand.Create(cmd, '', '', DoInternalCommand));
+
+  FKeyboardMap.AddSimpleMapping(VK_BACK,   [], TNEDEditorCommand.Create(cmdEditDelete,                   'EditDelete', 'Delete last char (i.e. backspace key)', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_DELETE, [], TNEDEditorCommand.Create(cmdEditDeleteInPlace,            'EditDeleteInPlace', 'Delete char at cursor (i.e. delete key)', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_DELETE, [ssAlt], TNEDEditorCommand.Create(cmdEditDeleteWholeWord,     'EditDeleteWholeWord', 'Delete Word under cursor', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_BACK,   [ssCtrl], TNEDEditorCommand.Create(cmdEditDeleteBOWord,       'EditDeleteBOWord', 'Delete from cursor to start of word', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(Ord('T'),  [ssCtrl], TNEDEditorCommand.Create(cmdEditDeleteEOWord,       'EditDeleteEOWord', 'Delete from cursor to end of word', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_BACK,   [ssShift], TNEDEditorCommand.Create(cmdEditDeleteBOL,         'EditDeleteBOL', 'Delete from cursor to beginning of line', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(Ord('Y'),  [ssCtrl, ssShift], TNEDEditorCommand.Create(cmdEditDeleteEOL, 'EditDeleteEOL', 'Delete from cursor to end of line', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(Ord('Y'),  [ssCtrl], TNEDEditorCommand.Create(cmdEditDeleteLine,         'EditDeleteLine', 'Delete current line', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_DELETE, [ssCtrl, ssShift], TNEDEditorCommand.Create(cmdEditClearAll,  'EditClearAll', 'Delete everything', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_RETURN, [], TNEDEditorCommand.Create(cmdEditLineBreak,                'EditLineBreak', 'Break line at current position, move caret to new line', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_RETURN, [ssShift], TNEDEditorCommand.Create(cmdEditInsertLine,        'EditInsertLine', 'Break line at current position, leave caret', DoInternalCommand));
+//  FKeyboardMap.AddSimpleMapping(VK_, [], TNEDEditorCommand.Create(cmdEditChar, '', 'Insert a character at current position', DoInternalCommand));
+
+end;
+
+procedure TNEDCustomEditorView.DoInternalCommand(Sender: TNEDEditorCommand; const CommandID: TNEDCommandIDType; var Handled: Boolean);
+
+  procedure SetHandled;
+  begin
+    Handled := True;
+  end;
+
+var
+  LineLength: Integer;
+  LineText: String;
+  FirstChar: Integer;
+  LCaretPos: TNEDCaretPosition;
+  LTextPos: TNEDTextPosition;
+  LTopOffset: Integer;
+begin
+  try
+    LCaretPos := CaretPosition;
+
+    case CommandID of
+      cmdCursorLeft: begin
+        LCaretPos.X := Max(LCaretPos.X - 1, 1);
+        SetHandled;
+      end;
+
+      cmdCursorRight: begin
+        if not (epScrollPastEol in Options.EditorProperties) then begin
+          LineLength := Document.Lines[CaretToLineColumn(LCaretPos).Line].Length;
+          if LineLength > 0 then
+            LCaretPos.X := Min(LCaretPos.X + 1, LineLength + 1);
+        end
+        else
+          LCaretPos.X := Max(LCaretPos.X + 1, 1); // ensure LCaretPos.X always greater then zero
+        SetHandled;
+      end;
+
+      cmdCursorUp: begin
+        LCaretPos.Y := Max(LCaretPos.Y - 1, 1);
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorDown: begin
+        LCaretPos.Y := Min(LCaretPos.Y + 1, LineColumnToCaret(VisibleLineCount - 1, 0).Y);
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorLineStart: begin
+        if epEnhancedHomeKey in Options.EditorProperties then begin
+          LineText := Document.GetLineText(CaretToLineColumn(LCaretPos).Line);
+          FirstChar := 1;
+          while (FirstChar < LineText.Length) and IsWhiteSpace(LineText[FirstChar]) do
+            Inc(FirstChar);
+
+          if LCaretPos.X > FirstChar then
+            LCaretPos.X := FirstChar
+          else if FirstChar = LCaretPos.X then
+            LCaretPos.X := 1
+          else
+            LCaretPos.X := FirstChar;
+        end
+        else
+          LCaretPos.X := 1;
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorLineEnd: begin
+        LineLength := Document.Lines[CaretToLineColumn(LCaretPos).Line].Length;
+        if epEnhancedEndKey in Options.EditorProperties then begin
+          LineText := Document.GetLineText(CaretToLineColumn(LCaretPos).Line);
+          FirstChar := LineLength;
+          while (LineText.Length > 0) and (FirstChar > 1) and IsWhiteSpace(LineText[FirstChar]) do
+            Dec(FirstChar);
+
+          if FirstChar = 0 then
+            LCaretPos.X := 1
+          else if LCaretPos.X > FirstChar then
+            LCaretPos.X := FirstChar
+          else if FirstChar = LCaretPos.X then
+            LCaretPos.X := LineLength
+          else
+            LCaretPos.X := FirstChar;
+        end
+        else
+          LCaretPos.X := LineLength;
+
+        if (LCaretPos.X > 1) and (epScrollPastEol in Options.EditorProperties) then
+          Inc(LCaretPos.X);
+
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorPageUp: begin
+        FTopIndex := Max(FTopIndex - (GetLinesArea.Height div LineHeight), 0);
+        LCaretPos.Y := Max(LCaretPos.Y - (GetLinesArea.Height div LineHeight), 1);
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorPageDown: begin
+        FTopIndex := Min(FTopIndex + (GetLinesArea.Height div LineHeight), VisibleLineCount - 1);
+        LCaretPos.Y := Min(LCaretPos.Y + (GetLinesArea.Height div LineHeight), LineColumnToCaret(VisibleLineCount - 1, 0).Y);
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorPageTop: begin
+        LTopOffset := LCaretPos.Y - 1 - TopIndex; // how far from top of the view in lines
+        LCaretPos.Y := Max(LCaretPos.Y - LTopOffset, 1);
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorPageBottom: begin
+        LTopOffset := LCaretPos.Y - 1 - TopIndex; // how far from top of the view in lines
+        LCaretPos.Y := Min(LCaretPos.Y - LTopOffset + (GetLinesArea.Height div LineHeight), LineColumnToCaret(VisibleLineCount - 1, 0).Y);
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorPageLeft: begin
+      end;
+
+      cmdCursorPageRight: begin
+      end;
+
+      cmdCursorEditorTop: begin
+        LCaretPos := TNEDCaretPosition.Create(1, 1);
+        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        SetHandled;
+      end;
+
+      cmdCursorEditorBottom: begin
+        if FVisibleLineCount > 0 then begin
+          LCaretPos := LineColumnToCaret(FVisibleLineCount - 1, 0);
+          ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+          SetHandled;
+        end;
+      end;
+
+      cmdEditDelete: begin // backspace
+        SetHandled;
+        if epReadOnly in Options.EditorProperties then
+          Exit;
+
+        if Document.Lines[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
+          Exit;
+
+        FCaret.CaretHide;
+        FDocument.Delete(LTextPos, 1, True);
+        FCaret.CaretShow;
+      end;
+
+      cmdEditDeleteInPlace: begin // delete
+        SetHandled;
+        if epReadOnly in Options.EditorProperties then
+          Exit;
+
+        LTextPos := CaretToLineColumn(LCaretPos);
+        if Document.Lines[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
+          Exit;
+
+        FCaret.CaretHide;
+        FDocument.Delete(LTextPos, 1, False);
+        FCaret.CaretShow;
+
+        Exit;
+      end;
+
+      cmdEditDeleteWholeWord: begin
+      end;
+
+      cmdEditDeleteBOWord: begin
+      end;
+
+      cmdEditDeleteEOWord: begin
+      end;
+
+      cmdEditDeleteBOL: begin
+      end;
+
+      cmdEditDeleteEOL: begin
+      end;
+
+      cmdEditDeleteLine: begin
+      end;
+
+      cmdEditClearAll: begin
+      end;
+
+      cmdEditLineBreak: begin
+      end;
+
+      cmdEditInsertLine: begin
+      end;
+
+      cmdEditChar: begin
+      end;
+
+    end;
+
+    FCaret.CaretPosition := LCaretPos;
+  finally
+    ReportEditorInfo;
+  end;
 end;
 
 procedure TNEDCustomEditorView.ReportEditorInfo;
@@ -2137,11 +2611,7 @@ end;
 
 procedure TNEDCustomEditorView.KeyDown(var Key: Word; Shift: TShiftState);
 var
-  LineLength: Integer;
-  LineText: String;
-  FirstChar: Integer;
-  LCaretPos: TNEDCaretPosition;
-  LTextPos: TNEDTextPosition;
+  Cmd: TNEDEditorCommand;
 //  PressedKey: Char;
 begin
   inherited;
@@ -2154,113 +2624,22 @@ begin
     Exit;
   end;
 
+// VK_BACK // it can't be handled and disabled in this place, so we have to do it by the book, at KeyPress event
+
   try
-    LCaretPos := CaretPosition;
-
-    case Key of
-      VK_HOME: begin
-        Key := 0;
-        if epEnhancedHomeKey in Options.EditorProperties then begin
-          LineText := Document.GetLineText(CaretToLineColumn(LCaretPos).Line);
-          FirstChar := 1;
-          while (FirstChar < LineText.Length) and IsWhiteSpace(LineText[FirstChar]) do
-            Inc(FirstChar);
-
-          if LCaretPos.X > FirstChar then
-            LCaretPos.X := FirstChar
-          else if FirstChar = LCaretPos.X then
-            LCaretPos.X := 1
-          else
-            LCaretPos.X := FirstChar;
-        end
-        else
-          LCaretPos.X := 1;
-        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
-      end;
-      VK_END: begin
-        Key := 0;
-        LineLength := Document.Lines[CaretToLineColumn(LCaretPos).Line].Length;
-        if epEnhancedEndKey in Options.EditorProperties then begin
-          LineText := Document.GetLineText(CaretToLineColumn(LCaretPos).Line);
-          FirstChar := LineLength;
-          while (LineText.Length > 0) and (FirstChar > 1) and IsWhiteSpace(LineText[FirstChar]) do
-            Dec(FirstChar);
-
-          if FirstChar = 0 then
-            LCaretPos.X := 1
-          else if LCaretPos.X > FirstChar then
-            LCaretPos.X := FirstChar
-          else if FirstChar = LCaretPos.X then
-            LCaretPos.X := LineLength
-          else
-            LCaretPos.X := FirstChar;
-        end
-        else
-          LCaretPos.X := LineLength;
-
-        if (LCaretPos.X > 1) and (epScrollPastEol in Options.EditorProperties) then
-          Inc(LCaretPos.X);
-
-        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
-      end;
-      VK_PRIOR: begin // page-up
-        Key := 0;
-      end;
-      VK_NEXT: begin // page-down
-        Key := 0;
-      end;
-      VK_UP: begin
-        Key := 0;
-        LCaretPos.Y := Max(LCaretPos.Y - 1, 1);
-        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
-      end;
-      VK_DOWN: begin
-        Key := 0;
-        LCaretPos.Y := Min(LCaretPos.Y + 1, VisibleLineCount - 1);
-        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
-      end;
-      VK_LEFT: begin
-        Key := 0;
-        LCaretPos.X := Max(LCaretPos.X - 1, 1)
-      end;
-      VK_RIGHT: begin
-        Key := 0;
-        if not (epScrollPastEol in Options.EditorProperties) then begin
-          LineLength := Document.Lines[CaretToLineColumn(LCaretPos).Line].Length;
-          if LineLength > 0 then
-            LCaretPos.X := Min(LCaretPos.X + 1, LineLength + 1);
-        end
-        else
-          LCaretPos.X := Max(LCaretPos.X + 1, 1); // ensure LCaretPos.X always greater then zero
-      end;
-  //    VK_BACK: begin // it can't be handled and disabled in this place, so we have to do it by the book, at KeyPress event
-  //      Key := 0;
-  //    end;
-      VK_DELETE: begin
-        Key := 0;
-        if epReadOnly in Options.EditorProperties then
-          Exit;
-
-        LTextPos := CaretToLineColumn(LCaretPos);
-        if Document.Lines[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
-          Exit;
-
-        FCaret.CaretHide;
-        FDocument.Delete(LTextPos, 1, False);
-        FCaret.CaretShow;
-
-        Exit;
-      end;
+    if FProcessNextKeyMap and FKeyboardMap.IsComplexCommand(Key, Shift) then begin
+      FProcessNextKeyMap := False;
+      FPreviousKeyMap.Key := Key;
+      FPreviousKeyMap.Shift := Shift;
+    end
+    else begin
+      Cmd := FKeyboardMap.GetCommand(FPreviousKeyMap.Key, FPreviousKeyMap.Shift, Key, Shift);
+      if (Cmd <> Nil) and Cmd.InvokeCommand then
+        Key := 0; // eat it
+      FProcessNextKeyMap := True;
     end;
-
-    FCaret.CaretPosition := LCaretPos;
-
   finally
-    ReportEditorInfo;
   end;
-
-//  if Key = 0 then
-//    Exit;
 
 //  PressedKey := GetCharFromVirtualKey(Key);
 //  if PressedKey <> '' then begin
@@ -2283,6 +2662,8 @@ end;
 
 procedure TNEDCustomEditorView.KeyPress(var Key: Char);
 var
+  Cmd: TNEDEditorCommand;
+  Shift: TShiftState;
   LCaretPos: TNEDCaretPosition;
   LTextPos: TNEDTextPosition;
 begin
@@ -2298,20 +2679,20 @@ begin
     LTextPos := CaretToLineColumn(LCaretPos);
 
     if Key = #8 then begin // backspace
+      Shift := KeyboardStateToShiftState;
+      Cmd := FKeyboardMap.GetCommand(VK_BACK, Shift);
+      if (Cmd <> Nil) then
+        Cmd.InvokeCommand;
+      FProcessNextKeyMap := True;
       Key := #0;
-
-      if Document.Lines[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
-        Exit;
-
-      FCaret.CaretHide;
-      FDocument.Delete(LTextPos, 1, True);
-      FCaret.CaretShow;
     end;
 
     if Key <> #0 then begin
+      FProcessNextKeyMap := True;
       FCaret.CaretHide;
       FDocument.Insert(LTextPos, Key);
       FCaret.CaretShow;
+      Key := #0;
     end;
   finally
     ReportEditorInfo;
@@ -2766,9 +3147,9 @@ begin
   Result := TNEDTextPosition.LineColumn(0, 0);
 
   CaretX := CaretPos.X - 1;
-  CaretY := TopIndex + CaretPos.Y - 1;
+  CaretY := CaretPos.Y - 1;
 
-  Line := 0;
+  Line := TopIndex;
   Column := 0;
   TopOffset := 0;
 
@@ -2913,3 +3294,4 @@ begin
 end;
 
 end.
+
