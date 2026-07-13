@@ -373,7 +373,8 @@ object NEDEditorForm: TNEDEditorForm
   object USymbolButton1: TUSymbolButton
     Left = 8
     Top = 56
-    ParentColor = False
+    ParentShowHint = False
+    ShowHint = False
     TabOrder = 2
     Visible = False
     StyleElements = []

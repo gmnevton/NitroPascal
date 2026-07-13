@@ -7,8 +7,11 @@ uses
   Messages,
   Classes,
   Controls,
+  Forms,
   Graphics,
   Types,
+  ExtCtrls,
+  CommCtrl,
   Generics.Collections,
   ned_editor_buffer;
 
@@ -19,40 +22,48 @@ type
 
 const
   // cursor specific commands
-  cmdCursorLeft            = 1;    // Move cursor left one char
-  cmdCursorRight           = 2;    // Move cursor right one char
-  cmdCursorUp              = 3;    // Move cursor up one line
-  cmdCursorDown            = 4;    // Move cursor down one line
-  cmdCursorLineStart       = 5;    // Move cursor to beginning of line
-  cmdCursorLineEnd         = 6;    // Move cursor to end of line
+  cmdCursorLeft            = 1;  // Move cursor left one char
+  cmdCursorRight           = 2;  // Move cursor right one char
+  cmdCursorUp              = 3;  // Move cursor up one line
+  cmdCursorDown            = 4;  // Move cursor down one line
+  cmdCursorLineStart       = 5;  // Move cursor to beginning of line
+  cmdCursorLineEnd         = 6;  // Move cursor to end of line
   //
-  cmdCursorPageUp          = 7;    // Move cursor up one page
-  cmdCursorPageDown        = 8;    // Move cursor down one page
-  cmdCursorPageLeft        = 9;    // Move cursor left one page
-  cmdCursorPageRight       = 10;   // Move cursor right one page
-  cmdCursorPageTop         = 11;   // Move cursor to top of page
-  cmdCursorPageBottom      = 12;   // Move cursor to bottom of page
-  cmdCursorEditorTop       = 13;   // Move cursor to absolute beginning
-  cmdCursorEditorBottom    = 14;   // Move cursor to absolute end
+  cmdCursorPageUp          = 7;  // Move cursor up one page
+  cmdCursorPageDown        = 8;  // Move cursor down one page
+  cmdCursorPageLeft        = 9;  // Move cursor left one page
+  cmdCursorPageRight       = 10; // Move cursor right one page
+  cmdCursorPageTop         = 11; // Move cursor to top of page
+  cmdCursorPageBottom      = 12; // Move cursor to bottom of page
+  cmdCursorEditorTop       = 13; // Move cursor to absolute beginning
+  cmdCursorEditorBottom    = 14; // Move cursor to absolute end
   //
-  cmdCursorWordLeft        = 15;   // Move cursor left one word
-  cmdCursorWordRight       = 16;   // Move cursor right one word
+  cmdCursorWordLeft        = 15; // Move cursor left one word
+  cmdCursorWordRight       = 16; // Move cursor right one word
   //
-  cmdCursorGotoXY          = 17;   // Move cursor to specific coordinates, Data = PPoint
+  cmdCursorGotoXY          = 17; // Move cursor to specific coordinates, Data = PPoint
 
   // edit commands
-  cmdEditDelete            = 51;   // Delete last char (i.e. backspace key)
-  cmdEditDeleteInPlace     = 52;   // Delete char at cursor (i.e. delete key)
-  cmdEditDeleteWholeWord   = 53;   // Delete Word from cursor
-  cmdEditDeleteBOWord      = 54;   // Delete from cursor to start of word
-  cmdEditDeleteEOWord      = 55;   // Delete from cursor to end of word
-  cmdEditDeleteBOL         = 56;   // Delete from cursor to beginning of line
-  cmdEditDeleteEOL         = 57;   // Delete from cursor to end of line
-  cmdEditDeleteLine        = 58;   // Delete current line
-  cmdEditClearAll          = 59;   // Delete everything
-  cmdEditLineBreak         = 60;   // Break line at current position, move caret to new line
-  cmdEditInsertLine        = 61;   // Break line at current position, leave caret
-  cmdEditChar              = 62;   // Insert a character at current position
+  cmdEditDelete            = 41; // Delete last char (i.e. backspace key)
+  cmdEditDeleteInPlace     = 42; // Delete char at cursor (i.e. delete key)
+  cmdEditDeleteWholeWord   = 43; // Delete Word from cursor
+  cmdEditDeleteBOWord      = 44; // Delete from cursor to start of word
+  cmdEditDeleteEOWord      = 45; // Delete from cursor to end of word
+  cmdEditDeleteBOL         = 46; // Delete from cursor to beginning of line
+  cmdEditDeleteEOL         = 47; // Delete from cursor to end of line
+  cmdEditDeleteLine        = 48; // Delete current line
+  cmdEditClearAll          = 49; // Delete everything
+  cmdEditLineBreak         = 50; // Break line at current position, move caret to new line
+  cmdEditInsertLine        = 51; // Break line at current position, leave caret
+  cmdEditChar              = 52; // Insert a character at current position
+
+  // window commands
+  cmdWindowSwitchToNext        = 81; // Switch to next editor window if any available
+  cmdWindowSwitchToPrev        = 82; // Switch to prev editor window if any available
+  cmdWindowOpenCurrentOnRight  = 83; // Open current editor on right side (split to right)
+  cmdWindowOpenCurrentOnBottom = 84; // Open current editor on bottom side (split to bottom)
+  cmdWindowOpenNewOnRight      = 85; // Open new editor on bottom side (split to bottom)
+  cmdWindowOpenNewOnBottom     = 86; // Open new editor on bottom side (split to bottom)
 
 type
   TNEDCustomEditorView = class;
@@ -251,13 +262,133 @@ type
   published
   end;
 
+  TNEDCustomScrollBarThumbButtonEnum = (tbTop, tbScroll, tbTrack, tbBottom);
+  TNEDCustomScrollBarHitTestEnum = (htNone, htTopButton, htBottomButton, htThumb, htTrack);
+  TNEDCustomScrollBarStateEnum = (
+    shHidden,
+    shShowing, // shFadeInThin,
+    shVisibleThin,
+    shExpand,
+    shVisibleFull, //shExpanded,
+    shCollapse,
+    //shVisibleThin
+    shHiding // shFadeOut
+  );
+
+  TNEDCustomScrollBarStateChangeEvent = procedure (Sender: TObject; State: TNEDCustomScrollBarStateEnum) of object;
+
+  TNEDCustomScrollBarActionEnum = (
+    saLineUp,
+    saLineDown,
+    saPageUp,
+    saPageDown,
+    saThumbTrack,
+    saThumbPosition
+  );
+
+  TNEDCustomScrollBarScrollEvent = procedure (Sender: TObject; const Action: TNEDCustomScrollBarActionEnum; const Position: Integer) of object;
+
   TNEDEditorScrollbar = class(TPersistent)
   private
+    FEditorControl: TNEDCustomEditorView;
+    //
+    FVisible: Boolean;
+    FRange: Integer; // total content size
+    FPageSize: Integer; // visible size
+    FPosition: Integer; // current offset
+    FScrollBarKind: TScrollBarKind;
+    FSize: Integer;
+    FXYScrollSize: TSize;
+    FUpdating: Boolean;
+    // colors
+    FThumbButtonColorInactive: TColor;
+    FThumbButtonColorActive: TColor;
+    FThumbButtonColorPressed: TColor;
+    //
+    FScrollColorInactive: TColor;
+    FScrollColorActive: TColor;
+    FScrollColorPressed: TColor;
+    //
+    //
+    FAnimationTimer: TTimer;
+    FHoverTimer: TTimer;
+    FVisibleState: Boolean;
+    FCurrentWidth: Integer;
+    FTargetWidth: Integer;
+    FCurrentAlpha: Byte;
+    FTargetAlpha: Byte;
+    FThinWidth: Integer;
+    FExpandedWidth: Integer;
+    //
+    FWantVisible: Boolean;
+    FWantExpanded: Boolean;
+    FState: TNEDCustomScrollBarStateEnum;
+    FStateChangeEvent: TNEDCustomScrollBarStateChangeEvent;
+    //
+    FDragging: Boolean;
+    FDragStartY: Integer;
+    FDragStartPosition: Integer;
+    FPressedPart: TNEDCustomScrollBarHitTestEnum;
+    FRepeatTimer: TTimer;
+    FScrollEvent: TNEDCustomScrollBarScrollEvent;
+  private
+    procedure SetVisible(const Value: Boolean);
+    procedure SetRange(const Value: Integer);
+    procedure SetPageSize(const Value: Integer);
+    procedure SetPosition(const Value: Integer);
+    procedure SetSize(const Value: Integer);
+    procedure SetState(const AState: TNEDCustomScrollBarStateEnum);
+    procedure SetParentControlPosition;
+    function ClientRect: TRect;
+    function ClientHeight: Integer;
+    function ClientWidth: Integer;
+    function GetMaxPosition: Integer;
+    function GetInteractiveThumbRect: TRect;
+    function HitTest(const P: TPoint): TNEDCustomScrollBarHitTestEnum;
+    procedure UpdateState;
+    procedure DoStateChange(const AState: TNEDCustomScrollBarStateEnum);
+    procedure DoScroll(const AAction: TNEDCustomScrollBarActionEnum; const APosition: Integer);
+    procedure BeginShowing;
+    procedure BeginHiding;
+    procedure BeginExpand;
+    procedure BeginCollapse;
+    procedure AnimationTimer(Sender: TObject);
+    procedure HoverTimer(Sender: TObject);
+    procedure RepeatTimer(Sender: TObject);
+    // messages
+    procedure CMMouseEnter(var Msg: TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Msg: TMessage); message CM_MOUSELEAVE;
+    procedure CMVisibleChanged(var Msg: TMessage); message CM_VISIBLECHANGED;
+    procedure WMEraseBkgnd(var Msg: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
   protected
+    procedure CalcAutoRange; virtual;
+    function ControlSize(ControlSB, AssumeSB: Boolean): Integer;
+    function  CalculateThumbRect(const DrawRect: TRect; const Button: TNEDCustomScrollBarThumbButtonEnum): TRect;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); dynamic;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); dynamic;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); dynamic;
+    procedure Paint(const ACanvas: TCanvas);
+    procedure DrawBackground(const ACanvas: TCanvas; var ARect: TRect); virtual;
+    procedure DrawButtons(const ACanvas: TCanvas; const ARect: TRect); virtual;
+    procedure Update(ControlSB, AssumeSB: Boolean); virtual;
   public
-    constructor Create;
+    constructor Create(const AParentControl: TNEDCustomEditorView; AKind: TScrollBarKind); reintroduce;
     destructor Destroy; override;
-  published
+    // methods
+    function NeedsScrollBarVisible: Boolean;
+    procedure SetInfo(const ARange, APageSize, APosition: Integer);
+    procedure ShowAnimated;
+    procedure HideAnimated;
+    // properties
+    property Visible: Boolean read FVisible write SetVisible;
+    property Range: Integer read FRange write SetRange;
+    property PageSize: Integer read FPageSize write SetPageSize;
+    property Position: Integer read FPosition write SetPosition;
+    property Size: Integer read FSize write SetSize;
+    property MaxPosition: Integer read GetMaxPosition;
+    property OnStateChange: TNEDCustomScrollBarStateChangeEvent read FStateChangeEvent write FStateChangeEvent;
+    property OnScroll: TNEDCustomScrollBarScrollEvent read FScrollEvent write FScrollEvent;
   end;
 
   TNEDEditorPropertiesEnum = (
@@ -491,8 +622,8 @@ type
     FMinimap: TNEDEditorMinimap;
     FCaret: TNEDEditorCaret;
     FSelection: TNEDEditorSelection;
-    FHorizontalScrollBar: TNEDEditorScrollbar;
     FVerticalScrollBar: TNEDEditorScrollbar;
+    FHorizontalScrollBar: TNEDEditorScrollbar;
     //
     FOptions: TNEDEditorOptions;
     FColors: TNEDEditorColors;
@@ -509,7 +640,11 @@ type
     FActiveLineIndex: Integer;
     //
     FProcessNextKeyMap: Boolean;
+    FIgnoreInput: Boolean;
     FPreviousKeyMap: TNEDEditorKeyMap;
+    FWindowSwitchQueryNext: Boolean;
+    FUpdatingScrollBars: Boolean;
+    FAutoRangeCount: Integer;
     //
     // setters
 
@@ -520,13 +655,13 @@ type
     // internal functions
     procedure InitializeKeyboardMappings;
     procedure DoInternalCommand(Sender: TNEDEditorCommand; const CommandID: TNEDCommandIDType; var Handled: Boolean);
-    procedure ReportEditorInfo;
     function GetEditorEncodingStr: String;
     function GetEditorLineBreakStr: String;
     function GetEditorInsertStr: String;
     function GetEditorFileTypeStr: String;
   private
     procedure CMDesignHitTest(var Msg: TCMDesignHitTest); message CM_DESIGNHITTEST;
+    procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure CMFontChanged(var Msg: TMessage); message CM_FONTCHANGED;
     procedure CMMouseEnter(var Msg: TMessage); message CM_MOUSEENTER;
     procedure CMMouseLeave(var Msg: TMessage); message CM_MOUSELEAVE;
@@ -535,6 +670,7 @@ type
 //    procedure CMItemDetails(var Msg: TMessage); message CM_ITEMDETAILS;
 //    procedure CNItemClick(var Msg: TMessage); message CN_ITEMCLICK;
     procedure WMEraseBkgnd(var Msg: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure CMWantSpecialKey(var Msg: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
     procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
     procedure WMSize(var Msg: TWMSize); message WM_SIZE;
     procedure WMMouseWheel(var Msg: TWMMouseWheel); message WM_MOUSEWHEEL;
@@ -565,12 +701,15 @@ type
     procedure SetDocument(const DocumentBuffer: TNEDEditorBuffer);
     procedure SetObserver(const DocumentObserver: TNEDDocumentObserver);
     procedure SetActiveLineIndex(Value: Integer);
+    procedure CalcAutoRange; virtual;
+    procedure HideNativeScrollBars;
+    procedure UpdateScrollBars; virtual;
+    procedure ShowModernScrollBars;
+    procedure HideModernScrollBars;
     //
     function GetGutterArea: TRect;
     function GetLinesArea: TRect;
     function GetMinimapArea: TRect;
-    function GetHorizontalScrollbarArea: TRect;
-    function GetVerticalScrollbarArea: TRect;
     function GetCharWidth: Integer;
     function GetLineHeight: Integer;
     //
@@ -593,12 +732,18 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    //
+    procedure DisableAutoRange;
+    procedure EnableAutoRange;
+    procedure ReportEditorInfo;
   published
     property Document: TNEDEditorBuffer read FDocument write SetDocument;
     property Gutter: TNEDEditorGutter read FGutter;
     property Minimap: TNEDEditorMinimap read FMinimap;
     property Caret: TNEDEditorCaret read FCaret;
     property Selection: TNEDEditorSelection read FSelection;
+    property HorizontalScrollBar: TNEDEditorScrollbar read FHorizontalScrollBar;
+    property VerticalScrollBar: TNEDEditorScrollbar read FVerticalScrollBar;
     property Options: TNEDEditorOptions read FOptions;
     property Colors: TNEDEditorColors read FColors;
     //
@@ -617,16 +762,18 @@ type
   end;
 
 const
-  CM_NED_EDITOR_BASE     = $BD00; // max $BFFF
+  CM_NED_EDITOR_BASE     = $BE00; // max $BFFF
   //
   CM_NED_EDITORINFO_BASE = CM_NED_EDITOR_BASE + 0;
-  CM_NED_EDITORINFO_DETAILS = CM_NED_EDITORINFO_BASE + 1;
+  CM_NED_EDITORINFO_DETAILS = CM_NED_EDITORINFO_BASE + 0;
+
+  CM_NED_WINDOW_BASE = CM_NED_EDITOR_BASE + 10;
+  CM_NED_WINDOW_SWITCH = CM_NED_WINDOW_BASE + 0;
 
 implementation
 
 uses
   Windows,
-  Forms,
   Menus,
   Character,
   Imm,
@@ -664,6 +811,124 @@ begin
     end;
   end;
   aResult := '';
+end;
+
+// up arrow
+//   | 0 1 2 X
+// -----------
+// 0 |   x
+// 1 | x   x
+// 2 |
+// Y |
+
+// down arrow
+//   | 0 1 2 X
+// -----------
+// 0 | x   x
+// 1 |   x
+// 2 |
+// Y |
+
+// left arrow
+//   | 0 1 2 X
+// -----------
+// 0 |   x
+// 1 | x
+// 2 |   x
+// Y |
+
+// right arrow
+//   | 0 1 2 X
+// -----------
+// 0 | x
+// 1 |   x
+// 2 | x
+// Y |
+
+type
+  TDrawStateItem = (
+    dsDisabled,
+    dsPressed,
+    dsSelected,
+    dsHot,
+    dsFocused,
+    dsChecked,
+    dsExpanded,
+    dsDefaulted,
+    dsThin,
+    dsFlat,
+    dsBackground,
+    dsCustom
+  );
+  TDrawState = set of TDrawStateItem;
+
+  TDrawArrowDirection = (
+    daUp,
+    daDown,
+    daLeft,
+    daRight
+  );
+
+procedure DrawArrow(const Canvas: TCanvas; const R: TRect; ArrowDirection: TDrawArrowDirection; DrawState: TDrawState; Thickness, Size: Integer);
+const
+  // array points transformed by -1
+  ArrowPoints: Array[TDrawArrowDirection, 0..2] of TPoint = (
+    ((X: -1; Y:  0), (X:  0; Y: -1), (X:  1; Y:  0)), // up
+    ((X: -1; Y: -1), (X:  0; Y:  0), (X:  1; Y: -1)), // down
+    ((X:  0; Y: -1), (X: -1; Y:  0), (X:  0; Y:  1)), // left
+    ((X: -1; Y: -1), (X:  0; Y:  0), (X: -1; Y:  1))  // right
+  );
+var
+  CX, CY, Offset: Integer;
+  I, HalfSize: Integer;
+  P: Array[0..2] of TPoint;
+begin
+  // Clamp values
+  if Thickness < 1 then
+    Thickness := 1;
+
+  if Size < 2 then
+    Size := 2;
+
+  HalfSize := Round(Size * 0.5);
+  Offset := Round(Size / 0.5) div 5;
+
+  // Center of drawing rect
+  CX := (R.Left + R.Right) div 2;
+  CY := (R.Top + R.Bottom) div 2 - Thickness div 2;
+
+  // Pen setup
+  Canvas.Pen.Color := clWindow;
+  if dsSelected in DrawState then
+    Canvas.Pen.Color := clWindowText
+  else if dsHot in DrawState then
+    Canvas.Pen.Color := clCaptionText;
+  Canvas.Pen.Style := psSolid;
+  Canvas.Pen.Width := Thickness;
+
+  // Build arrow geometry
+  for I := 0 to 2 do begin
+    P[I] := Point(CX + ArrowPoints[ArrowDirection, I].X * Size, CY + ArrowPoints[ArrowDirection, I].Y * Size);
+    if (ArrowDirection = daUp) or (ArrowDirection = daDown) then
+      P[I].Offset(0{-Offset}, HalfSize)
+    else if ArrowDirection = daLeft then
+      P[I].Offset(HalfSize - Offset, 0)
+    else if ArrowDirection = daRight then
+      P[I].Offset(HalfSize, 0);
+  end;
+
+  Canvas.Polyline(P);
+
+  // Fixups
+  if Thickness = 1 then begin
+    Canvas.Pixels[P[2].X, P[2].Y] := Canvas.Pen.Color;
+  end
+  else begin
+    if ArrowDirection = daDown then
+      Canvas.Pixels[P[1].X, P[1].Y + 1] := Canvas.Pen.Color
+    else if ArrowDirection > daDown then
+      Canvas.Pixels[P[2].X, P[2].Y] := Canvas.Pen.Color;
+  end;
 end;
 
 { TNEDEditorGutter }
@@ -1455,15 +1720,858 @@ end;
 
 { TNEDEditorScrollbar }
 
-constructor TNEDEditorScrollbar.Create;
+constructor TNEDEditorScrollbar.Create(const AParentControl: TNEDCustomEditorView; AKind: TScrollBarKind);
 begin
-
+  FEditorControl := AParentControl;
+  //
+  // OS scrollbar width and height
+  FXYScrollSize.cx := GetSystemMetrics(SM_CXVSCROLL);
+  FXYScrollSize.cy := GetSystemMetrics(SM_CYHSCROLL);
+  //
+  // defaults
+  FVisible := False;
+  if AKind = sbHorizontal then
+    FSize := FXYScrollSize.cy // height
+  else
+    FSize := FXYScrollSize.cx; // width
+  // our properties
+  FRange := -1;
+  FPageSize := -1;
+  FPosition := -1;
+  FScrollBarKind := AKind;
+  FUpdating := False;
+  //
+  FThumbButtonColorInactive := clNone;
+  FThumbButtonColorActive   := clNone;
+  FThumbButtonColorPressed  := clNone;
+  //
+  FScrollColorInactive := $00202020; // xxBBGGRR
+  FScrollColorActive   := $00404040;
+  FScrollColorPressed  := $00808080;
+  //
+  FState := shHidden;
+  FStateChangeEvent := Nil;
+  //
+  FAnimationTimer := TTimer.Create(FEditorControl);
+  FAnimationTimer.Enabled := False;
+  FAnimationTimer.Interval := 15;
+  FAnimationTimer.OnTimer := AnimationTimer;
+  //
+  FHoverTimer := TTimer.Create(FEditorControl);
+  FHoverTimer.Enabled := False;
+  FHoverTimer.Interval := 1500;
+  FHoverTimer.OnTimer := HoverTimer;
+  //
+  FVisibleState := False;
+  FCurrentWidth := 0;
+  FTargetWidth := FSize;
+  FCurrentAlpha := 0;
+  FTargetAlpha := 0;
+  FThinWidth := 1;
+  FExpandedWidth := FSize;
+  //
+  FRepeatTimer := TTimer.Create(FEditorControl);
+  FRepeatTimer.Enabled := False;
+  FRepeatTimer.Interval := 50;
+  FRepeatTimer.OnTimer := RepeatTimer;
+  //
+  FDragging := False;
+  FDragStartY := -1;
+  FDragStartPosition := -1;
+  FPressedPart := htNone;
 end;
 
 destructor TNEDEditorScrollbar.Destroy;
 begin
-
+  FAnimationTimer.Enabled := False;
+  FAnimationTimer.OnTimer := Nil;
+  FAnimationTimer.Free;
+  //
+  FHoverTimer.Enabled := False;
+  FHoverTimer.OnTimer := Nil;
+  FHoverTimer.Free;
+  //
+  FRepeatTimer.Enabled := False;
+  FRepeatTimer.OnTimer := Nil;
+  FRepeatTimer.Free;
   inherited;
+end;
+
+procedure TNEDEditorScrollbar.SetVisible(const Value: Boolean);
+begin
+  if FVisible <> Value then begin
+    FVisible := Value;
+
+    if not FUpdating then
+      FEditorControl.Invalidate;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.SetRange(const Value: Integer);
+begin
+  if Value <= 0 then
+    Exit;
+  //
+  if FRange <> Value then begin
+    FRange := Value;
+
+    // Clamp current position
+    FPosition := EnsureRange(FPosition, 0, GetMaxPosition);
+    Update(False, False);
+
+    if not FUpdating then
+      FEditorControl.Invalidate;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.SetPageSize(const Value: Integer);
+begin
+  if FPageSize <> Value then begin
+    FPageSize := Value;
+
+    // Clamp current position
+    FPosition := EnsureRange(FPosition, 0, GetMaxPosition);
+
+    if not FUpdating then
+      FEditorControl.Invalidate;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.SetPosition(const Value: Integer);
+var
+  NewPos: Integer;
+begin
+  NewPos := EnsureRange(Value, 0, GetMaxPosition);
+
+  if FPosition <> NewPos then begin
+    FPosition := NewPos;
+
+    if not FUpdating then
+      FEditorControl.Invalidate;
+
+    // optional:
+    // if Assigned(FOnScroll) then
+    //   FOnScroll(Self, FPosition);
+  end;
+end;
+
+procedure TNEDEditorScrollbar.SetSize(const Value: Integer);
+begin
+  if FSize <> Value then begin
+    FSize := Value;
+
+    if not FUpdating then
+      FEditorControl.Invalidate;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.SetState(const AState: TNEDCustomScrollBarStateEnum);
+begin
+  if FState <> AState then begin
+    FState := AState;
+    if Assigned(FStateChangeEvent) then
+      FStateChangeEvent(Self, AState);
+  end;
+end;
+
+procedure TNEDEditorScrollbar.SetParentControlPosition;
+var
+  Code: Word;
+begin
+  if FScrollBarKind = sbHorizontal then
+    Code := SB_HORZ
+  else
+    Code := SB_VERT;
+
+  if FlatSB_GetScrollPos(FEditorControl.Handle, Code) <> FPosition then
+    FlatSB_SetScrollPos(FEditorControl.Handle, Code, FPosition, True);
+end;
+
+function TNEDEditorScrollbar.ClientRect: TRect;
+begin
+  case FScrollBarKind of
+    sbHorizontal: Result := Rect(0, FEditorControl.ClientHeight - FSize, FEditorControl.ClientWidth, FEditorControl.ClientHeight);
+    sbVertical  : Result := Rect(FEditorControl.ClientWidth - FSize, 0, FEditorControl.ClientWidth, FEditorControl.ClientHeight);
+  end;
+end;
+
+function TNEDEditorScrollbar.ClientHeight: Integer;
+begin
+  Result := ClientRect.Height;
+end;
+
+function TNEDEditorScrollbar.ClientWidth: Integer;
+begin
+  Result := ClientRect.Width;
+end;
+
+function TNEDEditorScrollbar.GetMaxPosition: Integer;
+begin
+  Result := FRange - FPageSize;
+
+  if Result < 0 then
+    Result := 0;
+end;
+
+function TNEDEditorScrollbar.GetInteractiveThumbRect: TRect;
+begin
+  Result := CalculateThumbRect(ClientRect, tbScroll);
+  Result.Left := Result.Right - Round(FCurrentWidth);
+end;
+
+function TNEDEditorScrollbar.HitTest(const P: TPoint): TNEDCustomScrollBarHitTestEnum;
+var
+  CR, AreaRect: TRect;
+begin
+  CR := ClientRect;
+  // htNone, htTopButton, htBottomButton, htThumb, htTrack
+
+  AreaRect := CalculateThumbRect(CR, tbTop);
+  if PtInRect(AreaRect, P) then
+    Exit(htTopButton);
+
+  AreaRect := CalculateThumbRect(CR, tbScroll);
+  if PtInRect(AreaRect, P) then
+    Exit(htThumb);
+  AreaRect := CalculateThumbRect(CR, tbTrack);
+  if PtInRect(AreaRect, P) then
+    Exit(htTrack);
+
+  AreaRect := CalculateThumbRect(CR, tbBottom);
+  if PtInRect(AreaRect, P) then
+    Exit(htBottomButton);
+
+  Result := htNone;
+end;
+
+procedure TNEDEditorScrollbar.UpdateState;
+begin
+  if not FWantVisible then begin
+    if FState <> shHiding then
+      BeginHiding;
+    Exit;
+  end;
+
+  if FState = shHidden then begin
+    BeginShowing;
+    Exit;
+  end;
+
+  if FWantExpanded then begin
+    if not (FState in [shExpand, shVisibleFull]) then
+      BeginExpand;
+    Exit;
+  end;
+
+  if not (FState in [shCollapse, shVisibleThin]) then
+    BeginCollapse;
+end;
+
+procedure TNEDEditorScrollbar.DoScroll(const AAction: TNEDCustomScrollBarActionEnum; const APosition: Integer);
+begin
+  if Assigned(FScrollEvent) then
+    FScrollEvent(Self, AAction, APosition);
+end;
+
+procedure TNEDEditorScrollbar.DoStateChange(const AState: TNEDCustomScrollBarStateEnum);
+begin
+  case AState of
+    shHidden: ;
+    shShowing: begin
+      FTargetAlpha := 255;
+      FTargetWidth := FThinWidth;
+      FAnimationTimer.Enabled := True;
+    end;
+    shVisibleThin: begin
+      if not FHoverTimer.Enabled and (FState <> shVisibleThin) then
+        FHoverTimer.Enabled := True
+      else if FState = shExpand then begin
+
+      end;
+    end;
+    shExpand: ;
+    shVisibleFull: begin
+      if not FHoverTimer.Enabled and (FState <> shVisibleFull) then
+        FHoverTimer.Enabled := True
+      else if FState = shCollapse then begin
+
+      end;
+    end;
+    shCollapse: ;
+    shHiding: begin
+      FTargetAlpha := 0;
+      FTargetWidth := 0;
+      FAnimationTimer.Enabled := True;
+    end;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.BeginShowing;
+begin
+  if not Visible then
+    Visible := True;
+
+  FState := shShowing;
+
+  FTargetAlpha := 255;
+  FTargetWidth := FThinWidth;
+
+  FAnimationTimer.Enabled := True;
+end;
+
+procedure TNEDEditorScrollbar.BeginHiding;
+begin
+  FState := shHiding;
+
+  FTargetAlpha := 0;
+  FTargetWidth := 0;
+
+  FAnimationTimer.Enabled := True;
+end;
+
+procedure TNEDEditorScrollbar.BeginExpand;
+begin
+  FState := shExpand;
+
+  FTargetWidth := FExpandedWidth;
+  FTargetAlpha := 255;
+
+  FAnimationTimer.Enabled := True;
+end;
+
+procedure TNEDEditorScrollbar.BeginCollapse;
+begin
+  FState := shCollapse;
+
+  FTargetWidth := FThinWidth;
+  FTargetAlpha := 255;
+
+  FAnimationTimer.Enabled := True;
+end;
+
+procedure TNEDEditorScrollbar.AnimationTimer(Sender: TObject);
+const
+  mulby: Single = 0.2;
+  lesseq: Integer = 2; // mulby * 10;
+begin
+  // width interpolation
+  FCurrentWidth := FCurrentWidth + Round((FTargetWidth - FCurrentWidth) * mulby);
+
+  // alpha interpolation
+  FCurrentAlpha := FCurrentAlpha + Round((FTargetAlpha - FCurrentAlpha) * mulby);
+
+  FEditorControl.Invalidate;
+
+  // stop when close enough
+  if Abs(FCurrentWidth - FTargetWidth) <= lesseq then
+    FCurrentWidth := FTargetWidth;
+
+  if Abs(FCurrentAlpha - FTargetAlpha) <= lesseq then
+    FCurrentAlpha := FTargetAlpha;
+
+  if (FCurrentWidth = FTargetWidth) and (FCurrentAlpha = FTargetAlpha) then begin
+    FAnimationTimer.Enabled := False;
+//    case FState of
+//      shShowing    : SetState(shVisibleThin);
+//      shVisibleThin: begin
+//        if (FTargetWidth = 0) or (FTargetAlpha = 0) then begin // hiding scrollbar
+//          SetState(shHiding);
+//          Visible := False;
+//        end;
+//      end;
+//      shExpand     : SetState(shVisibleFull);
+//      shCollapse   : SetState(shVisibleThin);
+//      shHiding     : begin
+//        SetState(shHidden);
+//        Visible := False;
+//      end;
+//    end;
+
+    case FState of
+      shShowing: begin
+        if FWantExpanded then
+          BeginExpand
+        else
+          FState := shVisibleThin;
+      end;
+
+      shExpand: FState := shVisibleFull;
+
+      shCollapse: FState := shVisibleThin;
+
+      shHiding: begin
+        Visible := False;
+        FState := shHidden;
+      end;
+    end;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.HoverTimer(Sender: TObject);
+begin
+  FHoverTimer.Enabled := False;
+  if FState <> shVisibleFull then begin
+    FTargetWidth := FExpandedWidth;
+    SetState(shExpand);
+    FAnimationTimer.Enabled := True;
+  end
+  else if FState <> shVisibleThin then begin
+    FTargetWidth := FThinWidth;
+    SetState(shCollapse);
+    FAnimationTimer.Enabled := True;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.RepeatTimer(Sender: TObject);
+var
+  Action: TNEDCustomScrollBarActionEnum;
+  P: TPoint;
+begin
+  case FPressedPart of
+    htTopButton   : begin
+      Action := saLineUp;
+      Position := Position - 1;
+    end;
+    htBottomButton: begin
+      Action := saLineDown;
+      Position := Position + 1;
+    end;
+    htTrack: begin
+      GetCursorPos(P);
+      P := FEditorControl.ScreenToClient(P);
+      if P.Y < CalculateThumbRect(ClientRect, tbScroll).Top then begin
+        Action := saPageUp;
+        Position := Position - PageSize;
+      end
+      else if P.Y > CalculateThumbRect(ClientRect, tbScroll).Bottom then begin
+        Action := saPageDown;
+        Position := Position + PageSize;
+      end
+      else
+        Action := saThumbPosition;
+    end;
+  end;
+  if Action <> saThumbPosition then
+    DoScroll(Action, Position);
+end;
+
+function TNEDEditorScrollbar.NeedsScrollBarVisible: Boolean;
+begin
+  Result := FRange > ControlSize(False, False) div FEditorControl.LineHeight;
+end;
+
+procedure TNEDEditorScrollbar.SetInfo(const ARange, APageSize, APosition: Integer);
+begin
+  if (ARange < 0) or (APosition < 0) then
+    Exit;
+  FUpdating := True;
+  try
+    Range := ARange;
+    PageSize := APageSize;
+    Position := APosition;
+  finally
+    FUpdating := False;
+    FEditorControl.Invalidate;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.ShowAnimated;
+begin
+  if not Visible and (FState = shHidden) then begin
+    Visible := True;
+    FWantVisible := True;
+    UpdateState;
+//    DoStateChange(shShowing);
+  end;
+end;
+
+procedure TNEDEditorScrollbar.HideAnimated;
+begin
+  FWantVisible := False;
+  UpdateState;
+//  DoStateChange(shHiding);
+end;
+
+procedure TNEDEditorScrollbar.CMMouseEnter(var Msg: TMessage);
+begin
+  inherited;
+  FWantExpanded := True;
+  UpdateState;
+//  DoStateChange(shVisibleFull);
+end;
+
+procedure TNEDEditorScrollbar.CMMouseLeave(var Msg: TMessage);
+begin
+  inherited;
+  FWantExpanded := False;
+  UpdateState;
+//  DoStateChange(shVisibleThin);
+end;
+
+//  shHidden,
+//  shShowing, // shFadeInThin,
+//  shVisibleThin,
+//  shExpanding,
+//  shVisibleFull, //shExpanded,
+//  shCollapse,
+//  //shVisibleThin
+//  shHiding // shFadeOut
+
+procedure TNEDEditorScrollbar.CMVisibleChanged(var Msg: TMessage);
+begin
+  if (Msg.WParam = 1) and (FState = shHidden) then
+    SetState(shShowing);
+  //
+  inherited;
+  //
+  if (Msg.WParam = 0) and (FState = shHiding) then
+    SetState(shHidden)
+
+//  if (FShowing = shShowing) or (FShowing = shHiding) then begin
+//    if FShowing = shHiding then
+//      SetState(shHidden)
+//    else if FShowing = shShowing then
+//      SetState(shVisibleThin);
+//  end;
+end;
+
+procedure TNEDEditorScrollbar.WMEraseBkgnd(var Msg: TWMEraseBkgnd);
+begin
+  Msg.Result := 1;
+end;
+
+procedure TNEDEditorScrollbar.WMNCHitTest(var Msg: TWMNCHitTest);
+var
+  P: TPoint;
+begin
+  inherited;
+  // this should make entire control transparent when mouse clicking
+  P := FEditorControl.ScreenToClient(Point(Msg.XPos, Msg.YPos));
+
+  case HitTest(P) of
+    htTopButton,
+    htBottomButton,
+    htThumb: Msg.Result := HTCLIENT;
+    htTrack: begin
+      Msg.Result := HTCLIENT;
+//      if FState = shVisibleFull then
+//        Msg.Result := HTCLIENT
+//      else
+//        Msg.Result := HTTRANSPARENT;
+    end;
+  else
+    Msg.Result := HTTRANSPARENT;
+  end;
+end;
+
+procedure TNEDEditorScrollbar.CalcAutoRange;
+begin
+  if FScrollBarKind = sbVertical then begin
+    Range := FEditorControl.VisibleLineCount;
+  end
+  else begin
+    Range := 0; // @TODO: calculate longest line
+  end;
+end;
+
+function TNEDEditorScrollbar.ControlSize(ControlSB, AssumeSB: Boolean): Integer;
+begin
+  if FScrollBarKind = sbVertical then
+    Result := ClientHeight - IfThen(not ControlSB and not AssumeSB and
+                                    FEditorControl.HorizontalScrollBar.Visible and
+                                    (FRange > FEditorControl.ClientHeight div FEditorControl.LineHeight),
+                                    FEditorControl.HorizontalScrollBar.Size)
+  else
+    Result := ClientWidth - IfThen(not ControlSB and not AssumeSB and
+                                   FEditorControl.VerticalScrollBar.Visible and
+                                   (FRange > FEditorControl.ClientWidth div FEditorControl.CharWidth),
+                                   FEditorControl.VerticalScrollBar.Size);
+end;
+
+function TNEDEditorScrollbar.CalculateThumbRect(const DrawRect: TRect; const Button: TNEDCustomScrollBarThumbButtonEnum): TRect;
+var
+  ButtonSize: Integer;
+  TrackTop: Integer;
+  TrackBottom: Integer;
+  TrackHeight: Integer;
+  ThumbHeight: Integer;
+  ThumbTop: Integer;
+  DrawWidth: Integer;
+  DrawHeight: Integer;
+  AvailableTrack: Integer;
+begin
+  DrawWidth := DrawRect.Width;
+  DrawHeight := DrawRect.Height;
+
+  ButtonSize := FXYScrollSize.cy;
+
+  case Button of
+    tbTop: begin
+      Result := Rect(
+        DrawRect.Left,
+        DrawRect.Top,
+        DrawRect.Right,
+        DrawRect.Top + ButtonSize
+      );
+    end;
+
+    tbBottom: begin
+      Result := Rect(
+        DrawRect.Left,
+        DrawRect.Bottom - ButtonSize,
+        DrawRect.Right,
+        DrawRect.Bottom
+      );
+    end;
+
+    tbScroll: begin
+      TrackTop := DrawRect.Top + ButtonSize;
+      TrackBottom := DrawRect.Bottom - ButtonSize;
+
+      TrackHeight := TrackBottom - TrackTop;
+
+      // No scrolling needed
+      if (FRange <= 0) or (FPageSize >= FRange) then begin
+        Result := Rect(
+          DrawRect.Left,
+          TrackTop,
+          DrawRect.Right,
+          TrackBottom
+        );
+        Exit;
+      end;
+
+      // Thumb size proportional to visible content
+      ThumbHeight := MulDiv(TrackHeight, FPageSize, FRange);
+
+      // Minimum thumb size
+      if ThumbHeight < 32 then
+        ThumbHeight := 32;
+
+      // Never exceed track
+      if ThumbHeight > TrackHeight then
+        ThumbHeight := TrackHeight;
+
+      // Available movement range
+      AvailableTrack := TrackHeight - ThumbHeight;
+
+      // Thumb position
+      ThumbTop := TrackTop + MulDiv(AvailableTrack, FPosition, GetMaxPosition);
+
+      Result := Rect(
+        DrawRect.Left,
+        ThumbTop,
+        DrawRect.Right,
+        ThumbTop + ThumbHeight
+      );
+    end;
+
+    tbTrack: begin
+      Result := Rect(
+        DrawRect.Left,
+        ButtonSize,
+        DrawRect.Right,
+        DrawRect.Bottom - ButtonSize
+      );
+    end;
+  else
+    Result := Rect(0, 0, 0, 0);
+  end;
+end;
+
+procedure TNEDEditorScrollbar.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Action: TNEDCustomScrollBarActionEnum;
+begin
+  inherited;
+
+  if Button <> mbLeft then
+    Exit;
+
+  FPressedPart := HitTest(Point(X, Y));
+
+  case FPressedPart of
+    htThumb: begin
+      FDragging := True;
+
+      FDragStartY := Y;
+      FDragStartPosition := Position;
+
+      FEditorControl.MouseCapture := True;
+    end;
+
+    htTrack: begin
+      if Y < CalculateThumbRect(ClientRect, tbScroll).Top then begin
+        Action := saPageUp;
+        Position := Position - PageSize;
+      end
+      else begin
+        Action := saPageDown;
+        Position := Position + PageSize;
+      end;
+
+      DoScroll(Action, Position);
+
+      FEditorControl.MouseCapture := True;
+      FRepeatTimer.Enabled := True;
+    end;
+
+    htTopButton: begin
+      Position := Position - 1;
+
+      DoScroll(saLineUp, Position);
+
+      FRepeatTimer.Enabled := True;
+    end;
+
+    htBottomButton: begin
+      Position := Position + 1;
+
+      DoScroll(saLineDown, Position);
+
+      FRepeatTimer.Enabled := True;
+    end;
+  end;
+  SetParentControlPosition;
+end;
+
+procedure TNEDEditorScrollbar.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  DeltaPixels: Integer;
+  TrackHeight: Integer;
+  ThumbHeight: Integer;
+  AvailableTrack: Integer;
+  NewPos: Integer;
+//  Action: TCustomScrollBarActionEnum;
+begin
+  inherited;
+
+  if not FDragging then
+    Exit;
+
+  DeltaPixels := Y - FDragStartY;
+
+  ThumbHeight := CalculateThumbRect(ClientRect, tbScroll).Height;
+  TrackHeight := ClientHeight;
+
+  AvailableTrack := TrackHeight - ThumbHeight;
+
+  if AvailableTrack <= 0 then
+    Exit;
+
+  NewPos := FDragStartPosition + MulDiv(DeltaPixels, GetMaxPosition, AvailableTrack);
+
+  Position := EnsureRange(NewPos, 0, GetMaxPosition);
+  SetParentControlPosition;
+
+  DoScroll(saThumbTrack, Position);
+end;
+
+procedure TNEDEditorScrollbar.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  inherited;
+
+  if Button <> mbLeft then
+    Exit;
+
+  FDragging := False;
+  FEditorControl.MouseCapture := False;
+  FRepeatTimer.Enabled := False;
+  FPressedPart := htNone;
+  DoScroll(saThumbPosition, Position);
+end;
+
+procedure TNEDEditorScrollbar.Paint(const ACanvas: TCanvas);
+var
+  LRect: TRect;
+begin
+  LRect := ClientRect;
+  DrawBackground(ACanvas, LRect); // clear background
+  DrawButtons(ACanvas, LRect); // draw buttons
+end;
+
+procedure TNEDEditorScrollbar.DrawBackground(const ACanvas: TCanvas; var ARect: TRect);
+begin
+  // do we really want to paint background ??? how about transparent control
+  ACanvas.Brush.Style := bsSolid;
+  // transparent background simulation
+  ACanvas.Brush.Color := FEditorControl.Color; // TWinControlAccess(Parent).Color;
+  ACanvas.FillRect(ARect);
+end;
+
+function LerpByte(A, B: Byte; T: Single): Byte;
+begin
+  Result := Round(A + (B - A) * T);
+end;
+
+procedure TNEDEditorScrollbar.DrawButtons(const ACanvas: TCanvas; const ARect: TRect);
+var
+  ThumbRect: TRect;
+  BG, FG: COLORREF;
+  R, G, B: Byte;
+  T: Single;
+begin
+  // paint top thumb
+  if (FState = shExpand) or (FState = shVisibleFull) or (FState = shCollapse) then begin
+    ThumbRect := CalculateThumbRect(ARect, tbTop);
+    ACanvas.Brush.Color := FEditorControl.Color;
+    ACanvas.FillRect(ThumbRect);
+    DrawArrow(ACanvas, ThumbRect, daUp, [], 2, 4);
+  end;
+
+  // paint scroll
+  ThumbRect := CalculateThumbRect(ARect, tbScroll);
+  // thumb color
+  BG := ColorToRGB(FEditorControl.Color); // TWinControlAccess(Parent).Color);
+  FG := ColorToRGB(clGray);
+
+  T := FCurrentAlpha / 255.0;
+
+  R := LerpByte(GetRValue(BG), GetRValue(FG), T);
+  G := LerpByte(GetGValue(BG), GetGValue(FG), T);
+  B := LerpByte(GetBValue(BG), GetBValue(FG), T);
+
+  ACanvas.Brush.Color := RGB(R, G, B);
+  ACanvas.FillRect(ThumbRect);
+
+  // paint bottom thumb
+  if (FState = shExpand) or (FState = shVisibleFull) or (FState = shCollapse) then begin
+    ThumbRect := CalculateThumbRect(ARect, tbBottom);
+    ACanvas.Brush.Color := FEditorControl.Color;
+    ACanvas.FillRect(ThumbRect);
+    DrawArrow(ACanvas, ThumbRect, daDown, [], 2, 4);
+  end;
+end;
+
+procedure TNEDEditorScrollbar.Update(ControlSB, AssumeSB: Boolean);
+var
+  Code: Word;
+  ScrollInfo: TScrollInfo;
+  CalcRange: Integer;
+begin
+  CalcRange := 0;
+  Code := SB_HORZ;
+  if FScrollBarKind = sbVertical then
+    Code := SB_VERT;
+
+  if Visible then begin
+    CalcRange := Range - (ControlSize(ControlSB, AssumeSB) div FEditorControl.LineHeight);
+    if CalcRange < 0 then
+      CalcRange := 0;
+  end;
+
+  ScrollInfo.cbSize := SizeOf(ScrollInfo);
+  ScrollInfo.fMask := SIF_ALL;
+  ScrollInfo.nMin := 0;
+  if CalcRange > 0 then
+    ScrollInfo.nMax := Range
+  else
+    ScrollInfo.nMax := 0;
+  ScrollInfo.nPage := (ControlSize(ControlSB, AssumeSB) + 1) div FEditorControl.LineHeight;
+  ScrollInfo.nPos := FPosition;
+  ScrollInfo.nTrackPos := FPosition;
+  SetScrollInfo(FEditorControl.Handle, Code, ScrollInfo, True);
+  SetPosition(FPosition);
 end;
 
 { TNEDEditorOptions }
@@ -1870,8 +2978,10 @@ begin
   FMinimap := TNEDEditorMinimap.Create;
   FCaret := TNEDEditorCaret.Create(Self);
   FSelection := TNEDEditorSelection.Create;
-  FHorizontalScrollBar := TNEDEditorScrollbar.Create;
-  FVerticalScrollBar := TNEDEditorScrollbar.Create;
+  FVerticalScrollBar := TNEDEditorScrollbar.Create(Self, sbVertical);
+  FHorizontalScrollBar := TNEDEditorScrollbar.Create(Self, sbHorizontal);
+  FVerticalScrollBar.Visible := True;
+  FHorizontalScrollBar.Visible := True;
   //
   FOptions := TNEDEditorOptions.Create(Self);
   FColors := TNEDEditorColors.Create(Self);
@@ -1879,6 +2989,9 @@ begin
   FProcessNextKeyMap := True;
   FPreviousKeyMap.Key := 0;
   FPreviousKeyMap.Shift := [];
+  FIgnoreInput := False;
+  FWindowSwitchQueryNext := False;
+  FUpdatingScrollBars := False;
   //
   //
   FModified := False;
@@ -1924,13 +3037,15 @@ end;
 procedure TNEDCustomEditorView.CreateHandle;
 begin
   inherited CreateHandle;
+
   if FTextWidth = -1 then
     FTextWidth := Canvas.TextWidth(' ');
   if FTextHeight = -1 then
     FTextHeight := Canvas.TextHeight(' ');
-//  HideNativeScrollBars;
-//  UpdateScrollRange;
-//  ShowModernScrollBar;
+
+  HideNativeScrollBars;
+  UpdateScrollBars;
+  ShowModernScrollBars;
 end;
 
 procedure TNEDCustomEditorView.DestroyHandle;
@@ -1943,10 +3058,25 @@ end;
 procedure TNEDCustomEditorView.Loaded;
 begin
   inherited Loaded;
+
   if FTextWidth = -1 then
     FTextWidth := Canvas.TextWidth(' ');
   if FTextHeight = -1 then
     FTextHeight := Canvas.TextHeight(' ');
+end;
+
+procedure TNEDCustomEditorView.DisableAutoRange;
+begin
+  Inc(FAutoRangeCount);
+end;
+
+procedure TNEDCustomEditorView.EnableAutoRange;
+begin
+  if FAutoRangeCount > 0 then begin
+    Dec(FAutoRangeCount);
+    if (FAutoRangeCount = 0) and (FHorizontalScrollBar.Visible or FVerticalScrollBar.Visible) then
+      CalcAutoRange;
+  end;
 end;
 
 function TNEDCustomEditorView.GetCaretPosition: TNEDCaretPosition;
@@ -1989,6 +3119,9 @@ begin
   FKeyboardMap.AddSimpleMapping(VK_RETURN, [ssShift], TNEDEditorCommand.Create(cmdEditInsertLine,        'EditInsertLine', 'Break line at current position, leave caret', DoInternalCommand));
 //  FKeyboardMap.AddSimpleMapping(VK_, [], TNEDEditorCommand.Create(cmdEditChar, '', 'Insert a character at current position', DoInternalCommand));
 
+  FKeyboardMap.AddSimpleMapping(VK_TAB, [ssCtrl], TNEDEditorCommand.Create(cmdWindowSwitchToNext, 'WindowSwitchToNext', 'Switch to next editor window if any available', DoInternalCommand));
+  FKeyboardMap.AddSimpleMapping(VK_TAB, [ssCtrl, ssShift], TNEDEditorCommand.Create(cmdWindowSwitchToPrev, 'WindowSwitchToPrev', 'Switch to prev editor window if any available', DoInternalCommand));
+
 end;
 
 procedure TNEDCustomEditorView.DoInternalCommand(Sender: TNEDEditorCommand; const CommandID: TNEDCommandIDType; var Handled: Boolean);
@@ -2004,7 +3137,7 @@ var
   FirstChar: Integer;
   LCaretPos: TNEDCaretPosition;
   LTextPos: TNEDTextPosition;
-  LTopOffset: Integer;
+  LTopOffset, LLastLine: Integer;
 begin
   try
     LCaretPos := CaretPosition;
@@ -2108,7 +3241,10 @@ begin
 
       cmdCursorPageBottom: begin
         LTopOffset := LCaretPos.Y - 1 - TopIndex; // how far from top of the view in lines
-        LCaretPos.Y := Min(LCaretPos.Y - LTopOffset + (GetLinesArea.Height div LineHeight), LineColumnToCaret(VisibleLineCount - 1, 0).Y);
+        LLastLine := GetLinesArea.Height div LineHeight;
+        if LLastLine * LineHeight > GetLinesArea.Height then
+          Dec(LLastLine);
+        LCaretPos.Y := Min(LCaretPos.Y - LTopOffset + LLastLine - 1, LineColumnToCaret(VisibleLineCount - 1, 0).Y);
         ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
         SetHandled;
       end;
@@ -2190,6 +3326,20 @@ begin
       end;
 
       cmdEditChar: begin
+        SetHandled;
+//        FCaret.CaretHide;
+//        FDocument.Insert(LTextPos, Key);
+//        FCaret.CaretShow;
+      end;
+
+      cmdWindowSwitchToNext,
+      cmdWindowSwitchToPrev: begin
+        SetHandled;
+        PostMessage(Application.MainFormHandle,
+                    CM_NED_WINDOW_SWITCH,
+                    Integer(Self),
+                    IfThen(CommandID = cmdWindowSwitchToPrev, -1, 1) //
+                   ); // WParam = Editor; LParam = move forward: 1 / backward: -1
       end;
 
     end;
@@ -2441,6 +3591,28 @@ begin
   Msg.Result := 1;
 end;
 
+procedure TNEDCustomEditorView.CMDialogKey(var Msg: TCMDialogKey);
+var
+  Cmd: TNEDEditorCommand;
+  Shift: TShiftState;
+begin
+  Shift := KeyDataToShiftState(Msg.KeyData);
+  if Focused and (Msg.CharCode = VK_TAB) and (ssCtrl in Shift) then begin
+    if ssShift in Shift then begin
+      Cmd := FKeyboardMap.GetCommand(VK_TAB, [ssCtrl, ssShift]);
+      if (Cmd <> Nil) and Cmd.InvokeCommand then
+        Msg.Result := 1;
+    end
+    else begin
+      Cmd := FKeyboardMap.GetCommand(VK_TAB, [ssCtrl]);
+      if (Cmd <> Nil) and Cmd.InvokeCommand then
+        Msg.Result := 1;
+    end;
+  end
+  else
+    inherited;
+end;
+
 procedure TNEDCustomEditorView.CMFontChanged(var Msg: TMessage);
 begin
   inherited;
@@ -2453,8 +3625,8 @@ end;
 
 procedure TNEDCustomEditorView.CMMouseEnter(var Msg: TMessage);
 begin
-//  HideNativeScrollBars;
-//  ShowModernScrollBar;
+  HideNativeScrollBars;
+  ShowModernScrollBars;
   inherited;
 //  CaptureItem := FMouseItem;
 //  FMouseItem := Nil;
@@ -2484,10 +3656,38 @@ begin
   Msg.Result := 1;
 end;
 
+procedure TNEDCustomEditorView.CMWantSpecialKey(var Msg: TCMWantSpecialKey);
+begin
+  inherited;
+  // sended by TWinControl.CNKeyDown procedure, after that message, if result is 0,
+  // Delphi performs WM_GETDLGCODE, so we could decide here what we want the answear to be,
+  // in Msg.CharCode we get VK_xxx of virtual key that triggered the event, for desired mask:
+  //   VK_TAB: Mask := DLGC_WANTTAB;
+  //   VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN: Mask := DLGC_WANTARROWS;
+  //   VK_RETURN, VK_EXECUTE, VK_ESCAPE, VK_CANCEL: Mask := DLGC_WANTALLKEYS;
+
+  if Focused and (Msg.CharCode = VK_TAB) and (GetKeyState(VK_CONTROL) < 0) then begin
+    FWindowSwitchQueryNext := True;
+    Msg.Result := 0; // we want all special keys to be processed by parent form
+  end;
+
+//  if (Char(Msg.CharCode) = #13) then
+//    Msg.Result := 1;
+//  if (Msg.CharCode = VK_ESCAPE) and Modified then
+//    Message.Result := 1;
+end;
+
 procedure TNEDCustomEditorView.WMGetDlgCode(var Msg: TWMGetDlgCode);
 begin
   inherited;
-  Msg.Result := DLGC_WANTARROWS or DLGC_WANTTAB or DLGC_WANTALLKEYS or DLGC_WANTCHARS;
+  if FWindowSwitchQueryNext then begin
+    FWindowSwitchQueryNext := False;
+    Msg.Result := 0; // we want all special keys to be processed by parent form
+    Exit;
+  end
+  else
+    Msg.Result := Msg.Result or DLGC_WANTARROWS or DLGC_WANTTAB or DLGC_WANTALLKEYS or DLGC_WANTCHARS;
+
 //  Msg.Result := Msg.Result or DLGC_WANTARROWS or DLGC_WANTCHARS;
 //  if fWantTabs then
 //    Msg.Result := Msg.Result or DLGC_WANTTAB;
@@ -2496,11 +3696,22 @@ begin
 end;
 
 procedure TNEDCustomEditorView.WMSize(var Msg: TWMSize);
+var
+  SaveUpdatingScrollBars: Boolean;
 begin
+  HideNativeScrollBars;
   inherited;
-//  HideNativeScrollBars;
-//  UpdateScrollRange;
-//  ShowModernScrollBar;
+  SaveUpdatingScrollBars := FUpdatingScrollBars;
+  FUpdatingScrollBars := True;
+  try
+    CalcAutoRange;
+  finally
+    FUpdatingScrollBars := SaveUpdatingScrollBars;
+  end;
+  if FHorizontalScrollBar.Visible or FVerticalScrollBar.Visible then begin
+    UpdateScrollBars;
+    ShowModernScrollBars;
+  end;
 end;
 
 procedure TNEDCustomEditorView.WMMouseWheel(var Msg: TWMMouseWheel);
@@ -2528,7 +3739,7 @@ end;
 
 procedure TNEDCustomEditorView.WMVScroll(var Msg: TWMScroll);
 begin
-//  HideNativeScrollBars;
+  HideNativeScrollBars;
 //  case Msg.ScrollCode of
 //    SB_TOP       : SetTopIndex(0);
 //    SB_BOTTOM    : SetTopIndex(VisibleEntriesCount - 1);
@@ -2543,7 +3754,7 @@ end;
 procedure TNEDCustomEditorView.WMHScroll(var Msg: TWMScroll);
 begin
   // we do not scroll left/right
-//  HideNativeScrollBars;
+  HideNativeScrollBars;
 end;
 
 procedure TNEDCustomEditorView.WMTimer(var Msg: TWMTimer);
@@ -2569,16 +3780,17 @@ end;
 
 procedure TNEDCustomEditorView.WMSetFocus(var Msg: TWMSetFocus);
 begin
-  FCaret.CaretCreate;
-//  HideNativeScrollBars;
-//  ShowModernScrollBar;
+  HideNativeScrollBars;
+  ShowModernScrollBars;
   inherited;
+  FCaret.CaretCreate;
   Invalidate;
 end;
 
 procedure TNEDCustomEditorView.WMKillFocus(var Msg: TWMKillFocus);
 begin
-//  HideModernScrollBar;
+  HideNativeScrollBars;
+  HideModernScrollBars;
   inherited;
 //  FMouseCapture := False;
 //  FDownIndex := -1;
@@ -2654,7 +3866,7 @@ begin
   inherited;
 
   try
-
+    //FIgnoreInput
   finally
     ReportEditorInfo;
   end;
@@ -2685,6 +3897,12 @@ begin
         Cmd.InvokeCommand;
       FProcessNextKeyMap := True;
       Key := #0;
+      Exit;
+    end;
+
+    if FIgnoreInput then begin
+      FIgnoreInput := False;
+      Exit;
     end;
 
     if Key <> #0 then begin
@@ -2738,6 +3956,7 @@ end;
 
 procedure TNEDCustomEditorView.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
+  HideNativeScrollBars;
   inherited;
 
   try
@@ -2777,15 +3996,16 @@ end;
 
 procedure TNEDCustomEditorView.Paint;
 var
-  LinesR, SB: TRect;
+  LinesR: TRect;
 begin
   LinesR := GetLinesArea;
   DrawBackground(Canvas, LinesR); // clear background
-//  if FDrawVerticalScrollBar or (not MouseInClient and Focused and not FVerticalScrollBar.Visible) then begin
-//    FDrawVerticalScrollBar := False;
-//    SB := VerticalScrollBarArea;
-//    DrawBackground(Canvas, SB); // clear background
-//  end;
+  if (MouseInClient or Focused) and FVerticalScrollBar.Visible and FVerticalScrollBar.NeedsScrollBarVisible then begin
+    FVerticalScrollBar.Paint(Canvas);
+  end;
+  if (MouseInClient or Focused) and FHorizontalScrollBar.Visible and FHorizontalScrollBar.NeedsScrollBarVisible then begin
+    FHorizontalScrollBar.Paint(Canvas);
+  end;
   //
   if FGutter.Visible and (FGutter.GetWidth > 0) then
     FGutter.Paint(Canvas, GetGutterArea);
@@ -2846,10 +4066,18 @@ begin
     R := Row;
     R.Top := R.Top + Y;
     R.Height := CurrentLineHeight;
-    if R.Bottom <= ClipR.Top then // if we are ouside of cliping-area, go to next entry
+    if R.Bottom <= ClipR.Top then begin // if we are ouside of cliping-area, go to next entry
+      Inc(I);
+      Inc(Y, CurrentLineHeight);
+      //
       Continue;
-    if R.Top >= ClipR.Bottom then // if we are ouside of cliping-area, go to next entry
+    end;
+    if R.Top >= ClipR.Bottom then begin // if we are ouside of cliping-area, go to next entry
+      Inc(I);
+      Inc(Y, CurrentLineHeight);
+      //
       Continue;
+    end;
     //
     DrawLine(ACanvas, R, FTopIndex + I);
     //
@@ -2976,6 +4204,54 @@ begin
   end
 end;
 
+procedure TNEDCustomEditorView.CalcAutoRange;
+begin
+  if FAutoRangeCount <= 0 then begin
+    HorizontalScrollBar.CalcAutoRange;
+    VerticalScrollBar.CalcAutoRange;
+  end;
+end;
+
+procedure TNEDCustomEditorView.HideNativeScrollBars;
+begin
+  if HandleAllocated then
+    FlatSB_ShowScrollBar(Handle, SB_BOTH, False);
+end;
+
+procedure TNEDCustomEditorView.UpdateScrollBars;
+begin
+  if not FUpdatingScrollBars and HandleAllocated then try
+    FUpdatingScrollBars := True;
+    if FVerticalScrollBar.NeedsScrollBarVisible then begin
+      FHorizontalScrollBar.Update(False, True);
+      FVerticalScrollBar.Update(True, False);
+    end
+    else if FHorizontalScrollBar.NeedsScrollBarVisible then begin
+      FVerticalScrollBar.Update(False, True);
+      FHorizontalScrollBar.Update(True, False);
+    end
+    else begin
+      FVerticalScrollBar.Update(False, False);
+      FHorizontalScrollBar.Update(True, False);
+    end;
+  finally
+    FUpdatingScrollBars := False;
+  end;
+end;
+
+procedure TNEDCustomEditorView.ShowModernScrollBars;
+begin
+  if FVerticalScrollBar.Visible and FVerticalScrollBar.NeedsScrollBarVisible then
+    FVerticalScrollBar.ShowAnimated;
+  if FHorizontalScrollBar.Visible and FHorizontalScrollBar.NeedsScrollBarVisible then
+    FHorizontalScrollBar.ShowAnimated;
+end;
+
+procedure TNEDCustomEditorView.HideModernScrollBars;
+begin
+  FVerticalScrollBar.HideAnimated;
+end;
+
 function TNEDCustomEditorView.GetGutterArea: TRect;
 begin
   Result := TRect.Empty;
@@ -2983,8 +4259,8 @@ begin
     Exit;
 
   Result := Rect(0, 0, FGutter.GetWidth, Self.Height);
-//  if FHorizontalScrollBar.Visible then
-//    Result.Bottom := Result.Bottom - FHorizontalScrollBar.Size;
+  if FHorizontalScrollBar.Visible and FHorizontalScrollBar.NeedsScrollBarVisible then
+    Result.Bottom := Result.Bottom - FHorizontalScrollBar.Size;
 end;
 
 function TNEDCustomEditorView.GetLinesArea: TRect;
@@ -2993,23 +4269,13 @@ var
 begin
   Gutter := GetGutterArea;
   Result := Rect(Gutter.Width, 0, Self.Width, Self.Height);
-//  if FVerticalScrollBar.Visible then
-//    Result.Right := Result.Right - FVerticalScrollBar.Size;
-//  if FHorizontalScrollBar.Visible then
-//    Result.Bottom := Result.Bottom - FHorizontalScrollBar.Size;
+  if FVerticalScrollBar.Visible and FVerticalScrollBar.NeedsScrollBarVisible then
+    Result.Right := Result.Right - FVerticalScrollBar.Size;
+  if FHorizontalScrollBar.Visible and FHorizontalScrollBar.NeedsScrollBarVisible then
+    Result.Bottom := Result.Bottom - FHorizontalScrollBar.Size;
 end;
 
 function TNEDCustomEditorView.GetMinimapArea: TRect;
-begin
-  // @TODO
-end;
-
-function TNEDCustomEditorView.GetHorizontalScrollbarArea: TRect;
-begin
-  // @TODO
-end;
-
-function TNEDCustomEditorView.GetVerticalScrollbarArea: TRect;
 begin
   // @TODO
 end;
@@ -3273,6 +4539,10 @@ begin
   ActiveLineIndex := CaretToLineColumn(CaretPosition).Line;
 
   // and than
+  CalcAutoRange;
+  HideNativeScrollBars;
+  UpdateScrollBars;
+  ShowModernScrollBars;
   Invalidate;
 
   ReportEditorInfo;

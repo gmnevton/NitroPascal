@@ -197,8 +197,9 @@ type
     FModalForm: TForm;
     FLastOpenedPath: String;
     //
-    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
+    procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
+    procedure NEDWindowSwitch(var Msg: TMessage); message CM_NED_WINDOW_SWITCH;
   private
     NEDViewForm: TNEDViewForm;
   protected
@@ -326,20 +327,21 @@ begin
 //
 end;
 
-procedure TNEDMainForm.CMDialogKey(var Message: TCMDialogKey);
+procedure TNEDMainForm.CMDialogKey(var Msg: TCMDialogKey);
 begin
-  if GetKeyState(VK_MENU) >= 0 then begin
-    case Message.CharCode of
+//  if GetKeyState(VK_MENU) >= 0 then begin // ALT
+    case Msg.CharCode of
       VK_TAB: begin
-//        if GetKeyState(VK_CONTROL) >= 0 then begin
+        if GetKeyState(VK_CONTROL) >= 0 then begin
+//          ShowMessage('MAIN CTRL+TAB');
 //          SelectNext(FActiveControl, GetKeyState(VK_SHIFT) >= 0, True);
 //          Result := 1;
 //          Exit;
-//        end;
-        Exit;
+        end;
+//        Exit;
       end;
     end;
-  end;
+//  end;
   inherited;
 end;
 
@@ -371,6 +373,43 @@ begin
     end;
   end;
   Msg.Result := 1;
+end;
+
+procedure TNEDMainForm.NEDWindowSwitch(var Msg: TMessage);
+var
+  CurrentEditor: TNEDCustomEditorView;
+  MoveDirection: Integer;
+  i, idx: Integer;
+begin
+  CurrentEditor := TNEDCustomEditorView(Pointer(Msg.WParam));
+  MoveDirection := Msg.LParam;
+
+  if CurrentEditor <> Nil then begin
+    idx := -1;
+    for i := 0 to NEDEditors.Count - 1 do begin
+      if NEDEditors.Items[i].Editor = CurrentEditor then begin
+        idx := i;
+        Break;
+      end;
+    end;
+    //
+    if idx > -1 then begin
+      if (MoveDirection = 1) and (idx + 1 < NEDEditors.Count) then begin
+        TNEDEditorForm.SelectEditorByIndex(idx + 1);
+      end
+      else if (MoveDirection = -1) and (idx - 1 >= 0) then begin
+        TNEDEditorForm.SelectEditorByIndex(idx - 1);
+      end
+      else begin // wrap around
+        if (MoveDirection = 1) and (idx + 1 = NEDEditors.Count) then begin
+          TNEDEditorForm.SelectEditorByIndex(0);
+        end
+        else if (MoveDirection = -1) and (idx - 1 < 0) then begin
+          TNEDEditorForm.SelectEditorByIndex(NEDEditors.Count - 1);
+        end;
+      end;
+    end;
+  end;
 end;
 
 procedure TNEDMainForm.WMGetDlgCode(var Msg: TWMGetDlgCode);

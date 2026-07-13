@@ -141,21 +141,27 @@ function TNEDViewForm.OpenNewBuffer(const FilePath: String; out Buffer: TNEDEdit
 var
   Editor: TNEDEditorView;
 begin
-  Buffer := TNEDEditorBuffer.Create;
-  if View = Nil then begin
-    View := TNEDEditorForm.Create(Self);
-    View.Parent := HostControl;
-    View.Align := alClient;
-    View.Show;
-    View.BringToFront;
+  try
+    Buffer := TNEDEditorBuffer.Create;
+    if View = Nil then begin
+      View := TNEDEditorForm.Create(Self);
+      View.Parent := HostControl;
+      View.Align := alClient;
+      View.Show;
+      View.BringToFront;
+    end;
+    //
+    Editor := View.NewEditor(Buffer);
+    //
+  //  Buffer.LoadFromFile('d:\Borland Librarys\NitroPascal\compiler\tests\simple_project\first.npe');
+    Buffer.LoadFromFile(FilePath);
+    //
+    Editor.SetFocus;
+    //
+    Result := True;
+  except
+    Result := False;
   end;
-  //
-  Editor := View.NewEditor(Buffer);
-  //
-//  Buffer.LoadFromFile('d:\Borland Librarys\NitroPascal\compiler\tests\simple_project\first.npe');
-  Buffer.LoadFromFile(FilePath);
-  //
-  Editor.SetFocus;
 end;
 
 function TNEDViewForm.OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const View: TNEDEditorForm): TNEDEditorView;

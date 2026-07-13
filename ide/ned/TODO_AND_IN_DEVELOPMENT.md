@@ -22,11 +22,13 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
     
     - [ ] and any CTRL / ALT / SHIFT combinations
   
-  - [x] Mouse click sets cursor location (and right click also)
+  - [x] Switch to next editor if available ([SHIFT+]CTRL+TAB shortcut)
   
-  - [ ] Render scroll bars
+  - [ ] Split-view current or new editor (shortcuts)
   
-  - [ ] Handle scrolling
+  - [ ] Render scroll bars (in progress)
+  
+  - [ ] Handle scrolling (in progress)
   
   - [ ] Handle selection
   
@@ -34,15 +36,17 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
   
   - [ ] Fully integrate with application
     
+    - [ ] Open the same code file multiple times in a split view
+    
     - [x] Open any code file using open dialog
     
     - [x] Open any code file in a split view
     
-    - [ ] Open the same code file multiple times in a split view
-    
-    - [ ] Handle thumbstone (header button) interactions
+    - [x] Handle thumbstone (header button) interactions
   
   - [ ] Test multi-edit/view on a single document
+  
+  - [x] Mouse click sets cursor location (and right click also)
 
 ## TODO
 
