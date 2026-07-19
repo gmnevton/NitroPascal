@@ -3,11 +3,11 @@ object NEDMainForm: TNEDMainForm
   Top = 0
   OnAlignPosition = FormAlignPosition
   Caption = 'NED'
-  ClientHeight = 561
-  ClientWidth = 884
+  ClientHeight = 581
+  ClientWidth = 904
   Color = clBtnFace
-  Constraints.MinHeight = 600
-  Constraints.MinWidth = 900
+  Constraints.MinHeight = 620
+  Constraints.MinWidth = 920
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -16,7 +16,6 @@ object NEDMainForm: TNEDMainForm
   Font.Style = []
   KeyPreview = True
   OldCreateOrder = False
-  WindowState = wsMaximized
   OnCanResize = FormCanResize
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
@@ -33,7 +32,7 @@ object NEDMainForm: TNEDMainForm
     Left = 245
     Top = 40
     Width = 7
-    Height = 489
+    Height = 509
     AssignedControl = pnlLeft
     AutoSnap = False
     DrawSpacer = True
@@ -45,12 +44,12 @@ object NEDMainForm: TNEDMainForm
   object barCaption: TUCaptionBar
     Left = 0
     Top = 0
-    Width = 884
+    Width = 904
     Height = 40
     Caption = '                  Nitro EDitor'
     DoubleBuffered = True
     ParentDoubleBuffered = False
-    TabOrder = 0
+    TabOrder = 1
     BackColors.Enabled = False
     BackColors.Color = clBlack
     BackColors.LightColor = 15921906
@@ -103,7 +102,7 @@ object NEDMainForm: TNEDMainForm
     UseSystemCaptionColor = True
     CaptionHeight = 40
     object btnClose: TUQuickButton
-      Left = 839
+      Left = 859
       Top = 0
       Height = 40
       Align = alRight
@@ -124,7 +123,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 32
     end
     object btnMax: TUQuickButton
-      Left = 794
+      Left = 814
       Top = 0
       Height = 40
       Align = alCustom
@@ -147,7 +146,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitHeight = 32
     end
     object btnMin: TUQuickButton
-      Left = 749
+      Left = 769
       Top = 0
       Height = 40
       Align = alCustom
@@ -195,7 +194,7 @@ object NEDMainForm: TNEDMainForm
     Left = 0
     Top = 40
     Width = 45
-    Height = 489
+    Height = 509
     Align = alLeft
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
@@ -204,7 +203,7 @@ object NEDMainForm: TNEDMainForm
     Font.Style = []
     ParentFont = False
     ShowCaption = False
-    TabOrder = 1
+    TabOrder = 2
     BackColor.Enabled = False
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
@@ -423,8 +422,8 @@ object NEDMainForm: TNEDMainForm
   end
   object pnlStatus: TUPanel
     Left = 0
-    Top = 529
-    Width = 884
+    Top = 549
+    Width = 904
     Height = 32
     Align = alBottom
     FullRepaint = False
@@ -435,7 +434,7 @@ object NEDMainForm: TNEDMainForm
     Font.Style = []
     ParentFont = False
     ShowCaption = False
-    TabOrder = 2
+    TabOrder = 4
     BackColor.Enabled = True
     BackColor.Color = 10444863
     BackColor.LightColor = 15132390
@@ -445,7 +444,7 @@ object NEDMainForm: TNEDMainForm
       Left = 8
       Top = 4
       Width = 44
-      Height = 17
+      Height = 24
       Margins.Left = 8
       Margins.Top = 4
       Margins.Right = 0
@@ -459,6 +458,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
       Left = 118
@@ -474,7 +474,7 @@ object NEDMainForm: TNEDMainForm
       Left = 138
       Top = 4
       Width = 34
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -488,6 +488,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
       Left = 172
@@ -501,7 +502,7 @@ object NEDMainForm: TNEDMainForm
       Left = 192
       Top = 4
       Width = 28
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -515,6 +516,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
       Left = 220
@@ -529,7 +531,7 @@ object NEDMainForm: TNEDMainForm
       Left = 240
       Top = 4
       Width = 32
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -543,6 +545,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
       Left = 272
@@ -556,7 +559,7 @@ object NEDMainForm: TNEDMainForm
       Left = 292
       Top = 4
       Width = 118
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -570,6 +573,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
       Left = 410
@@ -585,7 +589,7 @@ object NEDMainForm: TNEDMainForm
       Left = 430
       Top = 4
       Width = 15
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -600,9 +604,10 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
+      ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
-      Left = 578
+      Left = 598
       Top = 0
       Align = alRight
       Font.Charset = DEFAULT_CHARSET
@@ -622,7 +627,7 @@ object NEDMainForm: TNEDMainForm
     end
     object btnFileZoomIn: TUQuickButton
       AlignWithMargins = True
-      Left = 831
+      Left = 851
       Top = 0
       Margins.Left = 0
       Margins.Top = 0
@@ -641,6 +646,7 @@ object NEDMainForm: TNEDMainForm
       BackColors.DarkColor = 3947580
       ButtonStyle = qbsNone
       Caption = #59555
+      ExplicitLeft = 831
       ExplicitTop = -8
     end
     object txtFileType: TUText
@@ -648,7 +654,7 @@ object NEDMainForm: TNEDMainForm
       Left = 72
       Top = 4
       Width = 46
-      Height = 17
+      Height = 24
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -662,6 +668,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitHeight = 17
     end
     object USeparator7: TUSeparator
       Left = 52
@@ -675,7 +682,7 @@ object NEDMainForm: TNEDMainForm
       AlignWithMargins = True
       Left = 453
       Top = 12
-      Width = 125
+      Width = 145
       Height = 8
       Margins.Left = 8
       Margins.Top = 12
@@ -702,7 +709,7 @@ object NEDMainForm: TNEDMainForm
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True
-      Left = 627
+      Left = 647
       Top = 0
       Width = 200
       Height = 32
@@ -743,9 +750,28 @@ object NEDMainForm: TNEDMainForm
   object pnlWorkSpace: TUPanel
     Left = 252
     Top = 40
-    Width = 632
-    Height = 489
+    Width = 652
+    Height = 509
     Align = alClient
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWhite
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+    ShowCaption = False
+    TabOrder = 0
+    BackColor.Enabled = False
+    BackColor.Color = clBlack
+    BackColor.LightColor = 15132390
+    BackColor.DarkColor = 2039583
+  end
+  object pnlLeft: TUPanel
+    Left = 45
+    Top = 40
+    Width = 200
+    Height = 509
+    Align = alLeft
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWhite
     Font.Height = -11
@@ -758,30 +784,11 @@ object NEDMainForm: TNEDMainForm
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
-  end
-  object pnlLeft: TUPanel
-    Left = 45
-    Top = 40
-    Width = 200
-    Height = 489
-    Align = alLeft
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWhite
-    Font.Height = -11
-    Font.Name = 'Tahoma'
-    Font.Style = []
-    ParentFont = False
-    ShowCaption = False
-    TabOrder = 4
-    BackColor.Enabled = False
-    BackColor.Color = clBlack
-    BackColor.LightColor = 15132390
-    BackColor.DarkColor = 2039583
     object boxSearch: TUScrollBox
       Left = 0
       Top = 0
       Width = 200
-      Height = 489
+      Height = 509
       HorzScrollBar.Tracking = True
       VertScrollBar.Tracking = True
       Align = alClient
@@ -825,7 +832,7 @@ object NEDMainForm: TNEDMainForm
         Left = 0
         Top = 24
         Width = 200
-        Height = 465
+        Height = 485
         Align = alClient
         BevelInner = bvNone
         BevelOuter = bvNone
@@ -841,7 +848,7 @@ object NEDMainForm: TNEDMainForm
       Left = 0
       Top = 0
       Width = 200
-      Height = 489
+      Height = 509
       HorzScrollBar.Tracking = True
       VertScrollBar.Tracking = True
       Align = alClient
@@ -885,7 +892,7 @@ object NEDMainForm: TNEDMainForm
         Left = 0
         Top = 24
         Width = 200
-        Height = 465
+        Height = 485
         Align = alClient
         BevelInner = bvNone
         BevelOuter = bvNone

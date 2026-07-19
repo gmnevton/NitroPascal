@@ -267,7 +267,9 @@ end;
 
 procedure TNEDMainForm.FormShow(Sender: TObject);
 begin
-  NEDHomeForm.Show;
+  if true then
+    NEDHomeForm.Show;
+  Self.WindowState := wsMaximized;
 end;
 
 procedure TNEDMainForm.FormAlignPosition(Sender: TWinControl; Control: TControl; var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect; AlignInfo: TAlignInfo);
@@ -436,6 +438,9 @@ begin
   btnHome.Enabled := False;
   try
     // empty for now
+    if not NEDHomeForm.Visible then
+      NEDHomeForm.Show;
+    NEDHomeForm.BringToFront;
   finally
     btnHome.Enabled := True;
   end;

@@ -198,7 +198,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 623
     Width = 305
     Anchors = [akLeft, akBottom]
-    TabOrder = 0
+    TabOrder = 6
     OnClick = UCheckBox1Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
@@ -214,7 +214,7 @@ object NEDHomeForm: TNEDHomeForm
     Top = 613
     Width = 361
     Anchors = [akRight, akBottom]
-    TabOrder = 1
+    TabOrder = 7
     OnClick = USymbolButton1Click
     SymbolFont.Charset = DEFAULT_CHARSET
     SymbolFont.Color = clWindowText
@@ -235,7 +235,7 @@ object NEDHomeForm: TNEDHomeForm
     Left = 40
     Top = 343
     Width = 80
-    TabOrder = 2
+    TabOrder = 1
     OnClick = URadioButton1Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
@@ -249,7 +249,7 @@ object NEDHomeForm: TNEDHomeForm
     Left = 128
     Top = 343
     Width = 80
-    TabOrder = 3
+    TabOrder = 2
     OnClick = URadioButton2Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
@@ -263,7 +263,7 @@ object NEDHomeForm: TNEDHomeForm
     Left = 214
     Top = 343
     Width = 80
-    TabOrder = 4
+    TabOrder = 3
     OnClick = URadioButton3Click
     IconFont.Charset = DEFAULT_CHARSET
     IconFont.Color = clWindowText
@@ -278,7 +278,7 @@ object NEDHomeForm: TNEDHomeForm
     Left = 40
     Top = 387
     Width = 254
-    TabOrder = 5
+    TabOrder = 4
     OnClick = UButton1Click
     CustomColors.BackColors.Enabled = False
     CustomColors.BackColors.LightColor = 13421772
@@ -321,7 +321,7 @@ object NEDHomeForm: TNEDHomeForm
     Left = 40
     Top = 436
     Width = 254
-    TabOrder = 6
+    TabOrder = 5
     OnClick = UButton2Click
     CustomColors.BackColors.Enabled = False
     CustomColors.BackColors.LightColor = 13421772
@@ -394,7 +394,7 @@ object NEDHomeForm: TNEDHomeForm
         SizeStyle = ssAuto
       end>
     ShowCaption = False
-    TabOrder = 7
+    TabOrder = 0
     VerticalAlignment = taAlignTop
     object UPanel1: TUPanel
       AlignWithMargins = True
@@ -462,6 +462,7 @@ object NEDHomeForm: TNEDHomeForm
         BackColor.Color = clBlack
         BackColor.LightColor = 15132390
         BackColor.DarkColor = 2039583
+        ExplicitTop = 39
         object UItemButton1: TUItemButton
           Left = 0
           Top = 0
