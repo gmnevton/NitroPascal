@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-06
+// Modified: 2026-07
 // All rights reserved.
 //
 
@@ -15,6 +15,9 @@ uses
   madLinkDisAsm,
   madListModules,
   Forms,
+  ned_config in 'ned_config.pas',
+  ned_profiles in 'ned_profiles.pas',
+  ned_session_context in 'ned_session_context.pas',
   ned_main in 'ned_main.pas' {NEDMainForm},
   ned_source_editor in 'ned_source_editor.pas' {NEDEditorForm},
   ned_home_page in 'ned_home_page.pas' {NEDHomeForm},
@@ -30,6 +33,8 @@ uses
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
+  NEDConfig.LoadConfig;
   Application.CreateForm(TNEDMainForm, NEDMainForm);
   Application.Run;
+//  NEDConfig.SaveConfig;
 end.

@@ -1,0 +1,28 @@
+{
+  "NEDConfig" : {
+    "Application" : {
+      "Monitor" : 0,
+      "Position" : {
+        "X" : 143,
+        "Y" : 111
+      },
+      "Size" : {
+        "CX" : 920,
+        "CY" : 620
+      },
+      "Maximize" : false,
+      "ShowHomePage" : true,
+      "ColorSchema" : "system"
+    },
+    "Profiles" : {
+      "ShowProfileSelection" : true,
+      "ProfilesCount" : 0,
+      "ProfilesList" : [
+
+      ],
+      "LastProfile" : "",
+      "UseLastProfile" : true,
+      "LoadProfileSession" : true
+    }
+  }
+}

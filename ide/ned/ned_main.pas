@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-06
+// Modified: 2026-07
 // All rights reserved.
 //
 
@@ -165,6 +165,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormMove(Sender: TObject);
     procedure FormResize(Sender: TObject);
     //
     procedure btnShowHideToolboxClick(Sender: TObject);
@@ -221,7 +222,8 @@ uses
   ned_home_page,
   ned_source_editor,
   ned_dialog_open,
-  ned_splitview_manager;
+  ned_splitview_manager,
+  ned_config;
 
 type
   TWinControlAccess = class(TWinControl);
@@ -231,8 +233,59 @@ var
 //  NEDEditorForm: TNEDEditorForm;
 
 procedure TNEDMainForm.FormCreate(Sender: TObject);
+var
+  i, x_pos, y_pos, x, y: Integer;
+  _monitor: TMonitor;
+  P: TPoint;
 begin
   CaptionBar := barCaption;
+  //
+  NEDConfig.Lock;
+  try
+    x_pos := 0;
+    y_pos := 0;
+    if NEDConfig.Monitor <> 0 then begin
+      for i := 0 to Screen.MonitorCount - 1 do begin
+        _monitor := Screen.Monitors[i];
+        if _monitor.Handle = NEDConfig.Monitor then begin
+          if NEDConfig.Monitor <> Screen.PrimaryMonitor.Handle then begin
+            x_pos := _monitor.WorkareaRect.Left + NEDConfig.Position.X;
+            y_pos := _monitor.WorkareaRect.Top + NEDConfig.Position.Y;
+            if x_pos < 0 then
+              x := _monitor.WorkareaRect.Left - x_pos
+            else
+              x := x_pos;
+            if y_pos < 0 then
+              y := _monitor.WorkareaRect.Top - y_pos
+            else
+              y := y_pos;
+            P := Point(x, y);
+            if not PtInRect(_monitor.WorkareaRect, P) then begin
+              x_pos := _monitor.WorkareaRect.Left;
+              y_pos := _monitor.WorkareaRect.Top;
+            end;
+            Break;
+          end;
+        end;
+      end;
+    end
+    else begin
+      x_pos := NEDConfig.Position.X;
+      y_pos := NEDConfig.Position.Y;
+    end;
+    Self.Left := x_pos;
+    Self.Top := y_pos;
+    x := NEDConfig.Size.cx;
+    y := NEDConfig.Size.cy;
+    if x > -1 then
+      Self.Width := x;
+    if y > -1 then
+      Self.Height := y;
+  finally
+    NEDConfig.Unlock;
+  end;
+  //
+  OnMove := FormMove;
   //
   NEDHomeForm := TNEDHomeForm.Create(Self);
   NEDHomeForm.Parent := pnlWorkSpace;
@@ -244,6 +297,7 @@ begin
   txtFileLineBreaks.Caption := '---';
   txtFileEditMode.Caption := '---';
   txtFileEditPosition.Caption := '---';
+  txtStatus.Caption := '';
   //
   pnlLeft.Visible := False;
   splLeft.Visible := False;
@@ -251,6 +305,9 @@ begin
   //
   FModalForm := Nil;
   FLastOpenedPath := '';
+  //
+  if not NEDConfig.Loaded and NEDConfig.Error then
+    txtStatus.Caption := NEDConfig.ErrorMsg;
 end;
 
 procedure TNEDMainForm.CreateParams(var Params: TCreateParams);
@@ -267,9 +324,19 @@ end;
 
 procedure TNEDMainForm.FormShow(Sender: TObject);
 begin
-  if true then
+  if SameText(NEDConfig.ColorSchema, 'system') then begin
+    GetCommonThemeManager.Theme := ttSystem;
+  end
+  else if SameText(NEDConfig.ColorSchema, 'dark') then begin
+    GetCommonThemeManager.Theme := ttDark;
+  end
+  else if SameText(NEDConfig.ColorSchema, 'light') then begin
+    GetCommonThemeManager.Theme := ttLight;
+  end;
+  if NEDConfig.ShowHomePage then
     NEDHomeForm.Show;
-  Self.WindowState := wsMaximized;
+  if NEDConfig.Maximize then
+    Self.WindowState := wsMaximized;
 end;
 
 procedure TNEDMainForm.FormAlignPosition(Sender: TWinControl; Control: TControl; var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect; AlignInfo: TAlignInfo);
@@ -324,9 +391,35 @@ begin
 //
 end;
 
+procedure TNEDMainForm.FormMove(Sender: TObject);
+var
+  _monitor: TMonitor;
+  x_pos, y_pos: Integer;
+begin
+  _monitor := Screen.MonitorFromWindow(Self. Handle);
+  if (_monitor <> Nil) and (_monitor.Handle <> Screen.PrimaryMonitor.Handle) then begin
+    NEDConfig.Monitor := _monitor.Handle;
+    x_pos := _monitor.WorkareaRect.Left;
+    y_pos := _monitor.WorkareaRect.Top;
+    x_pos := Self.Left - x_pos;
+    y_pos := Self.Top - y_pos;
+    NEDConfig.Position := TPoint.Create(x_pos, y_pos);
+  end
+  else begin
+    NEDConfig.Monitor := 0;
+    NEDConfig.Position := TPoint.Create(Self.Left, Self.Top);
+  end;
+  NEDConfig.Size := TSize.Create(Self.Width, Self.Height);
+  NEDConfig.SaveConfig;
+end;
+
 procedure TNEDMainForm.FormResize(Sender: TObject);
 begin
-//
+  if csLoading in ComponentState then
+    Exit;
+  //
+  NEDConfig.Size := TSize.Create(Self.Width, Self.Height);
+  NEDConfig.SaveConfig;
 end;
 
 procedure TNEDMainForm.CMDialogKey(var Msg: TCMDialogKey);

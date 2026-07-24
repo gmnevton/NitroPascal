@@ -46,7 +46,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
-        <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
+        <DCC_DcuOutput>.\$(Platform)\$(Config)\dcus</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
         <DCC_E>false</DCC_E>
         <DCC_N>false</DCC_N>
@@ -107,24 +107,23 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="ned_config.pas"/>
+        <DCCReference Include="ned_profiles.pas"/>
+        <DCCReference Include="ned_session_context.pas"/>
         <DCCReference Include="ned_main.pas">
             <Form>NEDMainForm</Form>
         </DCCReference>
         <DCCReference Include="ned_source_editor.pas">
             <Form>NEDEditorForm</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="ned_home_page.pas">
             <Form>NEDHomeForm</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="ned_settings.pas">
             <Form>NEDSettingsForm</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="ned_dialog_open.pas">
             <Form>NEDDialogOpen</Form>
-            <FormType>dfm</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="ned_editor_buffer.pas"/>
@@ -132,7 +131,6 @@
         <DCCReference Include="ned_splitview_manager.pas"/>
         <DCCReference Include="ned_source_view.pas">
             <Form>NEDViewForm</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

@@ -30,6 +30,14 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
   
   - [ ] Handle selection
   
+  - [ ] Make IDE configuration
+  
+  - [ ] Make IDE profiles
+  
+  - [ ] Make IDE session context
+  
+  - [ ] Remodel home page
+  
   - [ ] Handle code highlighting
   
   - [ ] Fully integrate with application
