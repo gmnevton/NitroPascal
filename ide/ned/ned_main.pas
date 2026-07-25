@@ -43,8 +43,12 @@ uses
   SynEdit,
   VirtualTrees,
   SplitEx,
+  ned_dialog_base,
   ned_editor_view,
   ned_source_view;
+
+const
+  WM_AFTERSHOW = $BF00; // max $BFFF
 
 type
   TNEDMainForm = class(TUForm)
@@ -198,6 +202,8 @@ type
     FModalForm: TForm;
     FLastOpenedPath: String;
     //
+    procedure WMAfterShow(var Msg: TMessage); message WM_AFTERSHOW;
+    procedure ApplicationOnIdle(Sender: TObject; var Done: Boolean);
     procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
     procedure NEDWindowSwitch(var Msg: TMessage); message CM_NED_WINDOW_SWITCH;
@@ -207,6 +213,8 @@ type
     procedure CreateParams(var Params: TCreateParams); override;
     procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
   public
+    function CreateModalDialogForm(const AFormClass: TNEDDialogBaseClass): TNEDDialogBase;
+    function DestroyModalDialogForm(var ADialogForm: TNEDDialogBase): Boolean;
   end;
 
 var
@@ -220,6 +228,7 @@ uses
   Windows,
   Dialogs,
   ned_home_page,
+  ned_dialog_profiles,
   ned_source_editor,
   ned_dialog_open,
   ned_splitview_manager,
@@ -230,6 +239,7 @@ type
 
 var
   NEDHomeForm: TNEDHomeForm;
+//  NEDDialogProfiles: TNEDDialogProfiles;
 //  NEDEditorForm: TNEDEditorForm;
 
 procedure TNEDMainForm.FormCreate(Sender: TObject);
@@ -287,6 +297,8 @@ begin
   //
   OnMove := FormMove;
   //
+//  Application.OnIdle := ApplicationOnIdle;
+  //
   NEDHomeForm := TNEDHomeForm.Create(Self);
   NEDHomeForm.Parent := pnlWorkSpace;
   NEDHomeForm.Align := alClient;
@@ -319,6 +331,7 @@ end;
 
 procedure TNEDMainForm.FormDestroy(Sender: TObject);
 begin
+//  NEDDialogProfiles.Free;
   NEDHomeForm.Free;
 end;
 
@@ -337,6 +350,8 @@ begin
     NEDHomeForm.Show;
   if NEDConfig.Maximize then
     Self.WindowState := wsMaximized;
+  if NEDConfig.ShowProfileSelection then
+    PostMessage(Self.Handle, WM_AFTERSHOW, 0, 0);
 end;
 
 procedure TNEDMainForm.FormAlignPosition(Sender: TWinControl; Control: TControl; var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect; AlignInfo: TAlignInfo);
@@ -420,6 +435,28 @@ begin
   //
   NEDConfig.Size := TSize.Create(Self.Width, Self.Height);
   NEDConfig.SaveConfig;
+end;
+
+procedure TNEDMainForm.WMAfterShow(var Msg: TMessage);
+var
+  NEDDialogProfiles: TNEDDialogProfiles;
+begin
+  Msg.Result := 1;
+  NEDDialogProfiles := TNEDDialogProfiles(CreateModalDialogForm(TNEDDialogProfiles));
+  try
+    if NEDDialogProfiles <> Nil then begin
+      if NEDDialogProfiles.Execute then begin // load selected profile
+
+      end;
+    end;
+  finally
+    DestroyModalDialogForm(TNEDDialogBase(NEDDialogProfiles));
+  end;
+end;
+
+procedure TNEDMainForm.ApplicationOnIdle(Sender: TObject; var Done: Boolean);
+begin
+  Done := False;
 end;
 
 procedure TNEDMainForm.CMDialogKey(var Msg: TCMDialogKey);
@@ -512,6 +549,30 @@ begin
   inherited;
   // inform Windows that this form wants navigation keys
   Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS or DLGC_WANTALLKEYS;
+end;
+
+function TNEDMainForm.CreateModalDialogForm(const AFormClass: TNEDDialogBaseClass): TNEDDialogBase;
+begin
+  Result := Nil;
+  if FModalForm <> Nil then
+    Exit;
+  //
+  Result := AFormClass.Create(Application);
+  FModalForm := Result;
+end;
+
+function TNEDMainForm.DestroyModalDialogForm(var ADialogForm: TNEDDialogBase): Boolean;
+begin
+  Result := False;
+  if (FModalForm = Nil) and (ADialogForm = Nil) then
+    Exit;
+  //
+  FModalForm := Nil;
+  if ADialogForm <> Nil then begin
+    ADialogForm.Free;
+    ADialogForm := Nil;
+  end;
+  Result := True;
 end;
 
 procedure TNEDMainForm.btnShowHideToolboxClick(Sender: TObject);

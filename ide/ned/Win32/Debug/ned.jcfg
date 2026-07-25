@@ -3,12 +3,12 @@
     "Application" : {
       "Monitor" : 0,
       "Position" : {
-        "X" : 143,
-        "Y" : 111
+        "X" : 59,
+        "Y" : 58
       },
       "Size" : {
-        "CX" : 920,
-        "CY" : 620
+        "CX" : 1125,
+        "CY" : 778
       },
       "Maximize" : false,
       "ShowHomePage" : true,

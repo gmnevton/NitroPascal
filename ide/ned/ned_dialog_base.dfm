@@ -48,7 +48,7 @@ object NEDDialogBase: TNEDDialogBase
     DragMovement = False
     EnableSystemMenu = False
     UseSystemCaptionColor = True
-    Caption = 'Open...'
+    Caption = 'Dialog...'
     ExplicitLeft = 168
     ExplicitTop = 64
     ExplicitWidth = 0
@@ -71,104 +71,6 @@ object NEDDialogBase: TNEDDialogBase
     ButtonStyle = qbsNone
     Caption = #59153
   end
-  object SplitterEx1: TSplitterEx
-    Left = 201
-    Top = 73
-    Width = 7
-    Height = 292
-    AssignedControl = UPanel2
-    AutoSnap = False
-    DrawSpacer = True
-    MinSize = 50
-    ResizeStyle = rsUpdate
-    ExplicitTop = 74
-    ExplicitHeight = 291
-  end
-  object UPanel1: TUPanel
-    Left = 1
-    Top = 32
-    Width = 598
-    Height = 41
-    Align = alTop
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWhite
-    Font.Height = -11
-    Font.Name = 'Tahoma'
-    Font.Style = []
-    ParentFont = False
-    ShowCaption = False
-    TabOrder = 3
-    BackColor.Enabled = False
-    BackColor.Color = clBlack
-    BackColor.LightColor = 15132390
-    BackColor.DarkColor = 2039583
-    object txtPath: TUText
-      AlignWithMargins = True
-      Left = 53
-      Top = 8
-      Width = 537
-      Height = 25
-      Margins.Left = 8
-      Margins.Top = 8
-      Margins.Right = 8
-      Margins.Bottom = 8
-      Align = alClient
-      AutoSize = False
-      Caption = 'C:\NitroPascal\'
-      EllipsisPosition = epPathEllipsis
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWhite
-      Font.Height = -13
-      Font.Name = 'Segoe UI'
-      Font.Style = []
-      ParentFont = False
-      Transparent = True
-      Layout = tlCenter
-      ExplicitWidth = 39
-      ExplicitHeight = 17
-    end
-    object btnUpDirectory: TUQuickButton
-      Left = 0
-      Top = 0
-      Height = 41
-      Align = alLeft
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -13
-      Font.Name = 'Segoe MDL2 Assets'
-      Font.Style = []
-      ParentFont = False
-      OnClick = btnUpDirectoryClick
-      BackColors.Enabled = False
-      BackColors.Color = clBlack
-      BackColors.LightColor = 13619151
-      BackColors.DarkColor = 3947580
-      ButtonStyle = qbsNone
-      Caption = #59217
-      ExplicitLeft = 32
-      ExplicitTop = 24
-      ExplicitHeight = 32
-    end
-  end
-  object UPanel2: TUPanel
-    Left = 1
-    Top = 73
-    Width = 200
-    Height = 292
-    Align = alLeft
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWhite
-    Font.Height = -11
-    Font.Name = 'Tahoma'
-    Font.Style = []
-    ParentFont = False
-    ShowCaption = False
-    TabOrder = 0
-    BackColor.Enabled = False
-    BackColor.Color = clBtnFace
-    BackColor.LightColor = 15132390
-    BackColor.DarkColor = 2039583
-  end
   object UPanel3: TUPanel
     Left = 1
     Top = 406
@@ -182,7 +84,7 @@ object NEDDialogBase: TNEDDialogBase
     Font.Style = []
     ParentFont = False
     ShowCaption = False
-    TabOrder = 2
+    TabOrder = 0
     BackColor.Enabled = False
     BackColor.Color = clBlack
     BackColor.LightColor = 15132390
@@ -231,14 +133,14 @@ object NEDDialogBase: TNEDDialogBase
       CustomColors.TextColors.DarkFocused = clWhite
       Caption = 'Cancel'
     end
-    object btnOpen: TUButton
+    object btnOK: TUButton
       Left = 320
       Top = 0
       Width = 278
       Height = 41
       Align = alClient
       TabOrder = 1
-      OnClick = btnOpenClick
+      OnClick = btnOKClick
       CustomColors.BackColors.Enabled = False
       CustomColors.BackColors.LightColor = 13421772
       CustomColors.BackColors.LightHover = 13421772
@@ -273,61 +175,14 @@ object NEDDialogBase: TNEDDialogBase
       CustomColors.TextColors.DarkDisabled = clGray
       CustomColors.TextColors.DarkFocused = clWhite
       Highlight = True
-      Caption = 'Open'
-    end
-  end
-  object UPanel4: TUPanel
-    Left = 1
-    Top = 365
-    Width = 598
-    Height = 41
-    Align = alBottom
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWhite
-    Font.Height = -11
-    Font.Name = 'Tahoma'
-    Font.Style = []
-    ParentFont = False
-    ShowCaption = False
-    TabOrder = 1
-    BackColor.Enabled = False
-    BackColor.Color = clBlack
-    BackColor.LightColor = 15132390
-    BackColor.DarkColor = 2039583
-    object edtPath: TUEdit
-      AlignWithMargins = True
-      Left = 8
-      Top = 8
-      Width = 582
-      Height = 25
-      Margins.Left = 8
-      Margins.Top = 8
-      Margins.Right = 8
-      Margins.Bottom = 8
-      Align = alClient
-      BevelOuter = bvNone
-      TabOrder = 0
-      BorderThickness = 1
-      BackColor.Enabled = False
-      BackColor.Color = clWhite
-      BackColor.LightColor = clWhite
-      BackColor.DarkColor = clBlack
-      BackColor.FocusedLightColor = clBlack
-      BackColor.FocusedDarkColor = clBlack
-      BorderColor.Enabled = False
-      BorderColor.Color = clBlack
-      BorderColor.LightColor = 10066329
-      BorderColor.DarkColor = 6710886
-      BorderColor.FocusedLightColor = 14120960
-      BorderColor.FocusedDarkColor = 14120960
-      Transparent = True
+      Caption = 'OK'
     end
   end
   object ImageList1: TImageList
     ColorDepth = cd32Bit
     DrawingStyle = dsTransparent
     ShareImages = True
-    Left = 208
-    Top = 16
+    Left = 136
+    Top = 8
   end
 end
