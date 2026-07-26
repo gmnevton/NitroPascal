@@ -229,6 +229,7 @@ type
     procedure CaretCreate;
     procedure CaretDestroy;
     procedure CaretMove(const DeltaLine, DeltaColumn: Integer);
+    procedure CaretScroll(const DeltaLine, DeltaColumn: Integer);
     procedure CaretShow;
     procedure CaretHide;
     procedure CaretSetLocation(const CaretPos: TNEDCaretPosition);
@@ -639,10 +640,14 @@ type
     FCommentLineCount: Integer;
     FBlankLineCount: Integer;
     //
-    FTopIndex: Integer;
-    FTextWidth: Integer;
-    FTextHeight: Integer;
-    FVisibleLineCount: Integer;
+    FTopIndex: Integer; // vertical scroll
+    FLeftIndex: Integer; // horizontal scroll
+    FTextWidth: Integer; // cache
+    FTextHeight: Integer; // cache
+    FEditorLines: Integer; // cache
+    FEditorChars: Integer; // cache
+    FVisibleLinesCount: Integer; // cache
+    FLongestLineCharsCount: Integer; // cache
     FActiveLineIndex: Integer;
     //
     FProcessNextKeyMap: Boolean;
@@ -708,6 +713,7 @@ type
     procedure SetDocument(const DocumentBuffer: TNEDEditorBuffer);
     procedure SetObserver(const DocumentObserver: TNEDDocumentObserver);
     procedure SetTopIndex(Value: Integer);
+    procedure SetLeftIndex(Value: Integer);
     procedure SetActiveLineIndex(Value: Integer);
     procedure CalcAutoRange; virtual;
     procedure HideNativeScrollBars;
@@ -720,8 +726,12 @@ type
     function GetMinimapArea: TRect;
     function GetCharWidth: Integer;
     function GetLineHeight: Integer;
+    function GetEditorLines: Integer;
+    function GetEditorChars: Integer;
     //
     procedure InvalidateLine(const LineIndex: Integer);
+    procedure ScrollBy(DeltaX, DeltaY: Integer);
+    procedure ScrollLineIntoView(const ALine: Integer);
     procedure ScrollToSelection;
     function LineSelected(const LineIdx: Integer): Boolean;
     function LineColumnInView(const LineColumn: TNEDTextPosition): Boolean;
@@ -760,7 +770,10 @@ type
     property CharWidth: Integer read GetCharWidth;
     property LineHeight: Integer read GetLineHeight;
     property TopIndex: Integer read FTopIndex;
-    property VisibleLineCount: Integer read FVisibleLineCount;
+    property VisibleLinesCount: Integer read FVisibleLinesCount;
+    property LongestLineCharsCount: Integer read FLongestLineCharsCount;
+    property EditorLines: Integer read FEditorLines;
+    property EditorChars: Integer read FEditorChars;
     property ActiveLineIndex: Integer read FActiveLineIndex write SetActiveLineIndex;
     property CaretPosition: TNEDCaretPosition read GetCaretPosition;
     property EditorFileType: String read GetEditorFileTypeStr;
@@ -1158,7 +1171,7 @@ begin
     if FSpacer then
       Result := Result + FSpacerWidth;
     if (FLineNumberType > lnHidden) and (FEditorControl.Document <> Nil) then
-      Result := Result + GetLineNumbersLength(FEditorControl.Document.VisibleLineCount);
+      Result := Result + GetLineNumbersLength(FEditorControl.Document.VisibleLinesCount);
 
     Result := Result + FLineIndicatorWidth;
   end;
@@ -1229,7 +1242,7 @@ begin
   LineOffset := 0;
   Y := 0; // render height accumulator
   while Y < ARect.Height do begin // divide client-area into horizontal strips and render Lines
-    if I + FEditorControl.TopIndex > FEditorControl.VisibleLineCount - 1 then
+    if I + FEditorControl.TopIndex > FEditorControl.VisibleLinesCount - 1 then
       Break;
 
     LineProperties := FEditorControl.Document.Lines[I + FEditorControl.TopIndex];
@@ -1336,7 +1349,7 @@ begin
   I := 0;
   Y := 0; // render height accumulator
   while Y < ARect.Height do begin // divide client-area into horizontal strips and render Lines
-    if I + FEditorControl.TopIndex > FEditorControl.VisibleLineCount - 1 then
+    if I + FEditorControl.TopIndex > FEditorControl.VisibleLinesCount - 1 then
       Break;
 
     LineProperties := FEditorControl.Document.Lines[I + FEditorControl.TopIndex];
@@ -1592,11 +1605,12 @@ procedure TNEDEditorCaret.CaretMove(const DeltaLine, DeltaColumn: Integer);
 var
   LineLength: Integer;
 begin
+  // this function can't exit from Editor line-area rect, it's for placing caret inside this rect only
   if FEditorControl = Nil then
     Exit;
 
   if DeltaLine > 0 then begin
-    if FCaretPosition.Y + DeltaLine < FEditorControl.VisibleLineCount then
+    if FCaretPosition.Y + DeltaLine < FEditorControl.VisibleLinesCount then
       Inc(FCaretPosition.Y, DeltaLine);
     Exit;
   end
@@ -1619,6 +1633,37 @@ begin
   else if DeltaColumn < 0 then begin
     if FCaretPosition.X + DeltaColumn > 0 then
       Inc(FCaretPosition.X, DeltaColumn);
+  end;
+end;
+
+procedure TNEDEditorCaret.CaretScroll(const DeltaLine, DeltaColumn: Integer);
+var
+  LineLength: Integer;
+begin
+  // this function doesn't care about Editor line-area rect
+  if FEditorControl = Nil then
+    Exit;
+
+  if DeltaLine > 0 then begin
+    Inc(FCaretPosition.Y, DeltaLine);
+    Exit;
+  end
+  else if DeltaLine < 0 then begin
+    Inc(FCaretPosition.Y, DeltaLine);
+    Exit;
+  end;
+
+  LineLength := FEditorControl.Document.Lines[FEditorControl.CaretToLineColumn(FCaretPosition).Line].Length;
+  if DeltaColumn > 0 then begin
+    if epScrollPastEol in FEditorControl.Options.EditorProperties then begin
+      Inc(FCaretPosition.X, DeltaColumn);
+    end
+    else begin
+      Inc(FCaretPosition.X, DeltaColumn);
+    end;
+  end
+  else if DeltaColumn < 0 then begin
+    Inc(FCaretPosition.X, DeltaColumn);
   end;
 end;
 
@@ -2304,7 +2349,7 @@ end;
 procedure TNEDEditorScrollbar.CalcAutoRange;
 begin
   if FScrollBarKind = sbVertical then begin
-    Range := FEditorControl.VisibleLineCount;
+    Range := FEditorControl.VisibleLinesCount;
   end
   else begin
     Range := 0; // @TODO: calculate longest line
@@ -3081,9 +3126,13 @@ begin
   FBlankLineCount := 0;
   //
   FTopIndex := 0;
+  FLeftIndex := 0;
   FTextWidth := -1;
   FTextHeight := -1;
-  FVisibleLineCount := 0;
+  FEditorLines := -1;
+  FEditorChars := -1;
+  FVisibleLinesCount := 0;
+  FLongestLineCharsCount := 0;
   FActiveLineIndex := 0;
 //  FCaretPos.Line := 1;
 //  FCaretPos.Column := 1;
@@ -3122,11 +3171,14 @@ procedure TNEDCustomEditorView.CreateHandle;
 begin
   inherited CreateHandle;
 
-  if FTextWidth = -1 then
+  if FTextWidth = -1 then begin
     FTextWidth := Canvas.TextWidth(' ');
-  if FTextHeight = -1 then
+    FEditorChars := GetEditorChars;
+  end;
+  if FTextHeight = -1 then begin
     FTextHeight := Canvas.TextHeight(' ');
-
+    FEditorLines := GetEditorLines;
+  end;
 //  HideNativeScrollBars;
   UpdateScrollBars;
   ShowModernScrollBars;
@@ -3143,10 +3195,14 @@ procedure TNEDCustomEditorView.Loaded;
 begin
   inherited Loaded;
 
-  if FTextWidth = -1 then
+  if FTextWidth = -1 then begin
     FTextWidth := Canvas.TextWidth(' ');
-  if FTextHeight = -1 then
+    FEditorChars := GetEditorChars;
+  end;
+  if FTextHeight = -1 then begin
     FTextHeight := Canvas.TextHeight(' ');
+    FEditorLines := GetEditorLines;
+  end;
 end;
 
 procedure TNEDCustomEditorView.DisableAutoRange;
@@ -3228,11 +3284,19 @@ begin
 
     case CommandID of
       cmdCursorLeft: begin
+        LTextPos := CaretToLineColumn(LCaretPos);
+        if (LTextPos.Line < FTopIndex) or (LTextPos.Line > (FTopIndex + FEditorLines)) then
+          ScrollLineIntoView(ActiveLineIndex);
+        //
         LCaretPos.X := Max(LCaretPos.X - 1, 1);
         SetHandled;
       end;
 
       cmdCursorRight: begin
+        LTextPos := CaretToLineColumn(LCaretPos);
+        if (LTextPos.Line < FTopIndex) or (LTextPos.Line > (FTopIndex + FEditorLines)) then
+          ScrollLineIntoView(ActiveLineIndex);
+        //
         if not (epScrollPastEol in Options.EditorProperties) then begin
           LineLength := Document.Lines[CaretToLineColumn(LCaretPos).Line].Length;
           if LineLength > 0 then
@@ -3244,14 +3308,28 @@ begin
       end;
 
       cmdCursorUp: begin
+        LTextPos := CaretToLineColumn(LCaretPos);
+        if (LTextPos.Line < FTopIndex) or (LTextPos.Line > (FTopIndex + FEditorLines)) then
+          ScrollLineIntoView(ActiveLineIndex);
+        //
         LCaretPos.Y := Max(LCaretPos.Y - 1, 1);
-        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        LTextPos := CaretToLineColumn(LCaretPos);
+        if LTextPos.Line = FTopIndex - 1 then
+          ScrollBy(0, -1);
+        ActiveLineIndex := LTextPos.Line;
         SetHandled;
       end;
 
       cmdCursorDown: begin
-        LCaretPos.Y := Min(LCaretPos.Y + 1, LineColumnToCaret(VisibleLineCount - 1, 0).Y);
-        ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
+        LTextPos := CaretToLineColumn(LCaretPos);
+        if (LTextPos.Line < FTopIndex) or (LTextPos.Line > (FTopIndex + FEditorLines)) then
+          ScrollLineIntoView(ActiveLineIndex);
+        //
+        LCaretPos.Y := Min(LCaretPos.Y + 1, LineColumnToCaret(VisibleLinesCount - 1, 0).Y);
+        LTextPos := CaretToLineColumn(LCaretPos);
+        if LTextPos.Line = FTopIndex + FEditorLines + 1 then
+          ScrollBy(0, 1);
+        ActiveLineIndex := LTextPos.Line;
         SetHandled;
       end;
 
@@ -3303,32 +3381,36 @@ begin
       end;
 
       cmdCursorPageUp: begin
-        FTopIndex := Max(FTopIndex - (GetLinesArea.Height div LineHeight), 0);
-        LCaretPos.Y := Max(LCaretPos.Y - (GetLinesArea.Height div LineHeight), 1);
+        //LTopOffset := Max(FTopIndex - FEditorLines - 1, 0);
+        LCaretPos.Y := Max(LCaretPos.Y - FEditorLines - 1, 1);
+        //SetTopIndex(LTopOffset);
         ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
         SetHandled;
       end;
 
       cmdCursorPageDown: begin
-        FTopIndex := Min(FTopIndex + (GetLinesArea.Height div LineHeight), VisibleLineCount - 1);
-        LCaretPos.Y := Min(LCaretPos.Y + (GetLinesArea.Height div LineHeight), LineColumnToCaret(VisibleLineCount - 1, 0).Y);
+        //LTopOffset := Min(FTopIndex + FEditorLines + 1, VisibleLinesCount - 1);
+        LCaretPos.Y := Min(LCaretPos.Y + FEditorLines + 1, LineColumnToCaret(VisibleLinesCount - 1, 0).Y);
+        //SetTopIndex(LTopOffset);
         ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
         SetHandled;
       end;
 
       cmdCursorPageTop: begin
-        LTopOffset := LCaretPos.Y - 1 - TopIndex; // how far from top of the view in lines
-        LCaretPos.Y := Max(LCaretPos.Y - LTopOffset, 1);
+        LTextPos := CaretToLineColumn(LCaretPos);
+        LTopOffset := LTextPos.Line - FTopIndex; // how far from top of the view in lines
+        LCaretPos.Y := Max(LCaretPos.Y - (LineColumnToCaret(LTopOffset, 0).Y - 1), 1);
         ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
         SetHandled;
       end;
 
       cmdCursorPageBottom: begin
-        LTopOffset := LCaretPos.Y - 1 - TopIndex; // how far from top of the view in lines
-        LLastLine := GetLinesArea.Height div LineHeight;
+        LTextPos := CaretToLineColumn(LCaretPos);
+        LTopOffset := LTextPos.Line - FTopIndex; // how far from top of the view in lines
+        LLastLine := FEditorLines;
         if LLastLine * LineHeight > GetLinesArea.Height then
           Dec(LLastLine);
-        LCaretPos.Y := Min(LCaretPos.Y - LTopOffset + LLastLine - 1, LineColumnToCaret(VisibleLineCount - 1, 0).Y);
+        LCaretPos.Y := Min(LCaretPos.Y + LineColumnToCaret(LLastLine - LTopOffset - 1, 0).Y, LineColumnToCaret(VisibleLinesCount - 1, 0).Y);
         ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
         SetHandled;
       end;
@@ -3346,8 +3428,8 @@ begin
       end;
 
       cmdCursorEditorBottom: begin
-        if FVisibleLineCount > 0 then begin
-          LCaretPos := LineColumnToCaret(FVisibleLineCount - 1, 0);
+        if FVisibleLinesCount > 0 then begin
+          LCaretPos := LineColumnToCaret(FVisibleLinesCount - 1, 0);
           ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
           SetHandled;
         end;
@@ -3455,7 +3537,7 @@ begin
       LineColumn := CaretToLineColumn(Caret.CaretPosition);
       Line := LineColumn.Line + 1;
       Column := LineColumn.Column + 1;
-      Lines := Document.LineCount;
+      Lines := Document.LinesCount;
       MaxColumn := -1;
       LineMaxColumn := -1;
       Words := 0;
@@ -3465,7 +3547,7 @@ begin
       Saved := not Document.Modified;
       AutoSave := epAutoSave in Options.EditorProperties;
       TopIndex := TopIndex;
-      ViewLines := ClientHeight div LineHeight;
+      ViewLines := FEditorLines;
       //
       Status := '';
       StatusProgress := -1;
@@ -3704,6 +3786,8 @@ begin
   if HandleAllocated then begin
     FTextWidth := Canvas.TextWidth(' ');
     FTextHeight := Canvas.TextHeight(' ');
+    FEditorLines := GetEditorLines;
+    FEditorChars := GetEditorChars;
   end;
 end;
 
@@ -3792,6 +3876,9 @@ var
 begin
 //  HideNativeScrollBars;
   inherited;
+  FEditorLines := GetEditorLines;
+  FEditorChars := GetEditorChars;
+  //
   SaveUpdatingScrollBars := FUpdatingScrollBars;
   FUpdatingScrollBars := True;
   try
@@ -3827,6 +3914,8 @@ begin
     SetTopIndex(FTopIndex + Lines)
   else
     SetTopIndex(FTopIndex - Lines);
+
+  Msg.Result := 1;
   inherited;
 end;
 
@@ -4018,14 +4107,14 @@ procedure TNEDCustomEditorView.MouseDown(Button: TMouseButton; Shift: TShiftStat
     CaretX, CaretY, MaxPosX, MaxPosY: Integer;
   begin
     if PtInRect(GetLinesArea, MousePoint) then begin // lines area clicked
-      CaretY := Y div LineHeight;
-      CaretX := (X - FGutter.GetWidth) div CharWidth;
-      MaxPosX := GetLinesArea.Width div CharWidth;
-      MaxPosY := GetLinesArea.Height div LineHeight;
-      if CaretX > MaxPosX - 1 then
-        CaretX := MaxPosX - 1;
-      if CaretY > MaxPosY - 1 then
-        CaretY := MaxPosY - 1;
+      CaretY := FTopIndex + Y div LineHeight;
+      CaretX := FLeftIndex + (X - FGutter.GetWidth) div CharWidth;
+      MaxPosX := FLeftIndex + FEditorChars;
+      MaxPosY := FTopIndex + FEditorLines;
+      if CaretX > MaxPosX then
+        CaretX := MaxPosX;
+      if CaretY > MaxPosY then
+        CaretY := MaxPosY;
       LCaretPos := TNEDCaretPosition.Create(CaretX + 1, CaretY + 1);
       ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
       FCaret.CaretPosition := LCaretPos;
@@ -4196,7 +4285,7 @@ begin
   Y := 0; // render height accumulator
   while Y < ARect.Height do begin // divide client-area into horizontal strips and render Lines
     // ARect.Height div (LineHeight)
-    if I + FTopIndex > VisibleLineCount - 1 then
+    if I + FTopIndex > VisibleLinesCount - 1 then
       Break;
 
     // set strip dimmensions
@@ -4314,19 +4403,57 @@ var
   P: TPoint;
   count: Integer;
 begin
-  count := VisibleLineCount;
-  if Value > count - ClientHeight div LineHeight then
-    Value := count - ClientHeight div LineHeight;
+  count := VisibleLinesCount;
+  if Value > count - FEditorLines then
+    Value := count - FEditorLines;
   if Value < 0 then
     Value := 0;
   if Value <> FTopIndex then begin
-    Delta := (FTopIndex - Value) * LineHeight;
+    FCaret.CaretHide;
+    //Delta := (FTopIndex - Value) * LineHeight;
+    Delta := FTopIndex - Value;
     FTopIndex := Value;
 //    if FHotTrack then
 //      if FHotIndex > - 1 then
 //        InvalidateItem(FHotIndex);
 //    FHotIndex := -1;
     FVerticalScrollBar.Position := FTopIndex;
+//    FCaret.CaretScroll(Delta, 0);
+    FCaret.CaretUpdate;
+//    InvalidateItem(FItemIndex);
+//    if FHotTrack then begin
+//      P := ScreenToClient(Mouse.CursorPos);
+//      FHotIndex := ItemAtPos(P, False);
+//      if FHotIndex > -1 then
+//        if PtInRect(ItemRect(FHotIndex), P) then
+//          InvalidateItem(FHotIndex)
+//        else
+//          FHotIndex := -1;
+//    end;
+//    if FVerticalScrollBar.Visible then
+//      FVerticalScrollBar.Invalidate;
+  end;
+end;
+
+procedure TNEDCustomEditorView.SetLeftIndex(Value: Integer);
+var
+  Delta: Integer;
+  P: TPoint;
+  count: Integer;
+begin
+  count := LongestLineCharsCount;
+  if Value > count - FEditorChars then
+    Value := count - FEditorChars;
+  if Value < 0 then
+    Value := 0;
+  if Value <> FLeftIndex then begin
+    Delta := (FLeftIndex - Value) * CharWidth;
+    FLeftIndex := Value;
+//    if FHotTrack then
+//      if FHotIndex > - 1 then
+//        InvalidateItem(FHotIndex);
+//    FHotIndex := -1;
+    FHorizontalScrollBar.Position := FLeftIndex;
 //    Scroll(Delta);
 //    InvalidateItem(FItemIndex);
 //    if FHotTrack then begin
@@ -4350,8 +4477,8 @@ begin
   if FActiveLineIndex <> Value then begin
     if Value < 0 then
       Value := 0;
-    if Value >= FDocument.LineCount then
-      Value := FDocument.LineCount - 1;
+    if Value >= FDocument.LinesCount then
+      Value := FDocument.LinesCount - 1;
     //
     if not HandleAllocated then begin
       FActiveLineIndex := Value;
@@ -4418,6 +4545,8 @@ begin
       FVerticalScrollBar.Update(False, False);
       FHorizontalScrollBar.Update(True, False);
     end;
+    FEditorLines := GetEditorLines;
+    FEditorChars := GetEditorChars;
   finally
     FUpdatingScrollBars := False;
   end;
@@ -4466,18 +4595,32 @@ end;
 
 function TNEDCustomEditorView.GetCharWidth: Integer;
 begin
-  if FTextWidth = -1 then
+  if FTextWidth = -1 then begin
     FTextWidth := Canvas.TextWidth(' ');
+    FEditorChars := GetEditorChars;
+  end;
 
   Result := FTextWidth;
 end;
 
 function TNEDCustomEditorView.GetLineHeight: Integer;
 begin
-  if FTextHeight = -1 then
+  if FTextHeight = -1 then begin
     FTextHeight := Canvas.TextHeight(' ');
+    FEditorLines := GetEditorLines;
+  end;
 
   Result := FTextHeight;
+end;
+
+function TNEDCustomEditorView.GetEditorLines: Integer;
+begin
+  Result := Max((GetLinesArea.Height div LineHeight) - 1, 0); // in lines
+end;
+
+function TNEDCustomEditorView.GetEditorChars: Integer;
+begin
+  Result := Max((GetLinesArea.Width div CharWidth) - 1, 0); // in characters
 end;
 
 procedure TNEDCustomEditorView.InvalidateLine(const LineIndex: Integer);
@@ -4485,9 +4628,34 @@ begin
   // @TODO
 end;
 
-procedure TNEDCustomEditorView.ScrollToSelection;
+procedure TNEDCustomEditorView.ScrollBy(DeltaX, DeltaY: Integer);
 begin
-  // @TODO
+  if (FLeftIndex > 0) and (DeltaX < 0) then
+    SetLeftIndex(FLeftIndex - 1)
+  else if (FLeftIndex < LongestLineCharsCount) and (DeltaX > 0) then
+    SetLeftIndex(FLeftIndex + 1);
+  //
+  if (FTopIndex > 0) and (DeltaY < 0) then
+    SetTopIndex(FTopIndex - 1)
+  else if (FTopIndex < VisibleLinesCount) and (DeltaY > 0) then
+    SetTopIndex(FTopIndex + 1);
+end;
+
+procedure TNEDCustomEditorView.ScrollLineIntoView(const ALine: Integer);
+begin
+  if ALine < FTopIndex then
+    SetTopIndex(ALine)
+  else if ALine > FTopIndex + FEditorLines then
+    SetTopIndex(FTopIndex + (ALine - FTopIndex - FEditorLines));
+end;
+
+procedure TNEDCustomEditorView.ScrollToSelection;
+var
+  LTopOffset: Integer;
+begin
+  LTopOffset := FActiveLineIndex - FTopIndex; // how far from top of the view in lines
+  if (LTopOffset < 0) or (LTopOffset > FEditorLines) then
+    SetTopIndex(FTopIndex + LTopOffset);
 end;
 
 function TNEDCustomEditorView.LineSelected(const LineIdx: Integer): Boolean;
@@ -4593,6 +4761,7 @@ var
   CaretX, CaretY: Integer;
   Line, Column, TopOffset: Integer;
   LineProp: TNEDLineProperties;
+  Ascending: Boolean;
 begin
   Result := TNEDTextPosition.LineColumn(0, 0);
 
@@ -4603,11 +4772,19 @@ begin
   Column := 0;
   TopOffset := 0;
 
-  while Line < FVisibleLineCount do begin
+  Ascending := CaretY > Line;
+
+  while (Ascending and (Line < FVisibleLinesCount)) or (not Ascending and (Line >= 0)) do begin
     LineProp := Document.Lines[Line];
     if not LineProp.IsVisible and not (epShowNonVisibleLines in Options.EditorProperties) then begin
-      Inc(Line);
-      Inc(TopOffset);
+      if Ascending then begin
+        Inc(Line);
+        Inc(TopOffset);
+      end
+      else begin
+        Dec(Line);
+        Dec(TopOffset);
+      end;
       Continue;
     end;
 
@@ -4617,19 +4794,22 @@ begin
       Break;
     end;
     //
-    Inc(Line);
+    if Ascending then
+      Inc(Line)
+    else
+      Dec(Line);
   end;
 end;
 
 function TNEDCustomEditorView.CaretToPixels(const CaretPos: TNEDCaretPosition): TPoint;
 var
-  LineLen: Integer;
+  LineIdx, LineLen: Integer;
   S: String;
 begin
   Result.Y := (CaretPos.Y - 1 - TopIndex) * LineHeight;
-
-  LineLen := Document.Lines[CaretToLineColumn(CaretPos).Line].Length;
-  S := Document.GetLineText(CaretToLineColumn(CaretPos).Line);
+  LineIdx := CaretToLineColumn(CaretPos).Line;
+  LineLen := Document.Lines[LineIdx].Length;
+  S := Document.GetLineText(LineIdx);
 
   if CaretPos.X = 1 then
     Result.X := 0
@@ -4679,7 +4859,7 @@ var
   LCaretPos: TNEDCaretPosition;
 begin
   // @TODO - ??? do something ???
-  FVisibleLineCount := Document.VisibleLineCount;
+  FVisibleLinesCount := Document.VisibleLinesCount;
   if Change.Kind = dcInsert then begin
     FCaret.CaretMove(0, Change.InsertedLength);
     FCaret.CaretUpdate(False);

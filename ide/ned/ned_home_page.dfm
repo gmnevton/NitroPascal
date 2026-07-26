@@ -5,7 +5,7 @@ object NEDHomeForm: TNEDHomeForm
   BorderStyle = bsNone
   ClientHeight = 693
   ClientWidth = 1178
-  Color = clBtnFace
+  Color = 4210752
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText

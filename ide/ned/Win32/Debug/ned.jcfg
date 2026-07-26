@@ -3,14 +3,14 @@
     "Application" : {
       "Monitor" : 0,
       "Position" : {
-        "X" : 59,
-        "Y" : 58
+        "X" : -8,
+        "Y" : -8
       },
       "Size" : {
-        "CX" : 1125,
-        "CY" : 778
+        "CX" : 1936,
+        "CY" : 1056
       },
-      "Maximize" : false,
+      "Maximize" : true,
       "ShowHomePage" : true,
       "ColorSchema" : "system"
     },

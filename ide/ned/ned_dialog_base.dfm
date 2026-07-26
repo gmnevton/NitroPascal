@@ -98,6 +98,7 @@ object NEDDialogBase: TNEDDialogBase
       Anchors = [akLeft, akTop, akRight, akBottom]
       TabOrder = 0
       OnClick = btnCancelClick
+      CustomColors.UseCustomColors = True
       CustomColors.BackColors.Enabled = False
       CustomColors.BackColors.LightColor = 13421772
       CustomColors.BackColors.LightHover = 13421772
@@ -120,12 +121,12 @@ object NEDDialogBase: TNEDDialogBase
       CustomColors.BorderColors.DarkPress = 6710886
       CustomColors.BorderColors.DarkDisabled = 8750469
       CustomColors.BorderColors.DarkFocused = 8750469
-      CustomColors.TextColors.Enabled = False
-      CustomColors.TextColors.LightColor = clBlack
-      CustomColors.TextColors.LightHover = clBlack
-      CustomColors.TextColors.LightPress = clBlack
+      CustomColors.TextColors.Enabled = True
+      CustomColors.TextColors.LightColor = clWhite
+      CustomColors.TextColors.LightHover = clWhite
+      CustomColors.TextColors.LightPress = clWhite
       CustomColors.TextColors.LightDisabled = clGray
-      CustomColors.TextColors.LightFocused = clBlack
+      CustomColors.TextColors.LightFocused = clWhite
       CustomColors.TextColors.DarkColor = clWhite
       CustomColors.TextColors.DarkHover = clWhite
       CustomColors.TextColors.DarkPress = clWhite

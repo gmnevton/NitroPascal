@@ -24,19 +24,29 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
   
   - [ ] Split-view current or new editor (shortcuts)
   
-  - [ ] Render scroll bars (in progress; allmost done)
+  - [x] Render scroll bars (in progress; vertical - bug fixes; horizontal - to do)
   
-  - [ ] Handle scrolling (in progress)
+  - [x] Handle scrolling (in progress; vertical - bug fixes; horizontal - to do)
   
   - [ ] Handle selection
   
-  - [ ] Make IDE configuration
+  - [ ] Make IDE configuration (in progress)
   
-  - [ ] Make IDE profiles
+  - [ ] Make IDE profiles (in progress)
   
-  - [ ] Make IDE session context
+  - [ ] Make IDE session context (to do)
+    
+    - [ ] Save session (loaded projects, opened files)
+    
+    - [ ] Show closed session on IDE start (after profiles is selected and loaded, show projects panel)
+    
+    - [ ] Restore saved session (reopen editors) if selected in IDE config
   
-  - [ ] Remodel home page
+  - [ ] Remodel home page (in progress)
+    
+    - [ ] Combine favorite projects with open recent
+    
+    - [ ] Embed simple HTML browser (check: https://github.com/Matek0611/PospoliteView looks abandoned; check other options, if any ???)
   
   - [ ] Handle code highlighting
   

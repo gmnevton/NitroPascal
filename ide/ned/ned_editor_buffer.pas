@@ -418,8 +418,8 @@ type
     FModified: Boolean;
     FUpdateCount: Integer; // update lock
     FLength: Integer; // cached document length
-    FLineCount: Integer; // cached line count
-    FVisibleLineCount: Integer; // cached line count
+    FLinesCount: Integer; // cached lines count
+    FVisibleLinesCount: Integer; // cached visible lines count
   private
     procedure SetFileReadOnly(const Value: Boolean);
     procedure SetEncoding(const Value: TEncoding);
@@ -508,8 +508,8 @@ type
     function LineColumnToPosition(LineColumn: TNEDTextPosition): Integer; overload;
     //
     // line operations
-    function LineCount: Integer;
-    function VisibleLineCount: Integer;
+    function LinesCount: Integer;
+    function VisibleLinesCount: Integer;
     function LastLine: Integer;
     //
     // state
@@ -1308,8 +1308,8 @@ begin
   FUpdateCount := 0;
 
   FLength := 0;
-  FLineCount := 0;
-  FVisibleLineCount := 0;
+  FLinesCount := 0;
+  FVisibleLinesCount := 0;
   //
   // always keep at least one line
   Line := CreateLine;
@@ -1499,7 +1499,7 @@ var
   I: Integer;
 begin
   FLength := 0;
-  FVisibleLineCount := 0;
+  FVisibleLinesCount := 0;
 
   for I := 0 to FLines.Count - 1 do begin
     Lines[I].UpdateLength;
@@ -1512,10 +1512,10 @@ begin
     end;
 
     if Lines[I].IsVisible then
-      Inc(FVisibleLineCount);
+      Inc(FVisibleLinesCount);
   end;
 
-  FLineCount := FLines.Count;
+  FLinesCount := FLines.Count;
 end;
 
 procedure TNEDCustomDocument.RebuildLineNumbers;
@@ -2290,7 +2290,7 @@ begin
     Result := Copy(S, Column + 1, Length(S) - Column) + FLineBreak; // CRLF
     Dec(Count, Length(Result) + FLineBreakLen);
     Inc(Line);
-    while (Count > 0) and (Line < LineCount) do begin
+    while (Count > 0) and (Line < LinesCount) do begin
       S := GetLineText(Line);
       if Length(S) > Count then begin
         Result := Result + Copy(S, 1, Count);
@@ -2406,19 +2406,19 @@ begin
   Result := LineColumnToPosition(LineColumn.Line, LineColumn.Column);
 end;
 
-function TNEDCustomDocument.LineCount: Integer;
+function TNEDCustomDocument.LinesCount: Integer;
 begin
-  Result := FLineCount;
+  Result := FLinesCount;
 end;
 
-function TNEDCustomDocument.VisibleLineCount: Integer;
+function TNEDCustomDocument.VisibleLinesCount: Integer;
 begin
-  Result := FVisibleLineCount;
+  Result := FVisibleLinesCount;
 end;
 
 function TNEDCustomDocument.LastLine: Integer;
 begin
-  Result := FLineCount - 1;
+  Result := FLinesCount - 1;
 end;
 
 function TNEDCustomDocument.IsModified: Boolean;
