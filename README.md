@@ -1,15 +1,16 @@
 # ![NitroPascal](./git_res/NitroPascal.png)
-NitroPascal is a concept of new OOP programming language based on Pascal / Delphi.  
+
+NitroPascal is a new data/object oriented programming (DOOP) language based on Pascal / Delphi.  
 
 ![NitroPascal1](./git_res/NitroPascal1.png)
 
 The goal is to make this lannguage the best Pascal version there is.  
-Because we believe that a programing language is only as good as the experience of writing it.  
-To eliminate annoying bariers and old habits.  
+Because we believe that a programing language is only as good as the experience of writing in it.  
+We want to eliminate annoying bariers and old habits.  
 To give programmers the freedom to create without doubling down on old schemas.  
-And produce blazingly fast compiler with in memory compile and execution feature.  
+And produce blazingly fast compiler with in memory compile and compile-time execution feature.  
 
-Maybe in the future there will be a compiler and debugger.  
+Maybe in the future IDE NitroEDitor will have a debugging capability.  
 
 ---
 
@@ -21,9 +22,13 @@ Maybe in the future there will be a compiler and debugger.
 > All projects are made using Delphi 10.2.3.  
 > Project uses madExcept to track bugs and memory leaks.  
 > For now there is no other external dependencies - but this can change at any time.  
-  
-  
+
+---
+
+## Compiler info
+
 A typical compiler consists of key components such as:  
+
 - source code parser (TNPCSourceParser) wich contains:  
   - lexical analyser (TNPCLexer and TNPCTokenizer),  
   - syntax analyser (TNPCTokensParser),  
@@ -31,31 +36,45 @@ A typical compiler consists of key components such as:
 - intermediate code generator (TNPCINTGenerator),  
 - code optimiser (TNPCOptimization),  
 - byte code generator (TNPCBYTEGenerator).  
-  
+
+
+```
+Work progress:  
+
+           1- 16%       2- 34%      3- 50%      4- 67%    5- 84%   6- 95%  
+           |            |           |           |         |        |  
+#####################################  
+|--------|--------|--------|--------|--------|--------|--------|--------|  
+0%               25%               50%               75%             100%  
+```
+
 ```
 Stages completed/under development:  
-|*|( 16%) - lexical analyser,  
-|?|( 34%) - syntax analyser,  
-            -- control flow statements completed/under development:  
-            |?| - if statement,  
-            |?| - case statement,  
-            |?| - for statement,  
-            |?| - while statement,  
-            |?| - repeat statement,  
-            | | - goto statement,  
-            | | - with statement,  
-|?|( 50%) - semantic analyser,  
-| |( 67%) - intermediate code generator,  
-| |( 84%) - code optimiser,  
-| |(100%) - byte code generator.  
-  
-----------------------------------------------------------------------  
-| | - not developed yet  
-|?| - under development  
-|*| - bug fixes  
-|x| - done  
+  1 - |*| - lexical analyser,  
+  2 - |?| - syntax analyser,  
+          -- control flow statements completed/under development:  
+             |?| - if statement,  
+             |?| - case statement,  
+             |?| - for statement,  
+             |?| - while statement,  
+             |?| - repeat statement,  
+             | | - goto statement,  
+             | | - with statement,  
+  3 - |?| - semantic analyser,  
+  4 - | | - intermediate code generator,  
+  5 - | | - code optimiser,  
+  6 - | | - byte code generator.  
 ```
-  
+
+```
+Legend:  
+  | | - not developed yet  
+  |?| - under development  
+  |*| - bug fixes  
+  |x| - done  
+```
+
+
 ![NitroPascal3](./git_res/NitroPascal3.png)
 ---
 
@@ -139,7 +158,7 @@ import
   // variables are read/write and can be modified at any time
   [@global:]SomeVariable:type = value;
   SomeVariable = value;
-  
+
 // some examples of string variable declarations
 var
   ExampleString1: String = 'One line test string';  
@@ -191,37 +210,48 @@ end.
 ### Language rules:
 
 1. All source code files are local scope oriented, it means that everything that is defined in source code file is containd in its scope.
+
 2. Any type, const, variable or procedure/function defined can be set to be included in global scope, which means that it can be accessed by other source code files.
+
 3. There is no need for existance of interface and implementation sections as in traditional Pascal.
+
 4. Source code file is implicitly treated as implementation section, that defines what can be interfaced by declaring specifier prefix '@global:'.
+
 5. Type definition can be extended.
+
 6. 'begin' and 'end' key-words for method body declaration are history, for speed of typing we use brackets '{', '}' with ';' for declaration termination sign.
+
 7. 'begin' is only allowed in project body definition, 'end.' is required as project body or source code file termination.
+
 8. Body of methods defined in type declaration can be:
    a) declared inline with method declaration, eg.:
-```Pascal
-type
-  TExampleType = class {
-  public
+   
+   ```Pascal
+   type
+   TExampleType = class {
+   public
     MyExample(const A, B: Int32): Int32 {
       Result := A + B;
     };
-  };
-```
-   b) declared later in the body of source code file, eg.:
-```Pascal
-type
-  TExampleType = class {
-  public
-    MyExample(const A, B: Int32): Int32;
-  };
-
-  TSecondExampleType = class(TExampleType) {
-  public
-    MyOtherExample: String;
-  };
-  ...
+   };
+   ```
    
+   b) declared later in the body of source code file, eg.:
+   
+   ```Pascal
+   type
+   TExampleType = class {
+   public
+    MyExample(const A, B: Int32): Int32;
+   };
+   
+   TSecondExampleType = class(TExampleType) {
+   public
+    MyOtherExample: String;
+   };
+   ...
+   ```
+
 TExampleType.MyExample(const A, B: Int32): Int32 {
   Result := A + B;
 };
@@ -229,6 +259,7 @@ TExampleType.MyExample(const A, B: Int32): Int32 {
 TSecondExampleType.MyOtherExample: String {
   Result := 'output value';
 };
+
 ```
 9. Class or record methods can be defined as class methods by using prefix '@class:', eg.:
 ```Pascal
@@ -238,14 +269,16 @@ type
     @class:MyExample(const A, B: Int32): Int32;
   };
 ```
+
 10. Class or record methods can be defined as inline methods by using prefix '@inline:', eg.:
-```Pascal
-type
-  TExampleType = class {
-  public
+    
+    ```Pascal
+    type
+    TExampleType = class {
+    public
     @inline:MyExample(const A, B: Int32): Int32;
-  };
-```
+    };
+    ```
 11. Prefixes can be concatenated together like: @global:@inline:@class:.
 12. Const and variable declarations inside method body can be inlined.
 13. Access to globally declared types, consts, variables require using prefix '@global:'.
@@ -258,40 +291,45 @@ type
 ### Procedure/function declaration and implementation rules:
 
 1. Procedure/function declaration contains procedure/function name, set of parameters enclosed by '(' and ')', eventual result with type, eg.:
-```Pascal
-MyProcedure(const Param1: Int32, const Param2: Int16, const Param3: Boolean, const Param4: String);
-MyFunction(const A, B: UInt16): Int32;
-```
+   
+   ```Pascal
+   MyProcedure(const Param1: Int32, const Param2: Int16, const Param3: Boolean, const Param4: String);
+   MyFunction(const A, B: UInt16): Int32;
+   ```
 2. Function declaration can return multiple named results, by declaring them as implicit record, eg.:
-```Pascal
-MyFunction(const A, B: UInt16, const C: String): (OK: Boolean, Value: String) {
-  Result.OK := True;
-  Result.Value := C + ' = ' + IntToStr(A) + ', ' + IntToStr(B);
-};
-```
+   
+   ```Pascal
+   MyFunction(const A, B: UInt16, const C: String): (OK: Boolean, Value: String) {
+   Result.OK := True;
+   Result.Value := C + ' = ' + IntToStr(A) + ', ' + IntToStr(B);
+   };
+   ```
 3. Const and variable declarations inside of body of procedure/function implementation, can be:
    a) like in traditional Pascal, declaration on top of procedure/function body:
-```Pascal
-MyExample(var C: String) {
-  // on top const/var declaration
-  const i_max: Int32 = 123_456_789;
-  var i: Int32;
-  // procedure/function instructions
-  C:='';
-  for i := 0; i < i_max - 1; i += 1 {
+   
+   ```Pascal
+   MyExample(var C: String) {
+   // on top const/var declaration
+   const i_max: Int32 = 123_456_789;
+   var i: Int32;
+   // procedure/function instructions
+   C:='';
+   for i := 0; i < i_max - 1; i += 1 {
     C:=C + IntToStr(i) + ' ';
-  }
-};
-```
+   }
+   };
+   ```
+   
    b) can be inlined with declaration of instructions to do:
-```Pascal
-MyExample(var C: String) {
-  // on top const declaration
-  const i_max: Int32 = 123_456_789;
-  // procedure/function instructions with inlined var declaration
-  C:='';
-  for var i: Int32 = 0; i < i_max - 1; i += 1 {
+   
+   ```Pascal
+   MyExample(var C: String) {
+   // on top const declaration
+   const i_max: Int32 = 123_456_789;
+   // procedure/function instructions with inlined var declaration
+   C:='';
+   for var i: Int32 = 0; i < i_max - 1; i += 1 {
     C:=C + IntToStr(i) + ' ';
-  }
-};
-```
+   }
+   };
+   ```
