@@ -37,7 +37,6 @@ A typical compiler consists of key components such as:
 - code optimiser (TNPCOptimization),  
 - byte code generator (TNPCBYTEGenerator).  
 
-
 ```
 Work progress:  
 
@@ -73,7 +72,6 @@ Legend:
   |*| - bug fixes  
   |x| - done  
 ```
-
 
 ![NitroPascal3](./git_res/NitroPascal3.png)
 ---
@@ -228,64 +226,73 @@ end.
    
    ```Pascal
    type
-   TExampleType = class {
-   public
-    MyExample(const A, B: Int32): Int32 {
-      Result := A + B;
-    };
-   };
+     TExampleType = class {
+     public
+      MyExample(const A, B: Int32): Int32 {
+        Result := A + B;
+      };
+     };
    ```
    
    b) declared later in the body of source code file, eg.:
    
    ```Pascal
    type
-   TExampleType = class {
-   public
-    MyExample(const A, B: Int32): Int32;
+     TExampleType = class {
+     public
+       MyExample(const A, B: Int32): Int32;
+     };
+   
+     TSecondExampleType = class(TExampleType) {
+     public
+       MyOtherExample: String;
+     };
+   
+   ...  
+   
+   TExampleType.MyExample(const A, B: Int32): Int32 {
+     Result := A + B;
    };
    
-   TSecondExampleType = class(TExampleType) {
-   public
-    MyOtherExample: String;
+   TSecondExampleType.MyOtherExample: String {
+     Result := 'output value';
    };
-   ...
    ```
 
-TExampleType.MyExample(const A, B: Int32): Int32 {
-  Result := A + B;
-};
-
-TSecondExampleType.MyOtherExample: String {
-  Result := 'output value';
-};
-
-```
 9. Class or record methods can be defined as class methods by using prefix '@class:', eg.:
-```Pascal
-type
-  TExampleType = class {
-  public
-    @class:MyExample(const A, B: Int32): Int32;
-  };
-```
+   
+   ```Pascal
+   type
+     TExampleType = class {
+     public
+       @class:MyExample(const A, B: Int32): Int32;
+     };
+   ```
 
 10. Class or record methods can be defined as inline methods by using prefix '@inline:', eg.:
     
-    ```Pascal
-    type
-    TExampleType = class {
-    public
-    @inline:MyExample(const A, B: Int32): Int32;
-    };
-    ```
+   ```Pascal
+   type
+     TExampleType = class {
+     public
+       @inline:MyExample(const A, B: Int32): Int32;
+     };
+   ```
+
 11. Prefixes can be concatenated together like: @global:@inline:@class:.
+
 12. Const and variable declarations inside method body can be inlined.
+
 13. Access to globally declared types, consts, variables require using prefix '@global:'.
+
 14. If type, const, variable section defines many globally accessible definitions, prefix '@global:' can be added to such section definition, eg: @global:type. But any other section key-word use without such prefix sets the scope back to local.
+
 15. All project and source code files are case-sensitive, meaning that variable 'a' and 'A' are two different declarations.
+
 16. Some names can have spaces it them, to declare that use quotes, eg.: 'name with spaces'.
+
 17. Numbers can be declared with '_' for better readability, eg: 1_000_000.
+
 18. Procedures/functions are defined without differentiating key-words like in traditional Pascal.
 
 ### Procedure/function declaration and implementation rules:
@@ -296,27 +303,29 @@ type
    MyProcedure(const Param1: Int32, const Param2: Int16, const Param3: Boolean, const Param4: String);
    MyFunction(const A, B: UInt16): Int32;
    ```
+
 2. Function declaration can return multiple named results, by declaring them as implicit record, eg.:
    
    ```Pascal
    MyFunction(const A, B: UInt16, const C: String): (OK: Boolean, Value: String) {
-   Result.OK := True;
-   Result.Value := C + ' = ' + IntToStr(A) + ', ' + IntToStr(B);
+     Result.OK := True;
+     Result.Value := C + ' = ' + IntToStr(A) + ', ' + IntToStr(B);
    };
    ```
+
 3. Const and variable declarations inside of body of procedure/function implementation, can be:
    a) like in traditional Pascal, declaration on top of procedure/function body:
    
    ```Pascal
    MyExample(var C: String) {
-   // on top const/var declaration
-   const i_max: Int32 = 123_456_789;
-   var i: Int32;
-   // procedure/function instructions
-   C:='';
-   for i := 0; i < i_max - 1; i += 1 {
-    C:=C + IntToStr(i) + ' ';
-   }
+     // on top const/var declaration
+     const i_max: Int32 = 123_456_789;
+     var i: Int32;
+     // procedure/function instructions
+     C:='';
+     for i := 0; i < i_max - 1; i += 1 {
+       C:=C + IntToStr(i) + ' ';
+     }
    };
    ```
    
@@ -324,12 +333,12 @@ type
    
    ```Pascal
    MyExample(var C: String) {
-   // on top const declaration
-   const i_max: Int32 = 123_456_789;
-   // procedure/function instructions with inlined var declaration
-   C:='';
-   for var i: Int32 = 0; i < i_max - 1; i += 1 {
-    C:=C + IntToStr(i) + ' ';
-   }
+     // on top const declaration
+     const i_max: Int32 = 123_456_789;
+     // procedure/function instructions with inlined var declaration
+     C:='';
+     for var i: Int32 = 0; i < i_max - 1; i += 1 {
+       C:=C + IntToStr(i) + ' ';
+     }
    };
    ```
