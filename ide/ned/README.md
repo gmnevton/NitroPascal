@@ -12,7 +12,7 @@ NED project uses this components:
 
 - Code editor made from scratch, by hand:
   
-  - 
+  - dual architecture:
     - document buffer,
     - visual view component
     
