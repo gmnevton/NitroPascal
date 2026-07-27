@@ -16,6 +16,7 @@ object NEDMainForm: TNEDMainForm
   Font.Style = []
   KeyPreview = True
   OldCreateOrder = False
+  ShowHint = True
   OnCanResize = FormCanResize
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
@@ -33,7 +34,7 @@ object NEDMainForm: TNEDMainForm
     Top = 40
     Width = 7
     Height = 509
-    AssignedControl = pnlLeft
+    AssignedControl = pnlToolbox
     AutoSnap = False
     DrawSpacer = True
     MinSize = 200
@@ -167,7 +168,7 @@ object NEDMainForm: TNEDMainForm
       ExplicitLeft = 1030
       ExplicitTop = -6
     end
-    object btnShowHideToolbox: TUQuickButton
+    object btnSelectProfile: TUQuickButton
       Left = 0
       Top = 0
       Height = 40
@@ -178,7 +179,7 @@ object NEDMainForm: TNEDMainForm
       Font.Name = 'Segoe MDL2 Assets'
       Font.Style = []
       ParentFont = False
-      OnClick = btnShowHideToolboxClick
+      OnClick = btnSelectProfileClick
       BackColors.Enabled = False
       BackColors.Color = clBlack
       BackColors.LightColor = 13619151
@@ -384,6 +385,7 @@ object NEDMainForm: TNEDMainForm
         Height = 40
         Hint = 'Project'
         Align = alTop
+        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -13
@@ -411,6 +413,7 @@ object NEDMainForm: TNEDMainForm
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
+        OnClick = btnSearchClick
         BackColors.Enabled = False
         BackColors.Color = clBlack
         BackColors.LightColor = 13619151
@@ -441,11 +444,11 @@ object NEDMainForm: TNEDMainForm
     BackColor.DarkColor = 10444863
     object txtFilePath: TUText
       AlignWithMargins = True
-      Left = 8
+      Left = 65
       Top = 4
       Width = 44
       Height = 24
-      Margins.Left = 8
+      Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
       Margins.Bottom = 4
@@ -458,10 +461,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
+      ExplicitLeft = 77
+      ExplicitTop = 7
     end
     object USeparator3: TUSeparator
-      Left = 118
+      Left = 175
       Top = 0
       Height = 32
       Align = alLeft
@@ -471,7 +475,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileEncoding: TUText
       AlignWithMargins = True
-      Left = 138
+      Left = 195
       Top = 4
       Width = 34
       Height = 24
@@ -488,10 +492,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 138
       ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
-      Left = 172
+      Left = 229
       Top = 0
       Height = 32
       Align = alLeft
@@ -499,7 +504,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileLineBreaks: TUText
       AlignWithMargins = True
-      Left = 192
+      Left = 249
       Top = 4
       Width = 28
       Height = 24
@@ -516,10 +521,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 192
       ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
-      Left = 220
+      Left = 277
       Top = 0
       Height = 32
       Align = alLeft
@@ -528,7 +534,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileEditMode: TUText
       AlignWithMargins = True
-      Left = 240
+      Left = 297
       Top = 4
       Width = 32
       Height = 24
@@ -545,10 +551,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 240
       ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
-      Left = 272
+      Left = 329
       Top = 0
       Height = 32
       Align = alLeft
@@ -556,7 +563,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileEditPosition: TUText
       AlignWithMargins = True
-      Left = 292
+      Left = 349
       Top = 4
       Width = 118
       Height = 24
@@ -573,10 +580,11 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 292
       ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
-      Left = 410
+      Left = 467
       Top = 0
       Height = 32
       Align = alLeft
@@ -586,7 +594,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtStatus: TUText
       AlignWithMargins = True
-      Left = 430
+      Left = 487
       Top = 4
       Width = 15
       Height = 24
@@ -604,6 +612,7 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
+      ExplicitLeft = 430
       ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
@@ -651,7 +660,7 @@ object NEDMainForm: TNEDMainForm
     end
     object txtFileType: TUText
       AlignWithMargins = True
-      Left = 72
+      Left = 129
       Top = 4
       Width = 46
       Height = 24
@@ -668,21 +677,50 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
+      ExplicitLeft = 72
       ExplicitHeight = 17
     end
     object USeparator7: TUSeparator
-      Left = 52
+      Left = 109
       Top = 0
       Height = 32
       Align = alLeft
       ExplicitLeft = 51
       ExplicitTop = 6
     end
+    object txtProfile: TUText
+      AlignWithMargins = True
+      Left = 8
+      Top = 4
+      Width = 37
+      Height = 24
+      Margins.Left = 8
+      Margins.Top = 4
+      Margins.Right = 0
+      Margins.Bottom = 4
+      Align = alLeft
+      Caption = 'Profile'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clBlack
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
+      Font.Style = []
+      ParentFont = False
+      Layout = tlCenter
+      ExplicitHeight = 17
+    end
+    object USeparator8: TUSeparator
+      Left = 45
+      Top = 0
+      Height = 32
+      Align = alLeft
+      ExplicitTop = 6
+    end
     object barStatus: TUProgressBar
       AlignWithMargins = True
-      Left = 453
+      Left = 510
       Top = 12
-      Width = 145
+      Width = 88
       Height = 8
       Margins.Left = 8
       Margins.Top = 12
@@ -706,6 +744,8 @@ object NEDMainForm: TNEDMainForm
       FillColor.DarkColor = 3355443
       Value = 0
       Orientation = oHorizontal
+      ExplicitLeft = 453
+      ExplicitWidth = 145
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True
@@ -766,7 +806,7 @@ object NEDMainForm: TNEDMainForm
     BackColor.LightColor = 15132390
     BackColor.DarkColor = 2039583
   end
-  object pnlLeft: TUPanel
+  object pnlToolbox: TUPanel
     Left = 45
     Top = 40
     Width = 200

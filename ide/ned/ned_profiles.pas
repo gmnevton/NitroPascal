@@ -13,22 +13,38 @@ unit ned_profiles;
 interface
 
 uses
-  Generics.Collections;
+  SysUtils,
+  Generics.Collections,
+  ned_session_context;
 
 type
   TNEDProfile = class
   private
+    FID: String;
     FName: String;
+    FCopiedFrom: String; // not sure if this is needed
+    FIndex: Integer;
     FOpenedProjects: Integer;
     FOpenedFiles: Integer;
+    FSession: TNEDSessionContext;
   public
-    constructor Create(const AName: String);
+    constructor Create(const AName: String; const ACreateNewUID: Boolean);
     destructor Destroy; override;
+    //
+    function CopyFrom(const AName: String): Boolean;
+    //
+    property ID: String read FID;
+    property Name: String read FName;
+    property OriginateFrom: String read FCopiedFrom write FCopiedFrom;
+    property Index: Integer read FIndex;
+    property OpenedProjects: Integer read FOpenedProjects write FOpenedProjects;
+    property OpenedFiles: Integer read FOpenedFiles write FOpenedFiles;
   end;
 
   TNEDProfiles = class
   private
     FList: TObjectList<TNEDProfile>;
+    FDefaultIndex: Integer;
     //
     function GetProfile(const AIndex: Integer): TNEDProfile;
   public
@@ -37,27 +53,74 @@ type
     //
     procedure Clear;
     function Count: Integer;
-    function Add(const AName: String): TNEDProfile;
+    function Add(const AID, AName: String): TNEDProfile;
+    function AddNew(const AName: String; const ASetAsDefault: Boolean): TNEDProfile;
     function Remove(const AIndex: Integer): Boolean;
     //
     property Profile[const AIndex: Integer]: TNEDProfile read GetProfile;
+    property DefaultIndex: Integer read FDefaultIndex write FDefaultIndex;
   end;
 
 implementation
 
+uses
+//  ComObj,
+  ActiveX;
+
+function Succeeded(Res: HResult): Boolean;
+begin
+  Result := Res and $80000000 = 0;
+end;
+
+function GUIDToString(const ClassID: TGUID): string;
+var
+  P: PWideChar;
+  OpResult: HResult;
+begin
+  OpResult := StringFromCLSID(ClassID, P);
+  if not Succeeded(OpResult) then
+    Result :=  ''
+  else begin
+    Result := P;
+    Result := Result.Replace('{', '').Replace('}', '').Replace('-', '');
+    CoTaskMemFree(P);
+  end;
+end;
+
 { TNEDProfile }
 
-constructor TNEDProfile.Create(const AName: String);
+constructor TNEDProfile.Create(const AName: String; const ACreateNewUID: Boolean);
+var
+  G: TGUID;
+  Result: HResult;
 begin
+  FID := '';
+  if ACreateNewUID then begin
+    Result := CreateGUID(G);
+    if Succeeded(Result) then // @TODO: do something with this, when error occurs
+      FID := GUIDToString(G);
+  end;
+  //
   FName := AName;
+  FCopiedFrom := '';
+  FIndex := -1;
   FOpenedProjects := 0;
   FOpenedFiles := 0;
+  FSession := TNEDSessionContext.Create;
 end;
 
 destructor TNEDProfile.Destroy;
 begin
+  FID := '';
   FName := '';
+  FCopiedFrom := '';
+  FSession.Free;
   inherited;
+end;
+
+function TNEDProfile.CopyFrom(const AName: String): Boolean;
+begin
+  Result := False;
 end;
 
 { TNEDProfiles }
@@ -65,6 +128,7 @@ end;
 constructor TNEDProfiles.Create;
 begin
   FList := TObjectList<TNEDProfile>.Create(True);
+  FDefaultIndex := -1;
 end;
 
 destructor TNEDProfiles.Destroy;
@@ -90,11 +154,26 @@ begin
   Result := FList.Count;
 end;
 
-function TNEDProfiles.Add(const AName: String): TNEDProfile;
+function TNEDProfiles.Add(const AID, AName: String): TNEDProfile;
 begin
   try
-    Result := TNEDProfile.Create(AName);
-    FList.Add(Result);
+    Result := TNEDProfile.Create(AName, False);
+    Result.FID := AID;
+    Result.FIndex := FList.Add(Result);
+  except
+    if Result <> Nil then
+      Result.Free;
+    Result := Nil;
+  end;
+end;
+
+function TNEDProfiles.AddNew(const AName: String; const ASetAsDefault: Boolean): TNEDProfile;
+begin
+  try
+    Result := TNEDProfile.Create(AName, True);
+    Result.FIndex := FList.Add(Result);
+    if ASetAsDefault then
+      FDefaultIndex := Result.FIndex;
   except
     if Result <> Nil then
       Result.Free;

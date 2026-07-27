@@ -46,11 +46,14 @@ type
   private
     procedure Init;
     function EnsureNode(const ARoot: TJSONNode; const ANodeName: String; const ANodeType: TJSONNodeType): TJSONNode;
+    function EnsureObjectInArray(const ARoot: TJSONNode; const ANodeName, ANodeValue: String; const ANodeType: TJSONNodeType): TJSONNode;
     function NodeAsBoolean(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Boolean): Boolean;
     function NodeAsInteger(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Integer): Integer;
     function NodeAsString(const ARoot: TJSONNode; const ANodeName: String; const ADefault: String): String;
     procedure FieldsToJson;
     procedure JsonToFields;
+    procedure ProfilesToJson(const ARootNode: TJSONNode);
+    procedure JsonToProfiles(const ARootNode: TJSONNode);
   public
     constructor Create;
     destructor Destroy; override;
@@ -60,6 +63,8 @@ type
     //
     procedure Lock;
     procedure Unlock;
+    //
+    procedure Update;
     //
     property Loaded: Boolean read FLoaded;
     property Error: Boolean read FError;
@@ -130,6 +135,17 @@ begin
   Result := ARoot.FindNode(ANodeName, [ANodeType]);
   if Result = Nil then begin
     Result := ARoot.AddChild(ANodeName, ANodeType);
+  end;
+end;
+
+function TNEDConfig.EnsureObjectInArray(const ARoot: TJSONNode; const ANodeName, ANodeValue: String; const ANodeType: TJSONNodeType): TJSONNode;
+begin
+  Result := ARoot.FindNode(ANodeName, ANodeValue, [jtString], [jsRecursive]);
+  if Result = Nil then begin
+    Result := ARoot.AddChild('', ANodeType);
+  end
+  else begin
+    Result := Result.ParentNode; // gets object node
   end;
 end;
 
@@ -205,8 +221,11 @@ begin
       Node := EnsureNode(SubRoot, 'ProfilesCount', jtNumber);
       Node.ValueAsInteger := FProfilesCount;
       //
+      Node := EnsureNode(SubRoot, 'DefaultProfile', jtNumber);
+      Node.ValueAsInteger := FProfiles.DefaultIndex;
+      //
       Node := EnsureNode(SubRoot, 'ProfilesList', jtArray);
-      // @TODO: list profiles
+      ProfilesToJson(Node);
       //
       Node := EnsureNode(SubRoot, 'LastProfile', jtString);
       Node.ValueAsString := FLastProfile;
@@ -257,10 +276,11 @@ begin
       if SubRoot <> Nil then begin
         FShowProfileSelection := NodeAsBoolean(SubRoot, 'ShowProfileSelection', False);
         FProfilesCount := NodeAsInteger(SubRoot, 'ProfilesCount', 0);
+        FProfiles.DefaultIndex := NodeAsInteger(SubRoot, 'DefaultProfile', -1);
         //FProfiles := TNEDProfiles;
-        Node := SubRoot.FindNode('ProfilesList', [jtObject]);
+        Node := SubRoot.FindNode('ProfilesList', [jtArray]);
         if Node <> Nil then begin
-          //FProfiles: TNEDProfiles;
+          JsonToProfiles(Node); //FProfiles: TNEDProfiles;
         end;
         FLastProfile := NodeAsString(SubRoot, 'LastProfile', '');
         FUseLastProfile := NodeAsBoolean(SubRoot, 'UseLastProfile', True);
@@ -270,12 +290,70 @@ begin
   end;
 end;
 
+procedure TNEDConfig.ProfilesToJson(const ARootNode: TJSONNode);
+var
+  i: Integer;
+  SubRoot, Node, SubNode: TJSONNode;
+  Profile: TNEDProfile;
+begin
+  for i := 0 to FProfiles.Count - 1 do begin
+    Profile := FProfiles.Profile[i];
+    //
+    SubRoot := EnsureObjectInArray(ARootNode, 'ID', Profile.ID, jtObject);
+    //
+      Node := EnsureNode(SubRoot, 'ID', jtString);
+      Node.ValueAsString := Profile.ID;
+      //
+      Node := EnsureNode(SubRoot, 'Name', jtString);
+      Node.ValueAsString := Profile.Name;
+      //
+      Node := EnsureNode(SubRoot, 'OriginateFrom', jtString);
+      Node.ValueAsString := Profile.OriginateFrom;
+      //
+      Node := EnsureNode(SubRoot, 'OpenedProjects', jtNumber);
+      Node.ValueAsInteger := Profile.OpenedProjects;
+      //
+      Node := EnsureNode(SubRoot, 'OpenedFiles', jtNumber);
+      Node.ValueAsInteger := Profile.OpenedFiles;
+      //
+
+  end;
+end;
+
+procedure TNEDConfig.JsonToProfiles(const ARootNode: TJSONNode);
+var
+  SubRoot: TJSONNode;
+  Profile: TNEDProfile;
+  pID: String;
+  pName: String;
+  pOriginateFrom: String;
+  pOpenedProjects: Integer;
+  pOpenedFiles: Integer;
+begin
+  SubRoot := ARootNode.FirstChild;
+  while SubRoot <> Nil do begin
+    pID := NodeAsString(SubRoot, 'ID', '');
+    pName := NodeAsString(SubRoot, 'Name', '');
+    pOriginateFrom := NodeAsString(SubRoot, 'OriginateFrom', '');
+    pOpenedProjects := NodeAsInteger(SubRoot, 'OpenedProjects', 0);
+    pOpenedFiles := NodeAsInteger(SubRoot, 'OpenedFiles', 0);
+    //
+    Profile := NEDConfig.Profiles.Add(pID, pName);
+    Profile.OriginateFrom := pOriginateFrom;
+    Profile.OpenedProjects := pOpenedProjects;
+    Profile.OpenedFiles := pOpenedFiles;
+    //
+    SubRoot := SubRoot.NextSibling;
+  end;
+end;
+
 procedure TNEDConfig.LoadConfig;
 begin
   try
     FError := False;
     FErrorMsg := '';
     FStorage.Clear;
+    FProfiles.Clear;
     FStorage.LoadFromFile(ChangeFileExt(Application.ExeName, '.jcfg'));
     FLoaded := FStorage.Empty;
     if FLoaded then
@@ -318,6 +396,11 @@ begin
   Dec(FLocked);
   if FLocked <= 0 then
     FLocked := 0;
+end;
+
+procedure TNEDConfig.Update;
+begin
+  FProfilesCount := FProfiles.Count;
 end;
 
 initialization

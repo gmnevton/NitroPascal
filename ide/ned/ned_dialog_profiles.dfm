@@ -1,5 +1,8 @@
 inherited NEDDialogProfiles: TNEDDialogProfiles
   Caption = 'NEDDialogProfiles'
+  ShowHint = True
+  OnDestroy = FormDestroy
+  OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
   inherited UTitleBar1: TUTitleBar
@@ -109,7 +112,6 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
         Left = 20
         Top = 0
         Height = 40
-        Hint = 'Add new profile'
         Align = alRight
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -117,13 +119,12 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
-        ParentShowHint = False
-        ShowHint = True
         OnClick = btnProfileAddClick
         BackColors.Enabled = False
         BackColors.Color = clBlack
         BackColors.LightColor = 13619151
         BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
         Caption = #60686
         ExplicitLeft = 16
         ExplicitTop = 6
@@ -133,22 +134,20 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
         Left = 110
         Top = 0
         Height = 40
-        Hint = 'Edit profile'
         Align = alRight
         Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
-        Font.Height = -19
+        Font.Height = -16
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
-        ParentShowHint = False
-        ShowHint = True
         OnClick = btnProfileEditClick
         BackColors.Enabled = False
         BackColors.Color = clBlack
         BackColors.LightColor = 13619151
         BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
         Caption = #59151
         ExplicitLeft = 162
         ExplicitTop = 3
@@ -157,22 +156,21 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
         Left = 155
         Top = 0
         Height = 40
-        Hint = 'Delete profile'
         Align = alRight
         Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
-        Font.Height = -19
+        Font.Height = -16
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
-        ParentShowHint = False
-        ShowHint = True
+        StyleElements = []
         OnClick = btnProfileDelClick
-        BackColors.Enabled = False
-        BackColors.Color = clBlack
-        BackColors.LightColor = 13619151
-        BackColors.DarkColor = 3947580
+        BackColors.Enabled = True
+        BackColors.Color = clRed
+        BackColors.LightColor = clRed
+        BackColors.DarkColor = clRed
+        ButtonStyle = qbsNone
         Caption = #59213
         ExplicitLeft = 174
         ExplicitTop = 3
@@ -181,7 +179,6 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
         Left = 65
         Top = 0
         Height = 40
-        Hint = 'Import profile'
         Align = alRight
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -189,13 +186,12 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
-        ParentShowHint = False
-        ShowHint = True
         OnClick = btnProfileAddClick
         BackColors.Enabled = False
         BackColors.Color = clBlack
         BackColors.LightColor = 13619151
         BackColors.DarkColor = 3947580
+        ButtonStyle = qbsNone
         Caption = #59446
         ExplicitLeft = 84
         ExplicitTop = 3
@@ -291,6 +287,8 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
       BevelOuter = bvNone
       Color = clBlack
       TabOrder = 0
+      OnChange = edProfileInputNameChange
+      OnKeyPress = edProfileInputNameKeyPress
       BorderThickness = 1
       BackColor.Enabled = False
       BackColor.Color = clWhite
@@ -310,13 +308,13 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
       Top = 214
       Width = 333
       ParentColor = False
-      ParentFont = False
       Anchors = [akLeft, akTop, akRight]
       BevelOuter = bvNone
-      Color = 14211288
+      Color = clBlack
       Enabled = False
       ReadOnly = True
       TabOrder = 1
+      OnChange = edProfileInputImportPathChange
       BorderThickness = 1
       BackColor.Enabled = False
       BackColor.Color = clWhite
@@ -332,13 +330,14 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
       BorderColor.FocusedDarkColor = 14120960
       ControlState = csDisabled
     end
-    object UCheckBox1: TUCheckBox
+    object cbProfileInputSetDefault: TUCheckBox
       Left = 12
       Top = 250
       Width = 98
       Anchors = [akLeft, akTop, akRight]
       AutoSize = True
       TabOrder = 3
+      OnClick = cbProfileInputSetDefaultClick
       IconFont.Charset = DEFAULT_CHARSET
       IconFont.Color = clWindowText
       IconFont.Height = -20
@@ -442,6 +441,7 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
       Width = 100
       Height = 41
       Anchors = [akTop, akRight]
+      Enabled = False
       TabOrder = 5
       OnClick = btnProfileInputAddClick
       CustomColors.BackColors.Enabled = False
@@ -478,6 +478,7 @@ inherited NEDDialogProfiles: TNEDDialogProfiles
       CustomColors.TextColors.DarkDisabled = clGray
       CustomColors.TextColors.DarkFocused = clWhite
       BorderThickness = 2
+      ButtonState = csDisabled
       Highlight = True
       Caption = 'Add'
     end

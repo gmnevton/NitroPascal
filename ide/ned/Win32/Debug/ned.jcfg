@@ -16,9 +16,16 @@
     },
     "Profiles" : {
       "ShowProfileSelection" : true,
-      "ProfilesCount" : 0,
+      "ProfilesCount" : 1,
+      "DefaultProfile" : 0,
       "ProfilesList" : [
-
+        {
+          "ID" : "260BDBC10160400FBED06C3A54FA1B2D",
+          "Name" : "Test",
+          "OriginateFrom" : "",
+          "OpenedProjects" : 0,
+          "OpenedFiles" : 0
+        }
       ],
       "LastProfile" : "",
       "UseLastProfile" : true,

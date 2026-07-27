@@ -45,12 +45,18 @@ uses
   SplitEx,
   ned_dialog_base,
   ned_editor_view,
-  ned_source_view;
+  ned_source_view,
+  ned_profiles;
 
 const
   WM_AFTERSHOW = $BF00; // max $BFFF
 
 type
+  TNEDToolboxTypeEnum = (
+    ttProject,
+    ttSearch
+  );
+
   TNEDMainForm = class(TUForm)
     barCaption: TUCaptionBar;
     pnlShortCuts: TUPanel;
@@ -61,7 +67,7 @@ type
     btnMin: TUQuickButton;
     mnuMain: TMainMenu;
     File1: TMenuItem;
-    btnShowHideToolbox: TUQuickButton;
+    btnSelectProfile: TUQuickButton;
     New1: TMenuItem;
     Open1: TMenuItem;
     History1: TMenuItem;
@@ -116,7 +122,7 @@ type
     NEDprojectwebsite1: TMenuItem;
     NitroPascalwebsite1: TMenuItem;
     N9: TMenuItem;
-    pnlLeft: TUPanel;
+    pnlToolbox: TUPanel;
     boxProject: TUScrollBox;
     UPanel5: TUPanel;
     btnDebugRun: TUQuickButton;
@@ -158,6 +164,8 @@ type
     Spliteditortobottom1: TMenuItem;
     Openandsplittoright1: TMenuItem;
     Openandsplittobottom1: TMenuItem;
+    txtProfile: TUText;
+    USeparator8: TUSeparator;
     //
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -172,9 +180,10 @@ type
     procedure FormMove(Sender: TObject);
     procedure FormResize(Sender: TObject);
     //
-    procedure btnShowHideToolboxClick(Sender: TObject);
+    procedure btnSelectProfileClick(Sender: TObject);
     procedure btnHomeClick(Sender: TObject);
     procedure btnProjectClick(Sender: TObject);
+    procedure btnSearchClick(Sender: TObject);
     //
     procedure New1Click(Sender: TObject);
     procedure Open1Click(Sender: TObject);
@@ -200,13 +209,18 @@ type
     procedure AboutNED1Click(Sender: TObject);
   private
     FModalForm: TForm;
+    FProfile: TNEDProfile;
     FLastOpenedPath: String;
+    FActiveToolbox: TNEDToolboxTypeEnum;
+    //
     //
     procedure WMAfterShow(var Msg: TMessage); message WM_AFTERSHOW;
-    procedure ApplicationOnIdle(Sender: TObject; var Done: Boolean);
     procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
     procedure NEDWindowSwitch(var Msg: TMessage); message CM_NED_WINDOW_SWITCH;
+    //
+    //
+    procedure ShowHideToolBox(const AToolbox: TNEDToolboxTypeEnum);
   private
     NEDViewForm: TNEDViewForm;
   protected
@@ -297,12 +311,11 @@ begin
   //
   OnMove := FormMove;
   //
-//  Application.OnIdle := ApplicationOnIdle;
-  //
   NEDHomeForm := TNEDHomeForm.Create(Self);
   NEDHomeForm.Parent := pnlWorkSpace;
   NEDHomeForm.Align := alClient;
   //
+  txtProfile.Caption := '---';
   txtFilePath.Caption := '---';
   txtFileType.Caption := '---';
   txtFileEncoding.Caption := '---';
@@ -311,12 +324,15 @@ begin
   txtFileEditPosition.Caption := '---';
   txtStatus.Caption := '';
   //
-  pnlLeft.Visible := False;
+  pnlToolbox.Visible := False;
   splLeft.Visible := False;
   boxProject.BringToFront;
   //
   FModalForm := Nil;
+  FProfile := Nil;
   FLastOpenedPath := '';
+  boxProject.BringToFront;
+  FActiveToolbox := ttProject;
   //
   if not NEDConfig.Loaded and NEDConfig.Error then
     txtStatus.Caption := NEDConfig.ErrorMsg;
@@ -333,6 +349,7 @@ procedure TNEDMainForm.FormDestroy(Sender: TObject);
 begin
 //  NEDDialogProfiles.Free;
   NEDHomeForm.Free;
+  FProfile := Nil;
 end;
 
 procedure TNEDMainForm.FormShow(Sender: TObject);
@@ -438,25 +455,9 @@ begin
 end;
 
 procedure TNEDMainForm.WMAfterShow(var Msg: TMessage);
-var
-  NEDDialogProfiles: TNEDDialogProfiles;
 begin
   Msg.Result := 1;
-  NEDDialogProfiles := TNEDDialogProfiles(CreateModalDialogForm(TNEDDialogProfiles));
-  try
-    if NEDDialogProfiles <> Nil then begin
-      if NEDDialogProfiles.Execute then begin // load selected profile
-
-      end;
-    end;
-  finally
-    DestroyModalDialogForm(TNEDDialogBase(NEDDialogProfiles));
-  end;
-end;
-
-procedure TNEDMainForm.ApplicationOnIdle(Sender: TObject; var Done: Boolean);
-begin
-  Done := False;
+  btnSelectProfileClick(Nil);
 end;
 
 procedure TNEDMainForm.CMDialogKey(var Msg: TCMDialogKey);
@@ -551,6 +552,32 @@ begin
   Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS or DLGC_WANTALLKEYS;
 end;
 
+procedure TNEDMainForm.ShowHideToolBox(const AToolbox: TNEDToolboxTypeEnum);
+begin
+  if pnlToolbox.Visible then begin
+    if FActiveToolbox <> AToolbox then begin
+      FActiveToolbox := AToolbox;
+      if AToolbox = ttProject then
+        boxProject.BringToFront
+      else if AToolbox = ttSearch then
+        boxSearch.BringToFront;
+    end
+    else begin
+      pnlToolbox.Visible := False;
+      splLeft.Visible := False;
+    end;
+  end
+  else begin
+    FActiveToolbox := AToolbox;
+    if AToolbox = ttProject then
+      boxProject.BringToFront
+    else if AToolbox = ttSearch then
+      boxSearch.BringToFront;
+    splLeft.Visible := True;
+    pnlToolbox.Visible := True;
+  end;
+end;
+
 function TNEDMainForm.CreateModalDialogForm(const AFormClass: TNEDDialogBaseClass): TNEDDialogBase;
 begin
   Result := Nil;
@@ -575,15 +602,24 @@ begin
   Result := True;
 end;
 
-procedure TNEDMainForm.btnShowHideToolboxClick(Sender: TObject);
+procedure TNEDMainForm.btnSelectProfileClick(Sender: TObject);
+var
+  NEDDialogProfiles: TNEDDialogProfiles;
 begin
-  if pnlLeft.Visible then begin
-    pnlLeft.Visible := False;
-    splLeft.Visible := False;
-  end
-  else begin
-    splLeft.Visible := True;
-    pnlLeft.Visible := True;
+  NEDDialogProfiles := TNEDDialogProfiles(CreateModalDialogForm(TNEDDialogProfiles));
+  try
+    if NEDDialogProfiles <> Nil then begin
+      if NEDDialogProfiles.Execute then begin // load selected profile
+        FProfile := NEDDialogProfiles.SelectedProfile;
+        txtProfile.Caption := FProfile.Name;
+        // @TODO: load context if needed
+        btnProject.Enabled := True;
+        btnSearch.Enabled := True;
+        ShowHideToolBox(ttProject);
+      end;
+    end;
+  finally
+    DestroyModalDialogForm(TNEDDialogBase(NEDDialogProfiles));
   end;
 end;
 
@@ -602,7 +638,12 @@ end;
 
 procedure TNEDMainForm.btnProjectClick(Sender: TObject);
 begin
-// empty for now
+  ShowHideToolBox(ttProject);
+end;
+
+procedure TNEDMainForm.btnSearchClick(Sender: TObject);
+begin
+  ShowHideToolBox(ttSearch);
 end;
 
 procedure TNEDMainForm.New1Click(Sender: TObject);
