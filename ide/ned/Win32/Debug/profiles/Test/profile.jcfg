@@ -1,0 +1,82 @@
+{
+  "ID" : "260BDBC10160400FBED06C3A54FA1B2D",
+  "Name" : "Test",
+  "OriginateFrom" : "",
+  "CreateDate" : "2026-07-29T06:10:00+02:00",
+  "ModifyDate" : "2026-07-29T06:10:00+02:00",
+  "LastOpenedDate" : "2026-07-29T06:10:00+02:00",
+  "TimesOpened" : 0,
+  "TimeUsedMinutes" : 0,
+  "Context" : {
+    "Favorites" : {
+      "Count" : 1,
+      "List" : [
+        {
+          "ID" : "12345678901234567890123456789012",
+          "Type" : "project",
+          "Name" : "First_Test_Project",
+          "FileName" : "first.npe",
+          "FilePath" : "d:\Borland Librarys\NitroPascal\compiler\tests\simple_project",
+          "Description" : "Short description of a project...",
+          "CreateDate" : "2026-07-29T06:10:00+02:00",
+          "ModifyDate" : "2026-07-29T06:10:00+02:00",
+          "LastOpenedDate" : "2026-07-29T06:10:00+02:00",
+          "TimesOpened" : 0,
+          "TimeUsedMinutes" : 0,
+        }
+      ]
+    },
+    "Recents" : {
+      "Count" : 2,
+      "List" : [
+        {
+          "ID" : "12345678901234567890123456789012",
+          "Type" : "project",
+          "Name" : "First_Test_Project",
+          "FileName" : "first.npe",
+          "FilePath" : "d:\Borland Librarys\NitroPascal\compiler\tests\simple_project",
+          "Description" : "Short description of a project...",
+          "CreateDate" : "2026-07-29T06:10:00+02:00",
+          "ModifyDate" : "2026-07-29T06:10:00+02:00",
+          "LastOpenedDate" : "2026-07-29T06:10:00+02:00",
+          "TimesOpened" : 0,
+          "TimeUsedMinutes" : 0,
+        },
+        {
+          "ID" : "12345678901234567890123456789012",
+          "Type" : "file",
+          "Name" : "Source_code_name",
+          "FileName" : "first_main.npc",
+          "FilePath" : "d:\Borland Librarys\NitroPascal\compiler\tests\simple_project",
+          "Description" : "File used to test various aspects of a NitroPascal compiler...",
+          "CreateDate" : "2026-08-04T05:55:00+02:00",
+          "ModifyDate" : "2026-08-04T05:55:00+02:00",
+          "LastOpenedDate" : "2026-08-04T05:55:00+02:00",
+          "TimesOpened" : 0,
+          "TimeUsedMinutes" : 0,
+        }
+      ]
+    },
+    "Layout" : {
+    },
+    "Settings" : {
+    }
+  },
+  "LastOpenedProjects" : {
+    "ProjectsCount" : 0,
+    "Projects" : [
+      {
+        "Name" : "NitroEDitor",
+        "CreateDate" : "2026-07-29T06:10:00+02:00",
+        "ModifyDate" : "2026-07-29T06:10:00+02:00",
+        "LastOpenedDate" : "2026-07-29T06:10:00+02:00",
+        "FilesCount" : 0,
+        "Files" : [
+        ]
+      }
+    ],
+    "FilesCount" : 0,
+    "Files" : [
+    ]
+  }
+}

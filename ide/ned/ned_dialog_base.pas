@@ -67,7 +67,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     //
-    function Execute: Boolean;
+    function Execute: Boolean; dynamic;
   end;
 
   TNEDDialogBaseClass = class of TNEDDialogBase;

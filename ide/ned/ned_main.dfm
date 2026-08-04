@@ -461,8 +461,7 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 77
-      ExplicitTop = 7
+      ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
       Left = 175
@@ -492,7 +491,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 138
       ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
@@ -521,7 +519,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 192
       ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
@@ -551,7 +548,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 240
       ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
@@ -580,7 +576,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 292
       ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
@@ -612,7 +607,6 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
-      ExplicitLeft = 430
       ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
@@ -677,7 +671,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitLeft = 72
       ExplicitHeight = 17
     end
     object USeparator7: TUSeparator
@@ -744,8 +737,6 @@ object NEDMainForm: TNEDMainForm
       FillColor.DarkColor = 3355443
       Value = 0
       Orientation = oHorizontal
-      ExplicitLeft = 453
-      ExplicitWidth = 145
     end
     object sliFileZoom: TUSlider
       AlignWithMargins = True

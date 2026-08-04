@@ -18,8 +18,8 @@ uses
   Forms,
   Types,
   MultiMon, // HMONITOR type
-  ned_profiles,
-  JSON.VerySimple;
+  JSON.VerySimple,
+  ned_profiles;
 
 type
   TNEDConfig = class
@@ -45,11 +45,6 @@ type
     FLocked: Integer;
   private
     procedure Init;
-    function EnsureNode(const ARoot: TJSONNode; const ANodeName: String; const ANodeType: TJSONNodeType): TJSONNode;
-    function EnsureObjectInArray(const ARoot: TJSONNode; const ANodeName, ANodeValue: String; const ANodeType: TJSONNodeType): TJSONNode;
-    function NodeAsBoolean(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Boolean): Boolean;
-    function NodeAsInteger(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Integer): Integer;
-    function NodeAsString(const ARoot: TJSONNode; const ANodeName: String; const ADefault: String): String;
     procedure FieldsToJson;
     procedure JsonToFields;
     procedure ProfilesToJson(const ARootNode: TJSONNode);
@@ -89,6 +84,9 @@ var
   NEDConfig: TNEDConfig;
 
 implementation
+
+uses
+  ned_json_config_utils;
 
 { TNEDConfig }
 
@@ -130,110 +128,61 @@ begin
   FLoadProfileSession := True;
 end;
 
-function TNEDConfig.EnsureNode(const ARoot: TJSONNode; const ANodeName: String; const ANodeType: TJSONNodeType): TJSONNode;
-begin
-  Result := ARoot.FindNode(ANodeName, [ANodeType]);
-  if Result = Nil then begin
-    Result := ARoot.AddChild(ANodeName, ANodeType);
-  end;
-end;
-
-function TNEDConfig.EnsureObjectInArray(const ARoot: TJSONNode; const ANodeName, ANodeValue: String; const ANodeType: TJSONNodeType): TJSONNode;
-begin
-  Result := ARoot.FindNode(ANodeName, ANodeValue, [jtString], [jsRecursive]);
-  if Result = Nil then begin
-    Result := ARoot.AddChild('', ANodeType);
-  end
-  else begin
-    Result := Result.ParentNode; // gets object node
-  end;
-end;
-
-function TNEDConfig.NodeAsBoolean(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Boolean): Boolean;
-var
-  Node: TJSONNode;
-begin
-  Result := ADefault;
-  Node := ARoot.FindNode(ANodeName, [jtBoolean]);
-  if Node <> Nil then
-    Result := Node.ValueAsBoolean;
-end;
-
-function TNEDConfig.NodeAsInteger(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Integer): Integer;
-var
-  Node: TJSONNode;
-begin
-  Result := ADefault;
-  Node := ARoot.FindNode(ANodeName, [jtNumber]);
-  if Node <> Nil then
-    Result := Node.ValueAsInteger;
-end;
-
-function TNEDConfig.NodeAsString(const ARoot: TJSONNode; const ANodeName: String; const ADefault: String): String;
-var
-  Node: TJSONNode;
-begin
-  Result := ADefault;
-  Node := ARoot.FindNode(ANodeName, [jtString]);
-  if Node <> Nil then
-    Result := Node.ValueAsString;
-end;
-
 procedure TNEDConfig.FieldsToJson;
 var
   DocRoot, Root, SubRoot, Node, SubNode: TJSONNode;
 begin
   DocRoot := FStorage.DocumentElement;
   if DocRoot <> Nil then begin
-    Root := EnsureNode(DocRoot, 'NEDConfig', jtObject);
+    Root := FStorage.EnsureNode(DocRoot, 'NEDConfig', jtObject);
     //
-    SubRoot := EnsureNode(Root, 'Application', jtObject);
+    SubRoot := FStorage.EnsureNode(Root, 'Application', jtObject);
     //
-      Node := EnsureNode(SubRoot, 'Monitor', jtNumber);
+      Node := FStorage.EnsureNode(SubRoot, 'Monitor', jtNumber);
       Node.ValueAsInteger := Integer(FMonitor);
       //
-      Node := EnsureNode(SubRoot, 'Position', jtObject);
-        SubNode := EnsureNode(Node, 'X', jtNumber);
+      Node := FStorage.EnsureNode(SubRoot, 'Position', jtObject);
+        SubNode := FStorage.EnsureNode(Node, 'X', jtNumber);
         SubNode.ValueAsInteger := FPosition.X;
-        SubNode := EnsureNode(Node, 'Y', jtNumber);
+        SubNode := FStorage.EnsureNode(Node, 'Y', jtNumber);
         SubNode.ValueAsInteger := FPosition.Y;
       //
-      Node := EnsureNode(SubRoot, 'Size', jtObject);
-        SubNode := EnsureNode(Node, 'CX', jtNumber);
+      Node := FStorage.EnsureNode(SubRoot, 'Size', jtObject);
+        SubNode := FStorage.EnsureNode(Node, 'CX', jtNumber);
         SubNode.ValueAsInteger := FSize.cx;
-        SubNode := EnsureNode(Node, 'CY', jtNumber);
+        SubNode := FStorage.EnsureNode(Node, 'CY', jtNumber);
         SubNode.ValueAsInteger := FSize.cy;
       //
-      Node := EnsureNode(SubRoot, 'Maximize', jtBoolean);
+      Node := FStorage.EnsureNode(SubRoot, 'Maximize', jtBoolean);
       Node.ValueAsBoolean := FMaximize;
       //
-      Node := EnsureNode(SubRoot, 'ShowHomePage', jtBoolean);
+      Node := FStorage.EnsureNode(SubRoot, 'ShowHomePage', jtBoolean);
       Node.ValueAsBoolean := FShowHomePage;
       //
-      Node := EnsureNode(SubRoot, 'ColorSchema', jtString);
+      Node := FStorage.EnsureNode(SubRoot, 'ColorSchema', jtString);
       Node.ValueAsString := FColorSchema;
       //
-    SubRoot := EnsureNode(Root, 'Profiles', jtObject);
+    SubRoot := FStorage.EnsureNode(Root, 'Profiles', jtObject);
     //
-      Node := EnsureNode(SubRoot, 'ShowProfileSelection', jtBoolean);
+      Node := FStorage.EnsureNode(SubRoot, 'ShowProfileSelection', jtBoolean);
       Node.ValueAsBoolean := FShowProfileSelection;
       //
-      Node := EnsureNode(SubRoot, 'ProfilesCount', jtNumber);
+      Node := FStorage.EnsureNode(SubRoot, 'ProfilesCount', jtNumber);
       Node.ValueAsInteger := FProfilesCount;
       //
-      Node := EnsureNode(SubRoot, 'DefaultProfile', jtNumber);
+      Node := FStorage.EnsureNode(SubRoot, 'DefaultProfile', jtNumber);
       Node.ValueAsInteger := FProfiles.DefaultIndex;
       //
-      Node := EnsureNode(SubRoot, 'ProfilesList', jtArray);
+      Node := FStorage.EnsureNode(SubRoot, 'ProfilesList', jtArray);
       ProfilesToJson(Node);
       //
-      Node := EnsureNode(SubRoot, 'LastProfile', jtString);
+      Node := FStorage.EnsureNode(SubRoot, 'LastProfile', jtString);
       Node.ValueAsString := FLastProfile;
       //
-      Node := EnsureNode(SubRoot, 'UseLastProfile', jtBoolean);
+      Node := FStorage.EnsureNode(SubRoot, 'UseLastProfile', jtBoolean);
       Node.ValueAsBoolean := FUseLastProfile;
       //
-      Node := EnsureNode(SubRoot, 'LoadProfileSession', jtBoolean);
+      Node := FStorage.EnsureNode(SubRoot, 'LoadProfileSession', jtBoolean);
       Node.ValueAsBoolean := FLoadProfileSession;
   end;
 end;
@@ -248,12 +197,12 @@ begin
     if Root <> Nil then begin
       SubRoot := Root.FindNode('Application', [jtObject]);
       if SubRoot <> Nil then begin
-        FMonitor := HMONITOR(NodeAsInteger(SubRoot, 'Monitor', 0));
+        FMonitor := HMONITOR(FStorage.NodeAsInteger(SubRoot, 'Monitor', 0));
         //
         Node := SubRoot.FindNode('Position', [jtObject]);
         if Node <> Nil then begin
-          FPosition.X := NodeAsInteger(Node, 'X', 0);
-          FPosition.Y := NodeAsInteger(Node, 'Y', 0);
+          FPosition.X := FStorage.NodeAsInteger(Node, 'X', 0);
+          FPosition.Y := FStorage.NodeAsInteger(Node, 'Y', 0);
         end
         else begin
           FPosition := Point(0, 0);
@@ -261,30 +210,30 @@ begin
         //
         Node := SubRoot.FindNode('Size', [jtObject]);
         if Node <> Nil then begin
-          FSize.cx := NodeAsInteger(Node, 'CX', -1);
-          FSize.cy := NodeAsInteger(Node, 'CY', -1);
+          FSize.cx := FStorage.NodeAsInteger(Node, 'CX', -1);
+          FSize.cy := FStorage.NodeAsInteger(Node, 'CY', -1);
         end
         else begin
           FSize := TSize.Create(-1, -1);
         end;
         //
-        FMaximize := NodeAsBoolean(SubRoot, 'Maximize', True);
-        FShowHomePage := NodeAsBoolean(SubRoot, 'ShowHomePage', True);
-        FColorSchema := NodeAsString(SubRoot, 'ColorSchema', 'system');
+        FMaximize := FStorage.NodeAsBoolean(SubRoot, 'Maximize', True);
+        FShowHomePage := FStorage.NodeAsBoolean(SubRoot, 'ShowHomePage', True);
+        FColorSchema := FStorage.NodeAsString(SubRoot, 'ColorSchema', 'system');
       end;
       SubRoot := Root.FindNode('Profiles', [jtObject]);
       if SubRoot <> Nil then begin
-        FShowProfileSelection := NodeAsBoolean(SubRoot, 'ShowProfileSelection', False);
-        FProfilesCount := NodeAsInteger(SubRoot, 'ProfilesCount', 0);
-        FProfiles.DefaultIndex := NodeAsInteger(SubRoot, 'DefaultProfile', -1);
+        FShowProfileSelection := FStorage.NodeAsBoolean(SubRoot, 'ShowProfileSelection', False);
+        FProfilesCount := FStorage.NodeAsInteger(SubRoot, 'ProfilesCount', 0);
+        FProfiles.DefaultIndex := FStorage.NodeAsInteger(SubRoot, 'DefaultProfile', -1);
         //FProfiles := TNEDProfiles;
         Node := SubRoot.FindNode('ProfilesList', [jtArray]);
         if Node <> Nil then begin
           JsonToProfiles(Node); //FProfiles: TNEDProfiles;
         end;
-        FLastProfile := NodeAsString(SubRoot, 'LastProfile', '');
-        FUseLastProfile := NodeAsBoolean(SubRoot, 'UseLastProfile', True);
-        FLoadProfileSession := NodeAsBoolean(SubRoot, 'LoadProfileSession', True);
+        FLastProfile := FStorage.NodeAsString(SubRoot, 'LastProfile', '');
+        FUseLastProfile := FStorage.NodeAsBoolean(SubRoot, 'UseLastProfile', True);
+        FLoadProfileSession := FStorage.NodeAsBoolean(SubRoot, 'LoadProfileSession', True);
       end;
     end;
   end;
@@ -299,21 +248,21 @@ begin
   for i := 0 to FProfiles.Count - 1 do begin
     Profile := FProfiles.Profile[i];
     //
-    SubRoot := EnsureObjectInArray(ARootNode, 'ID', Profile.ID, jtObject);
+    SubRoot := FStorage.EnsureObjectInArray(ARootNode, 'ID', Profile.ID, jtObject);
     //
-      Node := EnsureNode(SubRoot, 'ID', jtString);
+      Node := FStorage.EnsureNode(SubRoot, 'ID', jtString);
       Node.ValueAsString := Profile.ID;
       //
-      Node := EnsureNode(SubRoot, 'Name', jtString);
+      Node := FStorage.EnsureNode(SubRoot, 'Name', jtString);
       Node.ValueAsString := Profile.Name;
       //
-      Node := EnsureNode(SubRoot, 'OriginateFrom', jtString);
+      Node := FStorage.EnsureNode(SubRoot, 'OriginateFrom', jtString);
       Node.ValueAsString := Profile.OriginateFrom;
       //
-      Node := EnsureNode(SubRoot, 'OpenedProjects', jtNumber);
+      Node := FStorage.EnsureNode(SubRoot, 'OpenedProjects', jtNumber);
       Node.ValueAsInteger := Profile.OpenedProjects;
       //
-      Node := EnsureNode(SubRoot, 'OpenedFiles', jtNumber);
+      Node := FStorage.EnsureNode(SubRoot, 'OpenedFiles', jtNumber);
       Node.ValueAsInteger := Profile.OpenedFiles;
       //
 
@@ -332,11 +281,11 @@ var
 begin
   SubRoot := ARootNode.FirstChild;
   while SubRoot <> Nil do begin
-    pID := NodeAsString(SubRoot, 'ID', '');
-    pName := NodeAsString(SubRoot, 'Name', '');
-    pOriginateFrom := NodeAsString(SubRoot, 'OriginateFrom', '');
-    pOpenedProjects := NodeAsInteger(SubRoot, 'OpenedProjects', 0);
-    pOpenedFiles := NodeAsInteger(SubRoot, 'OpenedFiles', 0);
+    pID := FStorage.NodeAsString(SubRoot, 'ID', '');
+    pName := FStorage.NodeAsString(SubRoot, 'Name', '');
+    pOriginateFrom := FStorage.NodeAsString(SubRoot, 'OriginateFrom', '');
+    pOpenedProjects := FStorage.NodeAsInteger(SubRoot, 'OpenedProjects', 0);
+    pOpenedFiles := FStorage.NodeAsInteger(SubRoot, 'OpenedFiles', 0);
     //
     Profile := NEDConfig.Profiles.Add(pID, pName);
     Profile.OriginateFrom := pOriginateFrom;

@@ -80,6 +80,7 @@ type
     procedure ProfilesViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean); // event
   public
     procedure FillProfilesList;
+    function Execute: Boolean; override;
     //
     property SelectedProfile: TNEDProfile read FSelectedProfile;
   end;
@@ -129,6 +130,17 @@ begin
   inherited;
   FillProfilesList;
   ProfilesView.Show;
+end;
+
+function TNEDDialogProfiles.Execute: Boolean;
+var
+  Idx: Integer;
+begin
+  Result := inherited Execute;
+  if Result and (ProfilesView.Selected <> Nil) and (FSelectedProfile = Nil) then begin
+    Idx := Integer(ProfilesView.Selected.Data); // we have Profile.Index here
+    FSelectedProfile := NEDConfig.Profiles.Profile[Idx];
+  end;
 end;
 
 procedure TNEDDialogProfiles.CheckInputForm;

@@ -613,6 +613,12 @@ begin
         FProfile := NEDDialogProfiles.SelectedProfile;
         txtProfile.Caption := FProfile.Name;
         // @TODO: load context if needed
+        if not FProfile.LoadSessionContext then begin
+          ShowMessage(FProfile.ErrorMsg);
+          Exit;
+        end;
+        NEDHomeForm.SyncProperties(FProfile);
+
         btnProject.Enabled := True;
         btnSearch.Enabled := True;
         ShowHideToolBox(ttProject);
