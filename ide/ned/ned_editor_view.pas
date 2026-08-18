@@ -1265,13 +1265,13 @@ begin
               LineNumber := IntToStr(LineIdx + FEditorControl.TopIndex);
             end;
             lnEachTenth: begin
-              if (LineIdx + FEditorControl.TopIndex) mod 10 = 0 then
+              if (LineIdx + FEditorControl.TopIndex = 1) or ((LineIdx + FEditorControl.TopIndex) mod 10 = 0) then
                 LineNumber := IntToStr(LineIdx + FEditorControl.TopIndex)
               else
                 LineNumber := '·';
             end;
             lnEachTenthWithDashedFifths: begin
-              if (LineIdx + FEditorControl.TopIndex) mod 10 = 0 then
+              if (LineIdx + FEditorControl.TopIndex = 1) or ((LineIdx + FEditorControl.TopIndex) mod 10 = 0) then
                 LineNumber := IntToStr(LineIdx + FEditorControl.TopIndex)
               else if (LineIdx + FEditorControl.TopIndex) mod 5 = 0 then
                 LineNumber := '-'
@@ -1291,13 +1291,13 @@ begin
               LineNumber := IntToStr(LineProperties.LineNo);
             end;
             lnEachTenth: begin
-              if LineProperties.LineNo mod 10 = 0 then
+              if (LineProperties.LineNo = 1) or (LineProperties.LineNo mod 10 = 0) then
                 LineNumber := IntToStr(LineProperties.LineNo)
               else
                 LineNumber := '·';
             end;
             lnEachTenthWithDashedFifths: begin
-              if LineProperties.LineNo mod 10 = 0 then
+              if (LineProperties.LineNo = 1) or (LineProperties.LineNo mod 10 = 0) then
                 LineNumber := IntToStr(LineProperties.LineNo)
               else if LineProperties.LineNo mod 5 = 0 then
                 LineNumber := '-'
