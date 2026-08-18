@@ -21,6 +21,8 @@ uses
   ned_main in 'ned_main.pas' {NEDMainForm},
   ned_home_page in 'ned_home_page.pas' {NEDHomeForm},
   ned_settings in 'ned_settings.pas' {NEDSettingsForm},
+  ned_workspace_manager in 'ned_workspace_manager.pas',
+  ned_projects in 'ned_projects.pas',
   ned_editor_buffer in 'ned_editor_buffer.pas',
   ned_editor_view in 'ned_editor_view.pas',
   ned_splitview_manager in 'ned_splitview_manager.pas',

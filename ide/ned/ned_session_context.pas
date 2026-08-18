@@ -15,7 +15,8 @@ interface
 uses
   SysUtils,
   Generics.Collections,
-  JSON.VerySimple;
+  JSON.VerySimple,
+  ned_projects;
 
 type
   TNEDLayout = class
@@ -34,56 +35,6 @@ type
     destructor Destroy; override;
     //
     procedure Clear;
-  end;
-
-  TNEDEditorContext = class
-  private
-  public
-    constructor Create;
-    destructor Destroy; override;
-  end;
-
-  TNEDProjectTypeEnum = (
-    ptUnknown,
-    ptProject,
-    ptProjectGroup,
-    ptFile
-  );
-  TNEDProjectType = class
-  public
-    class function ProjectTypeToString(const AValue: TNEDProjectTypeEnum): String;
-    class function StringToProjectType(AValue: String): TNEDProjectTypeEnum;
-  end;
-
-  TNEDProject = class
-  private
-    FID: String;
-    FType: TNEDProjectTypeEnum;
-    FName: String;
-    FFileName: String;
-    FFilePath: String;
-    FDescription: String;
-    FCreateDate: TDateTime;
-    FModifyDate: TDateTime;
-    FLastOpenedDate: TDateTime;
-    FTimesOpened: Integer;
-    FTimeUsedMinutes: Integer;
-    //
-    FEditors: TObjectList<TNEDEditorContext>;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    //
-    property &Type: TNEDProjectTypeEnum read FType;
-    property Name: String read FName;
-    property FileName: String read FFileName;
-    property FilePath: String read FFilePath;
-    property Description: String read FDescription;
-    property CreateDate: TDateTime read FCreateDate;
-    property ModifyDate: TDateTime read FModifyDate;
-    property LastOpenedDate: TDateTime read FLastOpenedDate;
-    property TimesOpened: Integer read FTimesOpened;
-    property TimeUsedMinutes: Integer read FTimeUsedMinutes;
   end;
 
   TNEDSessionContext = class
@@ -113,9 +64,11 @@ type
     function GetRecent(const AIndex: Integer): TNEDProject;
     function GetProject(const AIndex: Integer): TNEDProject;
   private
+    procedure ReadProfileHeader;
     procedure ReadContext;
     procedure ReadFavorites(const ARootNode: TJSONNode);
     procedure ReadRecents(const ARootNode: TJSONNode);
+    procedure ReadWorkspace;
     procedure ReadProject(const ANode: TJSONNode; const AList: TObjectList<TNEDProject>);
   public
     constructor Create;
@@ -193,57 +146,6 @@ begin
 
 end;
 
-{ TNEDEditorContext }
-
-constructor TNEDEditorContext.Create;
-begin
-
-end;
-
-destructor TNEDEditorContext.Destroy;
-begin
-
-  inherited;
-end;
-
-{ TNEDProjectType }
-
-class function TNEDProjectType.ProjectTypeToString(const AValue: TNEDProjectTypeEnum): String;
-begin
-  Result := 'unknown';
-  if AValue = ptProject then
-    Result := 'project'
-  else if AValue = ptProjectGroup then
-    Result := 'group'
-  else if AValue = ptFile then
-    Result := 'file';
-end;
-
-class function TNEDProjectType.StringToProjectType(AValue: String): TNEDProjectTypeEnum;
-begin
-  Result := ptUnknown;
-  AValue := LowerCase(AValue);
-  if AValue = 'project' then
-    Result := ptProject
-  else if AValue = 'group' then
-    Result := ptProjectGroup
-  else if AValue = 'file' then
-    Result := ptFile;
-end;
-
-{ TNEDProject }
-
-constructor TNEDProject.Create;
-begin
-  FEditors := TObjectList<TNEDEditorContext>.Create(True);
-end;
-
-destructor TNEDProject.Destroy;
-begin
-  FEditors.Free;
-  inherited;
-end;
-
 { TNEDSessionContext }
 
 constructor TNEDSessionContext.Create;
@@ -297,9 +199,9 @@ begin
     Result := FProjects.Items[AIndex];
 end;
 
-procedure TNEDSessionContext.ReadContext;
+procedure TNEDSessionContext.ReadProfileHeader;
 var
-  DocRoot, Root, SubRoot: TJSONNode;
+  DocRoot: TJSONNode;
 begin
   DocRoot := FStorage.DocumentElement;
   if DocRoot <> Nil then begin
@@ -311,7 +213,15 @@ begin
     FLastOpenedDate := FStorage.NodeAsInteger(DocRoot, 'LastOpenedDate', 0);
     FTimesOpened := FStorage.NodeAsInteger(DocRoot, 'TimesOpened', 0);
     FTimeUsedMinutes := FStorage.NodeAsInteger(DocRoot, 'TimeUsedMinutes', 0);
-    //
+  end;
+end;
+
+procedure TNEDSessionContext.ReadContext;
+var
+  DocRoot, Root, SubRoot: TJSONNode;
+begin
+  DocRoot := FStorage.DocumentElement;
+  if DocRoot <> Nil then begin
     Root := DocRoot.FindNode('Context', [jtObject]);
     if Root <> Nil then begin
       SubRoot := Root.FindNode('Favorites', [jtObject]);
@@ -377,61 +287,22 @@ begin
   end;
 end;
 
+procedure TNEDSessionContext.ReadWorkspace;
+begin
+
+end;
+
 procedure TNEDSessionContext.ReadProject(const ANode: TJSONNode; const AList: TObjectList<TNEDProject>);
 var
-  pID: String;
-  pType: TNEDProjectTypeEnum;
-  pName: String;
-  pFileName: String;
-  pFilePath: String;
-  pDescription: String;
-  pCreateDate: TDateTime;
-  pModifyDate: TDateTime;
-  pLastOpenedDate: TDateTime;
-  pTimesOpened: Integer;
-  pTimeUsedMinutes: Integer;
   //
   Project: TNEDProject;
 begin
   if ANode = Nil then
     Exit;
   //
-  pID := FStorage.NodeAsString(ANode, 'ID', '');
-  pType := TNEDProjectType.StringToProjectType(FStorage.NodeAsString(ANode, 'Type', 'unknown'));
-  pName := FStorage.NodeAsString(ANode, 'Name', '');
-  pFileName := FStorage.NodeAsString(ANode, 'FileName', '');
-  pFilePath := FStorage.NodeAsString(ANode, 'FilePath', '');
-  pDescription := FStorage.NodeAsString(ANode, 'Description', '');
-  pCreateDate := FStorage.NodeAsDateTime(ANode, 'CreateDate', 0);
-  pModifyDate := FStorage.NodeAsDateTime(ANode, 'ModifyDate', 0);
-  pLastOpenedDate := FStorage.NodeAsDateTime(ANode, 'LastOpenedDate', 0);
-  pTimesOpened := FStorage.NodeAsInteger(ANode, 'TimesOpened', 0);
-  pTimeUsedMinutes := FStorage.NodeAsInteger(ANode, 'TimeUsedMinutes', 0);
-  //
   try
-    Project := Nil;
-    try
-      Project := TNEDProject.Create;
-      Project.FID := pID;
-      Project.FType := pType;
-      Project.FName := pName;
-      Project.FFileName := pFileName;
-      Project.FFilePath := pFilePath;
-      Project.FDescription := pDescription;
-      Project.FCreateDate := pCreateDate;
-      Project.FModifyDate := pModifyDate;
-      Project.FLastOpenedDate := pLastOpenedDate;
-      Project.FTimesOpened := pTimesOpened;
-      Project.FTimeUsedMinutes := pTimeUsedMinutes;
-
-      AList.Add(Project);
-    finally
-      pID := '';
-      pName := '';
-      pFileName := '';
-      pFilePath := '';
-      pDescription := '';
-    end;
+    Project := TNEDProject.Create(FStorage, ANode);
+    AList.Add(Project);
   except
     if Project <> Nil then
       Project.Free;
@@ -463,10 +334,11 @@ end;
 function TNEDSessionContext.ContextAdd(const AProjectID, AName: String): TNEDProject;
 begin
   try
-    Result := TNEDProject.Create;
+    Result := Nil;
+//    Result := TNEDProject.Create(FStorage, ANode);
 //    Result.FID := AID;
 //    Result.FIndex :=
-    FProjects.Add(Result);
+//    FProjects.Add(Result);
   except
     if Result <> Nil then
       Result.Free;
@@ -477,9 +349,10 @@ end;
 function TNEDSessionContext.ContextAddNew(const AName: String): TNEDProject;
 begin
   try
-    Result := TNEDProject.Create; // (AName, True);
+    Result := Nil;
+//    Result := TNEDProject.Create(FStorage, ANode); // (AName, True);
 //    Result.FIndex :=
-    FProjects.Add(Result);
+//    FProjects.Add(Result);
 //    if ASetAsDefault then
 //      FDefaultIndex := Result.FIndex;
   except
@@ -511,6 +384,13 @@ begin
   end;
 end;
 
+//    FProjects: TObjectList<TNEDProject>;
+//    //
+//    FFavorites: TObjectList<TNEDProject>;
+//    FRecent: TObjectList<TNEDProject>;
+//    FLayout: TNEDLayout;
+//    FSettings: TNEDSettings;
+
 procedure TNEDSessionContext.LoadContext(const AProfilePath: String);
 begin
   try
@@ -521,8 +401,11 @@ begin
     FStorageFileName := IncludeTrailingPathDelimiter(AProfilePath) + 'profile.jcfg';
     FStorage.LoadFromFile(FStorageFileName);
     FLoaded := FStorage.Empty;
-    if FLoaded then
+    if FLoaded then begin
+      ReadProfileHeader;
       ReadContext;
+      ReadWorkspace;
+    end;
   except
     // no error here
     on E: Exception do begin
@@ -530,15 +413,6 @@ begin
       FErrorMsg := E.ClassName + ': ' + E.Message;
     end;
   end;
-
-
-//    FProjects: TObjectList<TNEDProject>;
-//    //
-//    FFavorites: TObjectList<TNEDProject>;
-//    FRecent: TObjectList<TNEDProject>;
-//    FLayout: TNEDLayout;
-//    FSettings: TNEDSettings;
-
 end;
 
 procedure TNEDSessionContext.LoadSession(const ASessionPath: String);

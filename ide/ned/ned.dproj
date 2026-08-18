@@ -119,6 +119,8 @@
         <DCCReference Include="ned_settings.pas">
             <Form>NEDSettingsForm</Form>
         </DCCReference>
+        <DCCReference Include="ned_workspace_manager.pas"/>
+        <DCCReference Include="ned_projects.pas"/>
         <DCCReference Include="ned_editor_buffer.pas"/>
         <DCCReference Include="ned_editor_view.pas"/>
         <DCCReference Include="ned_splitview_manager.pas"/>
@@ -130,19 +132,15 @@
         </DCCReference>
         <DCCReference Include="ned_dialog_base.pas">
             <Form>NEDDialogBase</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="ned_dialog_open.pas">
             <Form>NEDDialogOpen</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="ned_dialog_save.pas">
             <Form>NEDDialogSave</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="ned_dialog_profiles.pas">
             <Form>NEDDialogProfiles</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
@@ -596,6 +594,7 @@
                 <Platform value="Win32">True</Platform>
                 <Platform value="Win64">False</Platform>
             </Platforms>
+            <ModelSupport>False</ModelSupport>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
     </ProjectExtensions>

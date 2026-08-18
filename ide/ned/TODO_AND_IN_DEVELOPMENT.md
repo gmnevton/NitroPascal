@@ -12,7 +12,7 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
 
 - Visual editor component from scratch (~~TSynEdit component rework~~)
   
-  - [ ] Keyboard input handling
+  - [ ] Keyboard / mouse input handling
     
     - [ ] DELETE key
     
@@ -22,19 +22,17 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
     
     - [ ] and any CTRL / ALT / SHIFT combinations
   
-  - [ ] Split-view current or new editor (shortcuts)
+    - [ ] Split-view current or new editor (shortcuts)
   
-  - [x] Render scroll bars (in progress; vertical - bug fixes; horizontal - to do)
+    - [ ] Handle selection
   
-  - [x] Handle scrolling (in progress; vertical - bug fixes; horizontal - to do)
+  - [ ] IDE configuration
   
-  - [ ] Handle selection
+    - [ ] Make IDE configuration (in progress)
   
-  - [ ] Make IDE configuration (in progress)
+    - [ ] Make IDE profiles (in progress)
   
-  - [ ] Make IDE profiles (in progress)
-  
-  - [ ] Make IDE session context (to do)
+    - [ ] Make IDE session context (to do)
     
     - [ ] Save session (loaded projects, opened files)
     
@@ -61,6 +59,18 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
     - [x] Handle thumbstone (header button) interactions
   
   - [ ] Test multi-edit/view on a single document
+  
+  - [ ] Render scroll bars
+    
+    - [x] Vertical
+    
+    - [ ] Horizontal
+  
+  - [ ] Handle scrolling
+    
+    - [x] Vertical
+    
+    - [ ] Horizontal
   
   - [x] Switch to next editor if available ([SHIFT+]CTRL+TAB shortcut)
   

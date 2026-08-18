@@ -103,7 +103,9 @@ uses
   UCL.Types,
   UCL.Utils,
   ned_config,
-  ned_session_context;
+  ned_session_context,
+  ned_projects,
+  ned_main;
 
 procedure TNEDHomeForm.FormCreate(Sender: TObject);
 begin
@@ -328,7 +330,7 @@ end;
 
 procedure TNEDHomeForm.UHyperLink2Click(Sender: TObject);
 begin
-//
+  TNEDMainForm(Application.MainForm).Open1.Click;
 end;
 
 procedure TNEDHomeForm.UHyperLink3Click(Sender: TObject);

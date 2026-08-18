@@ -53,7 +53,7 @@ const
 
 type
   TNEDToolboxTypeEnum = (
-    ttProject,
+    ttWorkspace,
     ttSearch
   );
 
@@ -123,7 +123,7 @@ type
     NitroPascalwebsite1: TMenuItem;
     N9: TMenuItem;
     pnlToolbox: TUPanel;
-    boxProject: TUScrollBox;
+    boxWorkspace: TUScrollBox;
     UPanel5: TUPanel;
     btnDebugRun: TUQuickButton;
     btnDebugPause: TUQuickButton;
@@ -133,7 +133,7 @@ type
     btnDebugStepInto: TUQuickButton;
     UPanel7: TUPanel;
     btnHome: TUQuickButton;
-    btnProject: TUQuickButton;
+    btnWorkspace: TUQuickButton;
     btnSearch: TUQuickButton;
     USeparator2: TUSeparator;
     txtFilePath: TUText;
@@ -151,8 +151,8 @@ type
     barStatus: TUProgressBar;
     sepStatus: TUSeparator;
     txtStatus: TUText;
-    barProject: TUTitleBar;
-    vstProject: TVirtualStringTree;
+    barWorkspace: TUTitleBar;
+    vstWorkspace: TVirtualStringTree;
     boxSearch: TUScrollBox;
     barSearch: TUTitleBar;
     vstSearch: TVirtualStringTree;
@@ -182,7 +182,7 @@ type
     //
     procedure btnSelectProfileClick(Sender: TObject);
     procedure btnHomeClick(Sender: TObject);
-    procedure btnProjectClick(Sender: TObject);
+    procedure btnWorkspaceClick(Sender: TObject);
     procedure btnSearchClick(Sender: TObject);
     //
     procedure New1Click(Sender: TObject);
@@ -220,6 +220,7 @@ type
     procedure NEDWindowSwitch(var Msg: TMessage); message CM_NED_WINDOW_SWITCH;
     //
     //
+    procedure RestoreWindowPlacement;
     procedure ShowHideToolBox(const AToolbox: TNEDToolboxTypeEnum);
   private
     NEDViewForm: TNEDViewForm;
@@ -257,58 +258,9 @@ var
 //  NEDEditorForm: TNEDEditorForm;
 
 procedure TNEDMainForm.FormCreate(Sender: TObject);
-var
-  i, x_pos, y_pos, x, y: Integer;
-  _monitor: TMonitor;
-  P: TPoint;
 begin
   CaptionBar := barCaption;
-  //
-  NEDConfig.Lock;
-  try
-    x_pos := 0;
-    y_pos := 0;
-    if NEDConfig.Monitor <> 0 then begin
-      for i := 0 to Screen.MonitorCount - 1 do begin
-        _monitor := Screen.Monitors[i];
-        if _monitor.Handle = NEDConfig.Monitor then begin
-          if NEDConfig.Monitor <> Screen.PrimaryMonitor.Handle then begin
-            x_pos := _monitor.WorkareaRect.Left + NEDConfig.Position.X;
-            y_pos := _monitor.WorkareaRect.Top + NEDConfig.Position.Y;
-            if x_pos < 0 then
-              x := _monitor.WorkareaRect.Left - x_pos
-            else
-              x := x_pos;
-            if y_pos < 0 then
-              y := _monitor.WorkareaRect.Top - y_pos
-            else
-              y := y_pos;
-            P := Point(x, y);
-            if not PtInRect(_monitor.WorkareaRect, P) then begin
-              x_pos := _monitor.WorkareaRect.Left;
-              y_pos := _monitor.WorkareaRect.Top;
-            end;
-            Break;
-          end;
-        end;
-      end;
-    end
-    else begin
-      x_pos := NEDConfig.Position.X;
-      y_pos := NEDConfig.Position.Y;
-    end;
-    Self.Left := x_pos;
-    Self.Top := y_pos;
-    x := NEDConfig.Size.cx;
-    y := NEDConfig.Size.cy;
-    if x > -1 then
-      Self.Width := x;
-    if y > -1 then
-      Self.Height := y;
-  finally
-    NEDConfig.Unlock;
-  end;
-  //
+  RestoreWindowPlacement;
   OnMove := FormMove;
   //
   NEDHomeForm := TNEDHomeForm.Create(Self);
@@ -326,13 +278,12 @@ begin
   //
   pnlToolbox.Visible := False;
   splLeft.Visible := False;
-  boxProject.BringToFront;
   //
   FModalForm := Nil;
   FProfile := Nil;
   FLastOpenedPath := '';
-  boxProject.BringToFront;
-  FActiveToolbox := ttProject;
+  boxWorkspace.BringToFront;
+  FActiveToolbox := ttWorkspace;
   //
   if not NEDConfig.Loaded and NEDConfig.Error then
     txtStatus.Caption := NEDConfig.ErrorMsg;
@@ -460,21 +411,27 @@ begin
   btnSelectProfileClick(Nil);
 end;
 
-procedure TNEDMainForm.CMDialogKey(var Msg: TCMDialogKey);
-begin
+//procedure TNEDMainForm.CMDialogKey(var Msg: TCMDialogKey);
 //  if GetKeyState(VK_MENU) >= 0 then begin // ALT
-    case Msg.CharCode of
-      VK_TAB: begin
-        if GetKeyState(VK_CONTROL) >= 0 then begin
+//    case Msg.CharCode of
+//      VK_TAB: begin
+//        if GetKeyState(VK_CONTROL) >= 0 then begin
 //          ShowMessage('MAIN CTRL+TAB');
 //          SelectNext(FActiveControl, GetKeyState(VK_SHIFT) >= 0, True);
 //          Result := 1;
 //          Exit;
-        end;
+//        end;
 //        Exit;
-      end;
-    end;
+//      end;
+//    end;
 //  end;
+//  inherited;
+//end;
+procedure TNEDMainForm.CMDialogKey(var Msg: TCMDialogKey);
+begin
+  if (Msg.CharCode = VK_TAB) and (FModalForm <> Nil) then
+    Exit;
+
   inherited;
 end;
 
@@ -552,13 +509,65 @@ begin
   Msg.Result := Msg.Result or DLGC_WANTTAB or DLGC_WANTARROWS or DLGC_WANTALLKEYS;
 end;
 
+procedure TNEDMainForm.RestoreWindowPlacement;
+var
+  i, x_pos, y_pos, x, y: Integer;
+  _monitor: TMonitor;
+  P: TPoint;
+begin
+  NEDConfig.Lock;
+  try
+    x_pos := 0;
+    y_pos := 0;
+    if NEDConfig.Monitor <> 0 then begin
+      for i := 0 to Screen.MonitorCount - 1 do begin
+        _monitor := Screen.Monitors[i];
+        if _monitor.Handle = NEDConfig.Monitor then begin
+          if NEDConfig.Monitor <> Screen.PrimaryMonitor.Handle then begin
+            x_pos := _monitor.WorkareaRect.Left + NEDConfig.Position.X;
+            y_pos := _monitor.WorkareaRect.Top + NEDConfig.Position.Y;
+            if x_pos < 0 then
+              x := _monitor.WorkareaRect.Left - x_pos
+            else
+              x := x_pos;
+            if y_pos < 0 then
+              y := _monitor.WorkareaRect.Top - y_pos
+            else
+              y := y_pos;
+            P := Point(x, y);
+            if not PtInRect(_monitor.WorkareaRect, P) then begin
+              x_pos := _monitor.WorkareaRect.Left;
+              y_pos := _monitor.WorkareaRect.Top;
+            end;
+            Break;
+          end;
+        end;
+      end;
+    end
+    else begin
+      x_pos := NEDConfig.Position.X;
+      y_pos := NEDConfig.Position.Y;
+    end;
+    Self.Left := x_pos;
+    Self.Top := y_pos;
+    x := NEDConfig.Size.cx;
+    y := NEDConfig.Size.cy;
+    if x > -1 then
+      Self.Width := x;
+    if y > -1 then
+      Self.Height := y;
+  finally
+    NEDConfig.Unlock;
+  end;
+end;
+
 procedure TNEDMainForm.ShowHideToolBox(const AToolbox: TNEDToolboxTypeEnum);
 begin
   if pnlToolbox.Visible then begin
     if FActiveToolbox <> AToolbox then begin
       FActiveToolbox := AToolbox;
-      if AToolbox = ttProject then
-        boxProject.BringToFront
+      if AToolbox = ttWorkspace then
+        boxWorkspace.BringToFront
       else if AToolbox = ttSearch then
         boxSearch.BringToFront;
     end
@@ -569,8 +578,8 @@ begin
   end
   else begin
     FActiveToolbox := AToolbox;
-    if AToolbox = ttProject then
-      boxProject.BringToFront
+    if AToolbox = ttWorkspace then
+      boxWorkspace.BringToFront
     else if AToolbox = ttSearch then
       boxSearch.BringToFront;
     splLeft.Visible := True;
@@ -619,9 +628,9 @@ begin
         end;
         NEDHomeForm.SyncProperties(FProfile);
 
-        btnProject.Enabled := True;
+        btnWorkspace.Enabled := True;
         btnSearch.Enabled := True;
-        ShowHideToolBox(ttProject);
+        ShowHideToolBox(ttWorkspace);
       end;
     end;
   finally
@@ -642,9 +651,9 @@ begin
   end;
 end;
 
-procedure TNEDMainForm.btnProjectClick(Sender: TObject);
+procedure TNEDMainForm.btnWorkspaceClick(Sender: TObject);
 begin
-  ShowHideToolBox(ttProject);
+  ShowHideToolBox(ttWorkspace);
 end;
 
 procedure TNEDMainForm.btnSearchClick(Sender: TObject);
@@ -668,15 +677,16 @@ begin
   FModalForm := open;
   try
     if open.Execute(FLastOpenedPath) then begin
+      FLastOpenedPath := ExtractFilePath(open.FileName);
+      //
       if NEDViewForm = Nil then begin
         NEDViewForm := TNEDViewForm.Create(Application);
         NEDViewForm.Parent := pnlWorkSpace;
         NEDViewForm.Align := alClient;
         NEDViewForm.Show;
-        NEDViewForm.BringToFront;
       end;
+      NEDViewForm.BringToFront;
       //
-      FLastOpenedPath := ExtractFilePath(open.FileName);
       if Sender = Open1 then
         NEDViewForm.OpenFile(open.FileName)
       else if Sender = Openandsplittoright1 then

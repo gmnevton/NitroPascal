@@ -379,7 +379,7 @@ object NEDMainForm: TNEDMainForm
         ButtonStyle = qbsNone
         Caption = #57615
       end
-      object btnProject: TUQuickButton
+      object btnWorkspace: TUQuickButton
         Left = 0
         Top = 40
         Height = 40
@@ -392,7 +392,7 @@ object NEDMainForm: TNEDMainForm
         Font.Name = 'Segoe MDL2 Assets'
         Font.Style = []
         ParentFont = False
-        OnClick = btnProjectClick
+        OnClick = btnWorkspaceClick
         BackColors.Enabled = False
         BackColors.Color = clBlack
         BackColors.LightColor = 13619151
@@ -875,7 +875,7 @@ object NEDMainForm: TNEDMainForm
         Columns = <>
       end
     end
-    object boxProject: TUScrollBox
+    object boxWorkspace: TUScrollBox
       Left = 0
       Top = 0
       Width = 200
@@ -894,7 +894,7 @@ object NEDMainForm: TNEDMainForm
       BackColor.Color = clBlack
       BackColor.LightColor = 15132390
       BackColor.DarkColor = 2039583
-      object barProject: TUTitleBar
+      object barWorkspace: TUTitleBar
         Left = 0
         Top = 0
         Width = 200
@@ -916,10 +916,10 @@ object NEDMainForm: TNEDMainForm
         BackColors.FocusedDarkColor = 1525760
         DragMovement = False
         EnableSystemMenu = False
-        Caption = 'Project'
+        Caption = 'Workspace'
         ExplicitWidth = 185
       end
-      object vstProject: TVirtualStringTree
+      object vstWorkspace: TVirtualStringTree
         Left = 0
         Top = 24
         Width = 200
@@ -982,7 +982,7 @@ object NEDMainForm: TNEDMainForm
       end
       object Saveall1: TMenuItem
         Caption = 'Save all'
-        ShortCut = 49235
+        ShortCut = 24659
         OnClick = Saveall1Click
       end
       object N2: TMenuItem
@@ -990,7 +990,7 @@ object NEDMainForm: TNEDMainForm
       end
       object Close1: TMenuItem
         Caption = 'Close'
-        ShortCut = 16472
+        ShortCut = 32856
         OnClick = Close1Click
       end
       object Closeall1: TMenuItem
