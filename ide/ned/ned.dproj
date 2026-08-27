@@ -107,6 +107,7 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="ned_common_simple_types.pas"/>
         <DCCReference Include="ned_config.pas"/>
         <DCCReference Include="ned_profiles.pas"/>
         <DCCReference Include="ned_session_context.pas"/>
@@ -141,6 +142,9 @@
         </DCCReference>
         <DCCReference Include="ned_dialog_profiles.pas">
             <Form>NEDDialogProfiles</Form>
+        </DCCReference>
+        <DCCReference Include="ned_dialog_message.pas">
+            <Form>NEDDialogMessage</Form>
         </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

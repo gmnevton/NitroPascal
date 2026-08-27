@@ -447,7 +447,7 @@ object NEDMainForm: TNEDMainForm
       Left = 65
       Top = 4
       Width = 44
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -461,7 +461,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
       Left = 175
@@ -477,7 +476,7 @@ object NEDMainForm: TNEDMainForm
       Left = 195
       Top = 4
       Width = 34
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -491,7 +490,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
       Left = 229
@@ -505,7 +503,7 @@ object NEDMainForm: TNEDMainForm
       Left = 249
       Top = 4
       Width = 28
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -519,7 +517,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
       Left = 277
@@ -534,7 +531,7 @@ object NEDMainForm: TNEDMainForm
       Left = 297
       Top = 4
       Width = 32
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -548,7 +545,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
       Left = 329
@@ -562,7 +558,7 @@ object NEDMainForm: TNEDMainForm
       Left = 349
       Top = 4
       Width = 118
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -576,7 +572,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
       Left = 467
@@ -592,7 +587,7 @@ object NEDMainForm: TNEDMainForm
       Left = 487
       Top = 4
       Width = 15
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -607,7 +602,6 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
-      ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
       Left = 598
@@ -657,7 +651,7 @@ object NEDMainForm: TNEDMainForm
       Left = 129
       Top = 4
       Width = 46
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -671,7 +665,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator7: TUSeparator
       Left = 109
@@ -686,7 +679,7 @@ object NEDMainForm: TNEDMainForm
       Left = 8
       Top = 4
       Width = 37
-      Height = 24
+      Height = 17
       Margins.Left = 8
       Margins.Top = 4
       Margins.Right = 0
@@ -700,7 +693,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator8: TUSeparator
       Left = 45
@@ -875,7 +867,7 @@ object NEDMainForm: TNEDMainForm
         Columns = <>
       end
     end
-    object boxWorkspace: TUScrollBox
+    object boxWorkSpace: TUScrollBox
       Left = 0
       Top = 0
       Width = 200
@@ -920,11 +912,10 @@ object NEDMainForm: TNEDMainForm
         ExplicitWidth = 185
       end
       object vstWorkspace: TVirtualStringTree
-        Left = 0
-        Top = 24
-        Width = 200
-        Height = 485
-        Align = alClient
+        Left = 20
+        Top = 52
+        Width = 130
+        Height = 146
         BevelInner = bvNone
         BevelOuter = bvNone
         BorderStyle = bsNone
@@ -932,6 +923,7 @@ object NEDMainForm: TNEDMainForm
         Header.MainColumn = -1
         ParentColor = True
         TabOrder = 1
+        Visible = False
         Columns = <>
       end
     end

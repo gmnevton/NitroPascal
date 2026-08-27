@@ -64,14 +64,14 @@ type
     procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
   public
-    function NewEditor(const Buffer: TNEDEditorBuffer): TNEDEditorView;
+    function NewEditor(const Buffer: TNEDEditorBuffer; out Info: TNEDEditorInfo): TNEDEditorView;
     class procedure SelectEditorByThumbstone(const Thumbstone: TUSymbolButton);
     class procedure SelectEditorByEditor(const Editor: TNEDEditorView);
     class procedure SelectEditorByIndex(const Index: Integer);
   end;
 
 var
-  NEDEditors: TList<TNEDEditorInfo>;
+  NEDEditors: TObjectList<TNEDEditorInfo>;
 
 implementation
 
@@ -86,7 +86,7 @@ var
 
 procedure CreateEditorsList;
 begin
-  NEDEditors := TList<TNEDEditorInfo>.Create;
+  NEDEditors := TObjectList<TNEDEditorInfo>.Create(True);
 end;
 
 procedure DestroyEditorsList;
@@ -127,7 +127,7 @@ begin
   //
 end;
 
-function TNEDEditorForm.NewEditor(const Buffer: TNEDEditorBuffer): TNEDEditorView;
+function TNEDEditorForm.NewEditor(const Buffer: TNEDEditorBuffer; out Info: TNEDEditorInfo): TNEDEditorView;
 var
   Button, SymbolButton: TUSymbolButton;
   i, ctrl_left: Integer;
@@ -164,7 +164,8 @@ begin
   SymbolButton.Text := '---';
   SymbolButton.OnClick := btnEditorThumbClick;
   //
-  NEDEditors.Add(TNEDEditorInfo.Create(SymbolButton, Result));
+  Info := TNEDEditorInfo.Create(SymbolButton, Result);
+  NEDEditors.Add(Info);
 end;
 
 class procedure TNEDEditorForm.SelectEditorByThumbstone(const Thumbstone: TUSymbolButton);

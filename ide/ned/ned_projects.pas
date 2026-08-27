@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-07
+// Modified: 2026-08
 // All rights reserved.
 //
 
@@ -16,6 +16,7 @@ uses
   SysUtils,
   Generics.Collections,
   JSON.VerySimple,
+  ned_common_simple_types,
   ned_editor_context;
 
 type
@@ -25,6 +26,7 @@ type
     ptProjectGroup,
     ptFile
   );
+
   TNEDProjectType = class
   public
     class function ProjectTypeToString(const AValue: TNEDProjectTypeEnum): String;
@@ -33,7 +35,7 @@ type
 
   TNEDProject = class
   private
-    FID: String;
+    FID: TNEDUniqueID;
     FType: TNEDProjectTypeEnum;
     FName: String;
     FFileName: String;
@@ -46,10 +48,23 @@ type
     FTimeUsedMinutes: Integer;
     //
     FEditors: TObjectList<TNEDEditorContext>;
+  protected
+    function GetEditorsCount: Integer;
+    function GetEditor(const Index: Integer): TNEDEditorContext;
   public
-    constructor Create(const AStorage: TJSONVerySimple; const ANode: TJSONNode);
+    constructor Create; overload;
+    constructor Create(const AStorage: TJSONVerySimple; const ANode: TJSONNode); overload;
+    constructor Create(const AType: TNEDProjectTypeEnum; const AProjectPath: String); overload;
     destructor Destroy; override;
     //
+    procedure AddEditor(const AEditorContext: TNEDEditorContext);
+    procedure OpenEditors;
+    procedure OpenEditor(const AEditorContext: TNEDEditorContext);
+    procedure CloseEditors;
+    procedure CloseEditor(const AEditorContext: TNEDEditorContext);
+    procedure Touch;
+    //
+    property ID: TNEDUniqueID read FID;
     property &Type: TNEDProjectTypeEnum read FType;
     property Name: String read FName;
     property FileName: String read FFileName;
@@ -60,6 +75,9 @@ type
     property LastOpenedDate: TDateTime read FLastOpenedDate;
     property TimesOpened: Integer read FTimesOpened;
     property TimeUsedMinutes: Integer read FTimeUsedMinutes;
+    //
+    property EditorsCount: Integer read GetEditorsCount;
+    property Editor[const Index: Integer]: TNEDEditorContext read GetEditor;
   end;
 
 implementation
@@ -94,57 +112,112 @@ end;
 
 { TNEDProject }
 
-constructor TNEDProject.Create(const AStorage: TJSONVerySimple; const ANode: TJSONNode);
-var
-  pID: String;
-  pType: TNEDProjectTypeEnum;
-  pName: String;
-  pFileName: String;
-  pFilePath: String;
-  pDescription: String;
-  pCreateDate: TDateTime;
-  pModifyDate: TDateTime;
-  pLastOpenedDate: TDateTime;
-  pTimesOpened: Integer;
-  pTimeUsedMinutes: Integer;
+constructor TNEDProject.Create;
 begin
   FEditors := TObjectList<TNEDEditorContext>.Create(True);
   //
-  pID := AStorage.NodeAsString(ANode, 'ID', '');
-  pType := TNEDProjectType.StringToProjectType(AStorage.NodeAsString(ANode, 'Type', 'unknown'));
-  pName := AStorage.NodeAsString(ANode, 'Name', '');
-  pFileName := AStorage.NodeAsString(ANode, 'FileName', '');
-  pFilePath := AStorage.NodeAsString(ANode, 'FilePath', '');
-  pDescription := AStorage.NodeAsString(ANode, 'Description', '');
-  pCreateDate := AStorage.NodeAsDateTime(ANode, 'CreateDate', 0);
-  pModifyDate := AStorage.NodeAsDateTime(ANode, 'ModifyDate', 0);
-  pLastOpenedDate := AStorage.NodeAsDateTime(ANode, 'LastOpenedDate', 0);
-  pTimesOpened := AStorage.NodeAsInteger(ANode, 'TimesOpened', 0);
-  pTimeUsedMinutes := AStorage.NodeAsInteger(ANode, 'TimeUsedMinutes', 0);
+  FID := '';
+  FType := ptUnknown;
+  FName := '';
+  FFileName := '';
+  FFilePath := '';
+  FDescription := '';
+  FCreateDate := 0;
+  FModifyDate := 0;
+  FLastOpenedDate := 0;
+  FTimesOpened := 0;
+  FTimeUsedMinutes := 0;
+end;
+
+constructor TNEDProject.Create(const AStorage: TJSONVerySimple; const ANode: TJSONNode);
+begin
+  Create;
   //
-  FID := pID;
-  FType := pType;
-  FName := pName;
-  FFileName := pFileName;
-  FFilePath := pFilePath;
-  FDescription := pDescription;
-  FCreateDate := pCreateDate;
-  FModifyDate := pModifyDate;
-  FLastOpenedDate := pLastOpenedDate;
-  FTimesOpened := pTimesOpened;
-  FTimeUsedMinutes := pTimeUsedMinutes;
+  FID := AStorage.NodeAsString(ANode, 'ID', '');
+  FType := TNEDProjectType.StringToProjectType(AStorage.NodeAsString(ANode, 'Type', 'unknown'));
+  FName := AStorage.NodeAsString(ANode, 'Name', '');
+  FFileName := AStorage.NodeAsString(ANode, 'FileName', '');
+  FFilePath := AStorage.NodeAsString(ANode, 'FilePath', '');
+  FDescription := AStorage.NodeAsString(ANode, 'Description', '');
+  FCreateDate := AStorage.NodeAsDateTime(ANode, 'CreateDate', 0);
+  FModifyDate := AStorage.NodeAsDateTime(ANode, 'ModifyDate', 0);
+  FLastOpenedDate := AStorage.NodeAsDateTime(ANode, 'LastOpenedDate', 0);
+  FTimesOpened := AStorage.NodeAsInteger(ANode, 'TimesOpened', 0);
+  FTimeUsedMinutes := AStorage.NodeAsInteger(ANode, 'TimeUsedMinutes', 0);
+end;
+
+constructor TNEDProject.Create(const AType: TNEDProjectTypeEnum; const AProjectPath: String);
+begin
+  Create;
   //
-  pID := '';
-  pName := '';
-  pFileName := '';
-  pFilePath := '';
-  pDescription := '';
+  FID := NewGUID;
+  FType := AType;
+  FFileName := ExtractFileName(AProjectPath);
+  FFilePath := ExtractFilePath(AProjectPath);
+  FCreateDate := Now;
+  FModifyDate := FCreateDate;
+  FLastOpenedDate := FCreateDate;
+  FTimesOpened := 1;
+  //
+  FName := '';
+  FDescription := '';
 end;
 
 destructor TNEDProject.Destroy;
 begin
   FEditors.Free;
   inherited;
+end;
+
+function TNEDProject.GetEditorsCount: Integer;
+begin
+  Result := FEditors.Count;
+end;
+
+function TNEDProject.GetEditor(const Index: Integer): TNEDEditorContext;
+begin
+  Result := Nil;
+  if (FEditors.Count > 0) and (Index >= 0) and (Index < FEditors.Count) then
+    Result := FEditors.Items[Index];
+end;
+
+procedure TNEDProject.AddEditor(const AEditorContext: TNEDEditorContext);
+begin
+  FEditors.Add(AEditorContext);
+end;
+
+procedure TNEDProject.OpenEditors;
+var
+  i: Integer;
+begin
+  for i := 0 to FEditors.Count - 1 do begin
+    OpenEditor(FEditors.Items[i]);
+  end;
+end;
+
+procedure TNEDProject.OpenEditor(const AEditorContext: TNEDEditorContext);
+begin
+
+end;
+
+procedure TNEDProject.CloseEditors;
+var
+  i: Integer;
+begin
+  for i := 0 to FEditors.Count - 1 do begin
+    CloseEditor(FEditors.Items[i]);
+  end;
+end;
+
+procedure TNEDProject.CloseEditor(const AEditorContext: TNEDEditorContext);
+begin
+
+end;
+
+procedure TNEDProject.Touch;
+begin
+  FLastOpenedDate := Now;
+  Inc(FTimesOpened);
 end;
 
 end.

@@ -35,7 +35,9 @@ uses
   UCL.Panel,
   UCL.Graphics,
   SplitEx,
-  ned_profiles;
+  ned_profiles,
+  ned_projects,
+  ned_common_simple_types;
 
 type
   TNEDHomeForm = class(TUForm)
@@ -93,7 +95,16 @@ type
     procedure TitleDrawText(Sender: TUItemButton; const ACanvas: TCanvas; ARect: TRect; AText: String);
   public
     procedure SyncProperties(const AProfile: TNEDProfile);
+    function  FindProjectGroup(const AProjectPath: String): TNEDProject; overload;
+    function  FindProjectGroup(const AProjectID: TNEDUniqueID): TNEDProject; overload;
+    function  FindProject(const AProjectPath: String): TNEDProject; overload;
+    function  FindProject(const AProjectID: TNEDUniqueID): TNEDProject; overload;
+    //
+    property Profile: TNEDProfile read FProfile;
   end;
+
+var
+  NEDHomeForm: TNEDHomeForm;
 
 implementation
 
@@ -104,7 +115,6 @@ uses
   UCL.Utils,
   ned_config,
   ned_session_context,
-  ned_projects,
   ned_main;
 
 procedure TNEDHomeForm.FormCreate(Sender: TObject);
@@ -149,6 +159,30 @@ begin
   FillRecentsList;
 end;
 
+function TNEDHomeForm.FindProjectGroup(const AProjectPath: String): TNEDProject;
+begin
+  Result := FProfile.Session.FindFavorite(ptProjectGroup, AProjectPath);
+  if Result = Nil then
+    Result := FProfile.Session.FindRecent(ptProjectGroup, AProjectPath);
+end;
+
+function TNEDHomeForm.FindProjectGroup(const AProjectID: TNEDUniqueID): TNEDProject;
+begin
+  Result := Nil;
+end;
+
+function TNEDHomeForm.FindProject(const AProjectPath: String): TNEDProject;
+begin
+  Result := FProfile.Session.FindFavorite(ptProject, AProjectPath);
+  if Result = Nil then
+    Result := FProfile.Session.FindRecent(ptProject, AProjectPath);
+end;
+
+function TNEDHomeForm.FindProject(const AProjectID: TNEDUniqueID): TNEDProject;
+begin
+  Result := Nil;
+end;
+
 function TNEDHomeForm.GetNewButtonTop(const AParentControl: TUScrollBox): Integer;
 var
   i: Integer;
@@ -158,8 +192,8 @@ begin
   for i := 0 to AParentControl.ControlCount - 1 do begin
     if AParentControl.Controls[i] is TUItemButton then begin
       Button := TUItemButton(AParentControl.Controls[i]);
-      if Result < AParentControl.Controls[i].Top + AParentControl.Controls[i].Height then
-        Result := AParentControl.Controls[i].Top + AParentControl.Controls[i].Height;
+      if Result < Button.Top + Button.Height then
+        Result := Button.Top + Button.Height;
     end;
   end;
 end;

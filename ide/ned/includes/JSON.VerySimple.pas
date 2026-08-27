@@ -1398,7 +1398,7 @@ begin
         if sIndex + 1 <= sLen then begin
           case Result[sIndex + 1] of
             '\': begin
-              Delete(Result, sIndex, 1);
+              Delete(Result, sIndex + 1, 1);
               Dec(sLen, 1);
             end;
             '"': begin
@@ -1850,7 +1850,8 @@ begin
       // don't know what to do with this for now
     end;
     jtString: begin
-      Result:=TJSONVerySimple.Unescape(FValue);
+      //Result:=TJSONVerySimple.Unescape(FValue);
+      Result:=FValue;
       Exit;
     end;
     jtNumber: begin

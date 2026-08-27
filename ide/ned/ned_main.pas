@@ -45,8 +45,8 @@ uses
   SplitEx,
   ned_dialog_base,
   ned_editor_view,
-  ned_source_view,
-  ned_profiles;
+  ned_profiles,
+  ned_workspace_manager;
 
 const
   WM_AFTERSHOW = $BF00; // max $BFFF
@@ -123,7 +123,7 @@ type
     NitroPascalwebsite1: TMenuItem;
     N9: TMenuItem;
     pnlToolbox: TUPanel;
-    boxWorkspace: TUScrollBox;
+    boxWorkSpace: TUScrollBox;
     UPanel5: TUPanel;
     btnDebugRun: TUQuickButton;
     btnDebugPause: TUQuickButton;
@@ -210,20 +210,21 @@ type
   private
     FModalForm: TForm;
     FProfile: TNEDProfile;
+    FWorkspaceManager: TNEDWorkspaceManager;
     FLastOpenedPath: String;
     FActiveToolbox: TNEDToolboxTypeEnum;
     //
     //
     procedure WMAfterShow(var Msg: TMessage); message WM_AFTERSHOW;
     procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
-    procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
-    procedure NEDWindowSwitch(var Msg: TMessage); message CM_NED_WINDOW_SWITCH;
+    procedure WMEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
+    procedure WMWindowSwitch(var Msg: TMessage); message CM_NED_WINDOW_SWITCH;
+    procedure WMClearWorkspace(var Msg: TMessage); message WM_NED_CLEAR_WORKSPACE;
     //
     //
     procedure RestoreWindowPlacement;
     procedure ShowHideToolBox(const AToolbox: TNEDToolboxTypeEnum);
   private
-    NEDViewForm: TNEDViewForm;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
@@ -244,16 +245,17 @@ uses
   Dialogs,
   ned_home_page,
   ned_dialog_profiles,
+  ned_source_view,
   ned_source_editor,
   ned_dialog_open,
+  ned_dialog_message,
   ned_splitview_manager,
   ned_config;
 
 type
   TWinControlAccess = class(TWinControl);
 
-var
-  NEDHomeForm: TNEDHomeForm;
+//var
 //  NEDDialogProfiles: TNEDDialogProfiles;
 //  NEDEditorForm: TNEDEditorForm;
 
@@ -281,6 +283,7 @@ begin
   //
   FModalForm := Nil;
   FProfile := Nil;
+  FWorkspaceManager := TNEDWorkspaceManager.Create;
   FLastOpenedPath := '';
   boxWorkspace.BringToFront;
   FActiveToolbox := ttWorkspace;
@@ -300,6 +303,7 @@ procedure TNEDMainForm.FormDestroy(Sender: TObject);
 begin
 //  NEDDialogProfiles.Free;
   NEDHomeForm.Free;
+  FWorkspaceManager.Free;
   FProfile := Nil;
 end;
 
@@ -435,7 +439,7 @@ begin
   inherited;
 end;
 
-procedure TNEDMainForm.NEDEditorInfoDetails(var Msg: TMessage);
+procedure TNEDMainForm.WMEditorInfoDetails(var Msg: TMessage);
 var
   EditorInfoDetails: PNEDEditorInfoDetails;
 begin
@@ -465,7 +469,7 @@ begin
   Msg.Result := 1;
 end;
 
-procedure TNEDMainForm.NEDWindowSwitch(var Msg: TMessage);
+procedure TNEDMainForm.WMWindowSwitch(var Msg: TMessage);
 var
   CurrentEditor: TNEDCustomEditorView;
   MoveDirection: Integer;
@@ -499,6 +503,29 @@ begin
         end;
       end;
     end;
+  end;
+end;
+
+procedure TNEDMainForm.WMClearWorkspace(var Msg: TMessage);
+var
+  NEDDialogMessage: TNEDDialogMessage;
+  MessageClearWorkspace: TNEDMessageClearWorkspace;
+begin
+  NEDDialogMessage := TNEDDialogMessage(CreateModalDialogForm(TNEDDialogMessage));
+  try
+    if NEDDialogMessage <> Nil then begin
+      MessageClearWorkspace := TNEDMessageClearWorkspace(Pointer(Msg.LParam)^);
+      if NEDDialogMessage.Execute(dtConfirmation, MessageClearWorkspace.Buttons, MessageClearWorkspace.Title, MessageClearWorkspace.Question) then begin
+        Msg.Result := 1;
+        if NEDDialogMessage.ModalResult = mrYes then begin
+          FWorkspaceManager.ClearWorkspace;
+        end;
+      end
+      else
+        Msg.Result := 0;
+    end;
+  finally
+    DestroyModalDialogForm(TNEDDialogBase(NEDDialogMessage));
   end;
 end;
 
@@ -593,7 +620,7 @@ begin
   if FModalForm <> Nil then
     Exit;
   //
-  Result := AFormClass.Create(Application);
+  Result := AFormClass.Create(Self);
   FModalForm := Result;
 end;
 
@@ -669,35 +696,39 @@ end;
 procedure TNEDMainForm.Open1Click(Sender: TObject);
 var
   open: TNEDDialogOpen;
+  SplitType: TNEDSplitViewTypeEnum;
+  ok: Boolean;
+  FileName: String;
 begin
   if FModalForm <> Nil then
     Exit;
   //
-  open := TNEDDialogOpen.Create(Application);
+  open := TNEDDialogOpen.Create(Self);
   FModalForm := open;
   try
-    if open.Execute(FLastOpenedPath) then begin
+    ok := open.Execute(FLastOpenedPath);
+    if ok then begin
       FLastOpenedPath := ExtractFilePath(open.FileName);
-      //
-      if NEDViewForm = Nil then begin
-        NEDViewForm := TNEDViewForm.Create(Application);
-        NEDViewForm.Parent := pnlWorkSpace;
-        NEDViewForm.Align := alClient;
-        NEDViewForm.Show;
-      end;
-      NEDViewForm.BringToFront;
-      //
-      if Sender = Open1 then
-        NEDViewForm.OpenFile(open.FileName)
-      else if Sender = Openandsplittoright1 then
-        NEDViewForm.OpenFile(open.FileName, True, stSplitV)
-      else if Sender = Openandsplittobottom1 then
-        NEDViewForm.OpenFile(open.FileName, True, stSplitH);
+      FileName := open.FileName;
     end;
   finally
     FModalForm := Nil;
     open.Free;
     open := Nil;
+  end;
+  //
+  if ok then begin
+    FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
+    //
+    SplitType := stSplitNone;
+    //if Sender = Open1 then
+    //else
+    if Sender = Openandsplittoright1 then
+      SplitType := stSplitV
+    else if Sender = Openandsplittobottom1 then
+      SplitType := stSplitH;
+    //
+    FWorkspaceManager.Open(FileName, SplitType);
   end;
 end;
 

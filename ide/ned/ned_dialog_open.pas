@@ -89,6 +89,7 @@ type
     function GetPathFromPIDL(const IDL: PItemIDList): String;
     function GetPIDLFromPath(const Path: String): PItemIDList;
     function GetDirFromSpecialFolder(const Folder: Integer): String;
+    procedure FreePIDL(var AData: Pointer);
     procedure TrySelectMatchingFolder;
     // FolderView events
     procedure FolderChanged(Sender: TObject); // event
@@ -451,6 +452,7 @@ begin
         temp := GetShellItemName(Parent, IDL, SHGDN_NORMAL);
         Folder := FolderView.Entries.Add;
         Folder.Caption := temp;
+        Folder.UserFreeProc := FreePIDL;
         CloneIDL := ILClone(IDL);
         Folder.Data := CloneIDL;
         GetFolderIcon(IDL, Folder);
@@ -485,6 +487,7 @@ begin
       path := List.Strings[i];
       Item := Folders.Add;
       Item.Caption := path;
+      Item.UserFreeProc := FreePIDL;
       IDL := GetPIDLFromPath(FPath + path);
       CloneIDL := ILClone(IDL);
       Item.Data := CloneIDL;
@@ -511,6 +514,7 @@ begin
       path := List.Strings[i];
       Item := Files.Add;
       Item.Caption := path;
+      Item.UserFreeProc := FreePIDL;
       IDL := GetPIDLFromPath(FPath + path);
       CloneIDL := ILClone(IDL);
       Item.Data := CloneIDL;
@@ -616,6 +620,11 @@ begin
   SetLength(Result, StrLen(PChar(Result)));
   Result := IncludeTrailingPathDelimiter(Result);
   FreeItemIDList(SpecialDirIDL);
+end;
+
+procedure TNEDDialogOpen.FreePIDL(var AData: Pointer);
+begin
+  ILFree(AData);
 end;
 
 procedure TNEDDialogOpen.TrySelectMatchingFolder;
@@ -729,7 +738,7 @@ const
 var
   Objects: IEnumIdList;
   Flags: DWord;
-  AbsIDL, ItemIDL: PItemIDList;
+  AbsIDL, ItemIDL, TempAbsIDL: PItemIDList;
   DummyResult: ULONG;
   attr: UInt;
   descrID: HResult;
@@ -781,7 +790,10 @@ begin
       Item := Entry.Items.Add;
       temp := GetShellItemName(ShellFolder, ItemIDL, SHGDN_NORMAL);
       Item.Caption := temp;
-      AbsIDL := ILClone(ILCombine(IDL, ItemIDL));
+      Item.UserFreeProc := FreePIDL;
+      TempAbsIDL := ILCombine(IDL, ItemIDL);
+      AbsIDL := ILClone(TempAbsIDL);
+      ILFree(TempAbsIDL);
       Item.Data := AbsIDL;
       GetItemIcon(AbsIDL, Item);
 

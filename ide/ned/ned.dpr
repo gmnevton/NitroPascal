@@ -15,6 +15,7 @@ uses
   madLinkDisAsm,
   madListModules,
   Forms,
+  ned_common_simple_types in 'ned_common_simple_types.pas',
   ned_config in 'ned_config.pas',
   ned_profiles in 'ned_profiles.pas',
   ned_session_context in 'ned_session_context.pas',
@@ -31,7 +32,8 @@ uses
   ned_dialog_base in 'ned_dialog_base.pas' {NEDDialogBase},
   ned_dialog_open in 'ned_dialog_open.pas' {NEDDialogOpen},
   ned_dialog_save in 'ned_dialog_save.pas' {NEDDialogSave},
-  ned_dialog_profiles in 'ned_dialog_profiles.pas' {NEDDialogProfiles};
+  ned_dialog_profiles in 'ned_dialog_profiles.pas' {NEDDialogProfiles},
+  ned_dialog_message in 'ned_dialog_message.pas' {NEDDialogMessage};
 
 {$R *.res}
 

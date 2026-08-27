@@ -15,14 +15,15 @@ interface
 uses
   SysUtils,
   Generics.Collections,
-  ned_session_context;
+  ned_session_context,
+  ned_common_simple_types;
 
 type
   // this class is responsible for handling info about profiles that are available to the user,
   // all additional info is handled by session contex, that load/save profile file config
   TNEDProfile = class
   private
-    FID: String;
+    FID: TNEDUniqueID;
     FName: String;
     FCopiedFrom: String; // not sure if this is needed
     FIndex: Integer;
@@ -45,7 +46,7 @@ type
     function LoadSessionContext: Boolean;
     function UnloadSessionContext: Boolean;
     //
-    property ID: String read FID;
+    property ID: TNEDUniqueID read FID;
     property Name: String read FName;
     property OriginateFrom: String read FCopiedFrom write FCopiedFrom;
     property Index: Integer read FIndex;
@@ -70,7 +71,7 @@ type
     //
     procedure Clear;
     function Count: Integer;
-    function Add(const AID, AName: String): TNEDProfile;
+    function Add(const AID: TNEDUniqueID; const AName: String): TNEDProfile;
     function AddNew(const AName: String; const ASetAsDefault: Boolean): TNEDProfile;
     function Remove(const AIndex: Integer): Boolean;
     function Move(const AFromIndex, AToIndex: Integer): Boolean;
@@ -82,42 +83,15 @@ type
 implementation
 
 uses
-  Forms,
-//  ComObj,
-  ActiveX;
-
-function Succeeded(Res: HResult): Boolean;
-begin
-  Result := Res and $80000000 = 0;
-end;
-
-function GUIDToString(const ClassID: TGUID): string;
-var
-  P: PWideChar;
-  OpResult: HResult;
-begin
-  OpResult := StringFromCLSID(ClassID, P);
-  if not Succeeded(OpResult) then
-    Result :=  ''
-  else begin
-    Result := P;
-    Result := Result.Replace('{', '').Replace('}', '').Replace('-', '');
-    CoTaskMemFree(P);
-  end;
-end;
+  Forms;
 
 { TNEDProfile }
 
 constructor TNEDProfile.Create(const AName: String; const ACreateNewUID: Boolean);
-var
-  G: TGUID;
-  Result: HResult;
 begin
   FID := '';
   if ACreateNewUID then begin
-    Result := CreateGUID(G);
-    if Succeeded(Result) then // @TODO: do something with this, when error occurs
-      FID := GUIDToString(G);
+    FID := NewGUID;
   end;
   //
   FName := AName;
@@ -221,7 +195,7 @@ begin
   Result := FList.Count;
 end;
 
-function TNEDProfiles.Add(const AID, AName: String): TNEDProfile;
+function TNEDProfiles.Add(const AID: TNEDUniqueID; const AName: String): TNEDProfile;
 begin
   try
     Result := TNEDProfile.Create(AName, False);

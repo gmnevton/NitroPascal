@@ -20,7 +20,8 @@ uses
   ned_splitview_manager,
   ned_source_editor,
   ned_editor_buffer,
-  ned_editor_view;
+  ned_editor_view,
+  ned_editor_context;
 
 type
   TNEDViewForm = class(TUForm)
@@ -39,14 +40,15 @@ type
     procedure FormShow(Sender: TObject);
   private
     SplitManager: TNEDSplittingManager;
-    Buffers: TList<TNEDEditorBuffer>;
-    Views: TList<TNEDEditorForm>;
+    Buffers: TObjectList<TNEDEditorBuffer>;
+    Views: TObjectList<TNEDEditorForm>;
     MainView: TNEDEditorForm;
     //
-    function OpenNewBuffer(const FilePath: String; out Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm): Boolean;
+    function OpenNewBuffer(const FilePath: String; out Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
     function OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const View: TNEDEditorForm): TNEDEditorView;
   public
-    function OpenFile(const FilePath: String; const SplitWindow: Boolean = False; const SplitType: TNEDSplitViewTypeEnum = stSplitNone): Boolean;
+    function OpenFile(const FilePath: String; out EditorContext: TNEDEditorContext; const SplitType: TNEDSplitViewTypeEnum = stSplitNone): Boolean;
+    procedure CloseEditorViews;
   end;
 
 implementation
@@ -56,8 +58,8 @@ implementation
 procedure TNEDViewForm.FormCreate(Sender: TObject);
 begin
   SplitManager := TNEDSplittingManager.Create(pnlBaseView);
-  Buffers := TList<TNEDEditorBuffer>.Create;
-  Views := TList<TNEDEditorForm>.Create;
+  Buffers := TObjectList<TNEDEditorBuffer>.Create(True);
+  Views := TObjectList<TNEDEditorForm>.Create(True);
   MainView := Nil;
 end;
 
@@ -113,20 +115,23 @@ begin
 //
 end;
 
-function TNEDViewForm.OpenFile(const FilePath: String; const SplitWindow: Boolean; const SplitType: TNEDSplitViewTypeEnum): Boolean;
+function TNEDViewForm.OpenFile(const FilePath: String; out EditorContext: TNEDEditorContext; const SplitType: TNEDSplitViewTypeEnum = stSplitNone): Boolean;
 var
+  SplitWindow: Boolean;
   Buffer: TNEDEditorBuffer;
   View: TNEDEditorForm;
+  Info: TNEDEditorInfo;
   host_ctrl: TWinControl;
 begin
   View := MainView;
   host_ctrl := pnlBaseView;
+  SplitWindow := SplitType > stSplitNone;
   if SplitWindow then begin
     host_ctrl:= SplitManager.Split(SplitType);
     View := Nil;
   end;
   //
-  if OpenNewBuffer(FilePath, Buffer, host_ctrl, View) then begin
+  if OpenNewBuffer(FilePath, Buffer, host_ctrl, View, Info) then begin
     Buffers.Add(Buffer);
     Views.Add(View);
     if MainView = Nil then
@@ -135,9 +140,23 @@ begin
   else begin
 
   end;
+  //
+  EditorContext := TNEDEditorContext.Create(Buffer, Info);
 end;
 
-function TNEDViewForm.OpenNewBuffer(const FilePath: String; out Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm): Boolean;
+procedure TNEDViewForm.CloseEditorViews;
+var
+  i: Integer;
+  View: TNEDEditorForm;
+begin
+  for i := 0 to Views.Count - 1 do begin
+    View := Views[i];
+    Views[i] := Nil;
+    View.Free;
+  end;
+end;
+
+function TNEDViewForm.OpenNewBuffer(const FilePath: String; out Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
 var
   Editor: TNEDEditorView;
 begin
@@ -151,7 +170,7 @@ begin
       View.BringToFront;
     end;
     //
-    Editor := View.NewEditor(Buffer);
+    Editor := View.NewEditor(Buffer, Info);
     //
   //  Buffer.LoadFromFile('d:\Borland Librarys\NitroPascal\compiler\tests\simple_project\first.npe');
     Buffer.LoadFromFile(FilePath);
