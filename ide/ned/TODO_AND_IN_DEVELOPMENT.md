@@ -12,33 +12,9 @@ NitroEDitor: https://github.com/gmnevton/NitroPascal/tree/main/ide/ned
 
 - Visual editor component from scratch (~~TSynEdit component rework~~)
   
-  - [ ] Keyboard / mouse input handling
-    
-    - [ ] DELETE key
-    
-    - [ ] BACKSPACE key
-    
-    - [ ] TAB key
-    
-    - [ ] and any CTRL / ALT / SHIFT combinations
+  - [ ] [Keyboard / mouse input handling](.\tasks\20260829-175020-0000\TASK.md) (in progress)
   
-    - [ ] Split-view current or new editor (shortcuts)
-  
-    - [ ] Handle selection
-  
-  - [ ] IDE configuration
-  
-    - [ ] Make IDE configuration (in progress)
-  
-    - [ ] Make IDE profiles (in progress)
-  
-    - [ ] Make IDE session context (to do)
-    
-    - [ ] Save session (loaded projects, opened files)
-    
-    - [ ] Show closed session on IDE start (after profiles is selected and loaded, show projects panel)
-    
-    - [ ] Restore saved session (reopen editors) if selected in IDE config
+  - [ ] [IDE configuration](.\tasks\20260829-175221-0000\TASK.md) (in progress)
   
   - [ ] Remodel home page (in progress)
     

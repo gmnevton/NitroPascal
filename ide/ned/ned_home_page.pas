@@ -91,14 +91,23 @@ type
     procedure FillFavoritesList;
     procedure ClearRecentsList;
     procedure FillRecentsList;
+    procedure RefreshFavorites;
+    procedure RefreshRecents;
+    function  ButtonDetailText(const Project: TNEDProject): String;
+    function  ButtonTitleText(const Project: TNEDProject): String;
     procedure DetailDrawText(Sender: TUItemButton; const ACanvas: TCanvas; ARect: TRect; AText: String);
     procedure TitleDrawText(Sender: TUItemButton; const ACanvas: TCanvas; ARect: TRect; AText: String);
+    //
+    procedure FavoriteClicked(Sender: TObject);
+    procedure RecentClicked(Sender: TObject);
   public
     procedure SyncProperties(const AProfile: TNEDProfile);
     function  FindProjectGroup(const AProjectPath: String): TNEDProject; overload;
     function  FindProjectGroup(const AProjectID: TNEDUniqueID): TNEDProject; overload;
     function  FindProject(const AProjectPath: String): TNEDProject; overload;
     function  FindProject(const AProjectID: TNEDUniqueID): TNEDProject; overload;
+    function  FindProjectFile(const AFilePath: String): TNEDProject;
+    procedure RefreshProjects;
     //
     property Profile: TNEDProfile read FProfile;
   end;
@@ -115,7 +124,8 @@ uses
   UCL.Utils,
   ned_config,
   ned_session_context,
-  ned_main;
+  ned_main,
+  ned_splitview_manager;
 
 procedure TNEDHomeForm.FormCreate(Sender: TObject);
 begin
@@ -183,6 +193,17 @@ begin
   Result := Nil;
 end;
 
+function TNEDHomeForm.FindProjectFile(const AFilePath: String): TNEDProject;
+begin
+  Result := FProfile.Session.FindRecentFile(AFilePath);
+end;
+
+procedure TNEDHomeForm.RefreshProjects;
+begin
+  RefreshFavorites;
+  RefreshRecents;
+end;
+
 function TNEDHomeForm.GetNewButtonTop(const AParentControl: TUScrollBox): Integer;
 var
   i: Integer;
@@ -235,12 +256,12 @@ begin
       ItemButton.LeftIcon := Char($F000) // KnowledgeArticle
     else if Project.&Type = ptFile then
       ItemButton.LeftIcon := Char($E943); // Code
-    ItemButton.Detail := Format('Created: %s'#13#10'Modified: %s'#13#10'LastOpened: %s'#13#10'Opened: %d  Used: %dm',
-      [DateTimeToStr(Project.CreateDate), DateTimeToStr(Project.ModifyDate), DateTimeToStr(Project.LastOpenedDate), Project.TimesOpened, Project.TimeUsedMinutes]);
-    ItemButton.Text := Project.Name + ' (' + Project.FileName + ')' + #13#10 + Project.FilePath;
+    ItemButton.Detail := ButtonDetailText(Project);
+    ItemButton.Text := ButtonTitleText(Project);
     ItemButton.Transparent := False;
     ItemButton.OnDrawDetail := DetailDrawText;
     ItemButton.OnDrawText := TitleDrawText;
+    ItemButton.OnClick := FavoriteClicked;
     ItemButton.Tag := Integer(Project);
     ItemButton.Visible := True;
   end;
@@ -283,15 +304,54 @@ begin
       ItemButton.LeftIcon := Char($F000) // KnowledgeArticle
     else if Project.&Type = ptFile then
       ItemButton.LeftIcon := Char($E943); // Code
-    ItemButton.Detail := Format('Created: %s'#13#10'Modified: %s'#13#10'LastOpened: %s'#13#10'Opened: %d  Used: %dm',
-      [DateTimeToStr(Project.CreateDate), DateTimeToStr(Project.ModifyDate), DateTimeToStr(Project.LastOpenedDate), Project.TimesOpened, Project.TimeUsedMinutes]);
-    ItemButton.Text := Project.Name + ' (' + Project.FileName + ')' + #13#10 + Project.FilePath;
+    ItemButton.Detail := ButtonDetailText(Project);
+    ItemButton.Text := ButtonTitleText(Project);
     ItemButton.Transparent := False;
     ItemButton.OnDrawDetail := DetailDrawText;
     ItemButton.OnDrawText := TitleDrawText;
+    ItemButton.OnClick := RecentClicked;
     ItemButton.Tag := Integer(Project);
     ItemButton.Visible := True;
   end;
+end;
+
+procedure TNEDHomeForm.RefreshFavorites;
+var
+  i: Integer;
+  Button: TUItemButton;
+begin
+  for i := 0 to sbFavoritesList.ControlCount - 1 do begin
+    if sbFavoritesList.Controls[i] is TUItemButton then begin
+      Button := TUItemButton(sbFavoritesList.Controls[i]);
+      Button.Detail := ButtonDetailText(TNEDProject(Pointer(Button.Tag)));
+      Button.Text := ButtonTitleText(TNEDProject(Pointer(Button.Tag)));
+    end;
+  end;
+end;
+
+procedure TNEDHomeForm.RefreshRecents;
+var
+  i: Integer;
+  Button: TUItemButton;
+begin
+  for i := 0 to sbRecentsList.ControlCount - 1 do begin
+    if sbRecentsList.Controls[i] is TUItemButton then begin
+      Button := TUItemButton(sbRecentsList.Controls[i]);
+      Button.Detail := ButtonDetailText(TNEDProject(Pointer(Button.Tag)));
+      Button.Text := ButtonTitleText(TNEDProject(Pointer(Button.Tag)));
+    end;
+  end;
+end;
+
+function TNEDHomeForm.ButtonDetailText(const Project: TNEDProject): String;
+begin
+  Result := Format('Created: %s'#13#10'Modified: %s'#13#10'LastOpened: %s'#13#10'Opened: %d  Used: %dm',
+      [DateTimeToStr(Project.CreateDate), DateTimeToStr(Project.ModifyDate), DateTimeToStr(Project.LastOpenedDate), Project.TimesOpened, Project.TimeUsedMinutes]);
+end;
+
+function TNEDHomeForm.ButtonTitleText(const Project: TNEDProject): String;
+begin
+  Result := Project.FileName + ' - ' + Project.Name + #13#10 + Project.FilePath;
 end;
 
 procedure TNEDHomeForm.DetailDrawText(Sender: TUItemButton; const ACanvas: TCanvas; ARect: TRect; AText: String);
@@ -432,4 +492,25 @@ begin
 //
 end;
 
+procedure TNEDHomeForm.FavoriteClicked(Sender: TObject);
+var
+  ItemButton: TUItemButton;
+  Project: TNEDProject;
+begin
+  ItemButton := TUItemButton(Sender);
+  Project := TNEDProject(Pointer(ItemButton.Tag));
+  TNEDMainForm(Application.MainForm).CreateWorkSpaceAndOpenFile(Project, stSplitNone);
+end;
+
+procedure TNEDHomeForm.RecentClicked(Sender: TObject);
+var
+  ItemButton: TUItemButton;
+  Project: TNEDProject;
+begin
+  ItemButton := TUItemButton(Sender);
+  Project := TNEDProject(Pointer(ItemButton.Tag));
+  TNEDMainForm(Application.MainForm).CreateWorkSpaceAndOpenFile(Project, stSplitNone);
+end;
+
 end.
+

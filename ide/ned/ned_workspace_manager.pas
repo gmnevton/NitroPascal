@@ -74,8 +74,11 @@ type
     procedure Clear;
     //
     function CreateProjectGroup(const AGroupName: String): TEntryItem;
+    function CreateProject(const ProjectGroup: TEntryItem; const AProjectName: String): TEntryItem;
     function AddProject(const AProjectGroup: TEntryItem; const AProjectPath: String): TEntryItem;
-    function GetProjectGroup: TEntryItem;
+    function AddFile(const AProject: TEntryItem; const AFilePath: String): TEntryItem;
+    function GetFirstProjectGroup: TEntryItem;
+    function GetFirstProject: TEntryItem;
     //
     property Empty: Boolean read FEmpty;
     property Entries: TEntryView read FWorkspaceEntries;
@@ -204,16 +207,46 @@ begin
   end;
 end;
 
-function TNEDWorkspace.AddProject(const AProjectGroup: TEntryItem; const AProjectPath: String): TEntryItem;
-var
-  Project: TNEDProject;
+function TNEDWorkspace.CreateProject(const ProjectGroup: TEntryItem; const AProjectName: String): TEntryItem;
 begin
   FWorkspaceEntries.BeginUpdate;
   try
-    Result := AProjectGroup.Items.Add;
-    Result.Caption := ExtractFileName(AProjectPath);
-    //
+    Result := ProjectGroup.Items.Add;
+    if Length(AProjectName) > 0 then
+      Result.Caption := AProjectName
+    else
+      Result.Caption := 'Unnamed project';
+    FEmpty := False;
+  finally
+    FWorkspaceEntries.EndUpdate;
+  end;
+end;
+
+function TNEDWorkspace.AddProject(const AProjectGroup: TEntryItem; const AProjectPath: String): TEntryItem;
+var
+  Project: TNEDProject;
+  Entry: TEntryItem;
+begin
+  FWorkspaceEntries.BeginUpdate;
+  try
     Project := FWorkspaceManager.OpenProject(AProjectPath);
+    if Project = Nil then begin
+      Entry := GetFirstProject;
+      if Entry = Nil then begin
+        Project := FWorkspaceManager.NewProject('Unnamed project');
+      end
+      else
+        Project := TNEDProject(Entry.Data);
+      //
+      Result := AProjectGroup.Items.Add;
+      Result.Caption := ExtractFileName(AProjectPath);
+    end
+    else begin
+      Result := AProjectGroup.Items.Add;
+      Result.Caption := ExtractFileName(AProjectPath);
+    end;
+    //
+    Assert(Project <> Nil);
     Result.Data := Project;
     //Result.DataObject := True;
     Project.Touch;
@@ -222,9 +255,53 @@ begin
   end;
 end;
 
-function TNEDWorkspace.GetProjectGroup: TEntryItem;
+function TNEDWorkspace.AddFile(const AProject: TEntryItem; const AFilePath: String): TEntryItem;
+var
+  Project: TNEDProject;
+  Entry: TEntryItem;
+begin
+  FWorkspaceEntries.BeginUpdate;
+  try
+    Project := FWorkspaceManager.OpenFile(AFilePath);
+    if Project = Nil then begin
+      Entry := GetFirstProject;
+      if Entry = Nil then begin
+        Project := FWorkspaceManager.NewProject('Unnamed project');
+      end
+      else
+        Project := TNEDProject(Entry.Data);
+      //
+      Result := AProject.Items.Add;
+      Result.Caption := ExtractFileName(AFilePath);
+    end
+    else begin
+      Result := AProject.Items.Add;
+      Result.Caption := ExtractFileName(AFilePath);
+    end;
+    //
+    Assert(Project <> Nil);
+    Result.Data := Project;
+    //Result.DataObject := True;
+    Project.Touch;
+  finally
+    FWorkspaceEntries.EndUpdate;
+  end;
+end;
+
+function TNEDWorkspace.GetFirstProjectGroup: TEntryItem;
 begin
   Result := FWorkspaceEntries.GetFirstEntry;
+end;
+
+function TNEDWorkspace.GetFirstProject: TEntryItem;
+begin
+  Result := FWorkspaceEntries.GetFirstEntry;
+  while Result <> Nil do begin
+    if (Result.Data <> Nil) and (TNEDProject(Result.Data).&Type = ptProject) then
+      Exit;
+    //
+    Result := FWorkspaceEntries.GetNextEntry(Result);
+  end;
 end;
 
 { TNEDWorkspaceManager }
@@ -265,7 +342,7 @@ end;
 
 function TNEDWorkspaceManager.NewProject(const AName: String): TNEDProject;
 begin
-
+  Result := TNEDProject.Create(ptProject, '', AName);
 end;
 
 function TNEDWorkspaceManager.NewProjectGroup(const AName: String): TNEDProject;
@@ -322,12 +399,12 @@ begin
   ext := ExtractFileExt(AFilePath);
   if SameText(ext, '.npe') then begin // NitroPascal project
     if not FWorkspace.Empty then begin
-      ProjectGroup := FWorkspace.GetProjectGroup;
-      Assert(ProjectGroup <> Nil);
+      ProjectGroup := FWorkspace.GetFirstProjectGroup;
     end
     else begin
       ProjectGroup := FWorkspace.CreateProjectGroup('');
     end;
+    Assert(ProjectGroup <> Nil);
     Entry := FWorkspace.AddProject(ProjectGroup, AFilePath);
     ProjectGroup.Expand;
     if NEDViewForm.OpenFile(AFilePath, EditorContext, SplitType) then begin
@@ -341,10 +418,16 @@ begin
     Project := OpenProjectGroup(AFilePath);
     Project := AddProjectGroup(Project);
   end
-  else begin
-    ProjectGroup := FWorkspace.GetProjectGroup;
+  else begin // probably .npc file
+    if not FWorkspace.Empty then begin
+      ProjectGroup := FWorkspace.GetFirstProjectGroup;
+    end
+    else begin
+      ProjectGroup := FWorkspace.CreateProjectGroup('');
+    end;
     Assert(ProjectGroup <> Nil);
-    Entry := FWorkspace.AddProject(ProjectGroup, AFilePath);
+    Entry := FWorkspace.AddFile(ProjectGroup, AFilePath);
+    ProjectGroup.Expand;
     NEDViewForm.OpenFile(AFilePath, EditorContext, SplitType);
     EditorContext.WorkspaceEntry := Entry;
     TNEDProject(Entry.Data).AddEditor(EditorContext);
@@ -362,14 +445,15 @@ end;
 function TNEDWorkspaceManager.OpenProject(const AProjectPath: String): TNEDProject;
 begin
   Result := NEDHomeForm.FindProject(AProjectPath);
-  if Result = Nil then
-    raise Exception.Create('Not implemented !!!');
+//  if Result = Nil then
+//    raise Exception.Create('Not implemented !!!');
     //Result := NEDHomeForm.Profile.  // TNEDProject.Create(ptProject, AProjectPath);
 end;
 
 function TNEDWorkspaceManager.OpenFile(const AFilePath: String): TNEDProject;
 begin
-  Result := TNEDProject.Create(ptFile, AFilePath);
+//  Result := TNEDProject.Create(ptFile, AFilePath);
+  Result := NEDHomeForm.FindProjectFile(AFilePath);
 end;
 
 end.

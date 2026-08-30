@@ -46,6 +46,8 @@ uses
   ned_dialog_base,
   ned_editor_view,
   ned_profiles,
+  ned_projects,
+  ned_splitview_manager,
   ned_workspace_manager;
 
 const
@@ -224,13 +226,17 @@ type
     //
     procedure RestoreWindowPlacement;
     procedure ShowHideToolBox(const AToolbox: TNEDToolboxTypeEnum);
+    procedure DisableWindowControls;
+    procedure EnableWindowControls;
   private
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
   public
-    function CreateModalDialogForm(const AFormClass: TNEDDialogBaseClass): TNEDDialogBase;
-    function DestroyModalDialogForm(var ADialogForm: TNEDDialogBase): Boolean;
+    function  CreateModalDialogForm(const AFormClass: TNEDDialogBaseClass): TNEDDialogBase;
+    function  DestroyModalDialogForm(var ADialogForm: TNEDDialogBase): Boolean;
+    procedure CreateWorkSpaceAndOpenFile(const FileName: String; const SplitType: TNEDSplitViewTypeEnum); overload;
+    procedure CreateWorkSpaceAndOpenFile(const Project: TNEDProject; const SplitType: TNEDSplitViewTypeEnum); overload;
   end;
 
 var
@@ -249,7 +255,6 @@ uses
   ned_source_editor,
   ned_dialog_open,
   ned_dialog_message,
-  ned_splitview_manager,
   ned_config;
 
 type
@@ -614,12 +619,51 @@ begin
   end;
 end;
 
+procedure TNEDMainForm.DisableWindowControls;
+begin
+  btnSelectProfile.Enabled := False;
+  barCaption.MenuController.Enabled := False;
+//  btnHome.Enabled := False;
+//  btnWorkspace.Enabled := False;
+//  btnSearch.Enabled := False;
+//  btnDebugRun.Enabled := False;
+//  btnDebugPause.Enabled := False;
+//  btnDebugStop.Enabled := False;
+//  btnDebugStepOver.Enabled := False;
+//  btnDebugStepInto.Enabled := False;
+//  btnFileZoomIn.Enabled := False;
+//  btnFileZoomOut.Enabled := False;
+//  sliFileZoom.Enabled := False;
+end;
+
+procedure TNEDMainForm.EnableWindowControls;
+begin
+  btnSelectProfile.Enabled := True;
+  barCaption.MenuController.Enabled := True;
+end;
+
+procedure TNEDMainForm.CreateWorkSpaceAndOpenFile(const FileName: String; const SplitType: TNEDSplitViewTypeEnum);
+begin
+  FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
+  FWorkspaceManager.Open(FileName, SplitType);
+end;
+
+procedure TNEDMainForm.CreateWorkSpaceAndOpenFile(const Project: TNEDProject; const SplitType: TNEDSplitViewTypeEnum);
+var
+  FileName: String;
+begin
+  FileName := IncludeTrailingPathDelimiter(Project.FilePath) + Project.FileName;
+  FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
+  FWorkspaceManager.Open(FileName, SplitType);
+end;
+
 function TNEDMainForm.CreateModalDialogForm(const AFormClass: TNEDDialogBaseClass): TNEDDialogBase;
 begin
   Result := Nil;
   if FModalForm <> Nil then
     Exit;
   //
+  DisableWindowControls;
   Result := AFormClass.Create(Self);
   FModalForm := Result;
 end;
@@ -635,6 +679,7 @@ begin
     ADialogForm.Free;
     ADialogForm := Nil;
   end;
+  EnableWindowControls;
   Result := True;
 end;
 
@@ -718,8 +763,6 @@ begin
   end;
   //
   if ok then begin
-    FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
-    //
     SplitType := stSplitNone;
     //if Sender = Open1 then
     //else
@@ -728,7 +771,7 @@ begin
     else if Sender = Openandsplittobottom1 then
       SplitType := stSplitH;
     //
-    FWorkspaceManager.Open(FileName, SplitType);
+    CreateWorkSpaceAndOpenFile(FileName, SplitType);
   end;
 end;
 

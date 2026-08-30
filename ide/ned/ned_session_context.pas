@@ -83,6 +83,7 @@ type
     function ContextMove(const AFromIndex, AToIndex: Integer): Boolean;
     function FindFavorite(const AType: TNEDProjectTypeEnum; const AFilePath: String): TNEDProject;
     function FindRecent(const AType: TNEDProjectTypeEnum; const AFilePath: String): TNEDProject;
+    function FindRecentFile(const AFilePath: String): TNEDProject;
     //
     procedure LoadContext(const AProfilePath: String); // read profile favorites and recents, IDE layout and settings
     procedure LoadSession(const ASessionPath: String); // read what was opened
@@ -389,18 +390,12 @@ end;
 function TNEDSessionContext.FindFavorite(const AType: TNEDProjectTypeEnum; const AFilePath: String): TNEDProject;
 var
   i: Integer;
-  temp_file_path: String;
 begin
   Result := Nil;
   for i := 0 to FFavorites.Count - 1 do begin
-    temp_file_path := IncludeTrailingPathDelimiter(FFavorites.Items[i].FilePath) + FFavorites.Items[i].FileName;
-    try
-      if (FFavorites.Items[i].&Type = AType) and SameText(temp_file_path, AFilePath) then begin
-        Result := FFavorites.Items[i];
-        Exit;
-      end;
-    finally
-      temp_file_path := '';
+    if (FFavorites.Items[i].&Type = AType) and SameText(FFavorites.Items[i].FullFilePath, AFilePath) then begin
+      Result := FFavorites.Items[i];
+      Exit;
     end;
   end;
 end;
@@ -408,18 +403,35 @@ end;
 function TNEDSessionContext.FindRecent(const AType: TNEDProjectTypeEnum; const AFilePath: String): TNEDProject;
 var
   i: Integer;
-  temp_file_path: String;
 begin
   Result := Nil;
   for i := 0 to FRecents.Count - 1 do begin
-    temp_file_path := IncludeTrailingPathDelimiter(FRecents.Items[i].FilePath) + FRecents.Items[i].FileName;
-    try
-      if (FRecents.Items[i].&Type = AType) and SameText(temp_file_path, AFilePath) then begin
-        Result := FRecents.Items[i];
-        Exit;
-      end;
-    finally
-      temp_file_path := '';
+    if (FRecents.Items[i].&Type = AType) and SameText(FRecents.Items[i].FullFilePath, AFilePath) then begin
+      Result := FRecents.Items[i];
+      Exit;
+    end;
+  end;
+end;
+
+function TNEDSessionContext.FindRecentFile(const AFilePath: String): TNEDProject;
+var
+  i: Integer;
+  Project: TNEDProject;
+begin
+  Result := Nil;
+  for i := 0 to FRecents.Count - 1 do begin
+    Project := FRecents.Items[i];
+    if (Project.&Type = ptProject) and Project.ContainsFile(AFilePath) then begin
+      Result := Project;
+      Exit;
+    end;
+  end;
+  //
+  for i := 0 to FRecents.Count - 1 do begin
+    Project := FRecents.Items[i];
+    if (Project.&Type = ptFile) and SameText(Project.FullFilePath, AFilePath) then begin
+      Result := Project;
+      Exit;
     end;
   end;
 end;
