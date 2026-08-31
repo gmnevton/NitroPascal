@@ -12,7 +12,9 @@
       },
       "Maximize" : true,
       "ShowHomePage" : true,
-      "ColorSchema" : "system"
+      "ColorSchema" : "system",
+      "ScreenSnap" : false,
+      "ScreenSnapBuffer" : 10
     },
     "Profiles" : {
       "ShowProfileSelection" : true,

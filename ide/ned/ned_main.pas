@@ -325,8 +325,13 @@ begin
   end;
   if NEDConfig.ShowHomePage then
     NEDHomeForm.Show;
+  Self.ScreenSnap := False;
   if NEDConfig.Maximize then
-    Self.WindowState := wsMaximized;
+    Self.WindowState := wsMaximized
+  else begin
+    Self.ScreenSnap := NEDConfig.ScreenSnap;
+    Self.SnapBuffer := NEDConfig.ScreenSnapBuffer;
+  end;
   if NEDConfig.ShowProfileSelection then
     PostMessage(Self.Handle, WM_AFTERSHOW, 0, 0);
 end;
@@ -687,6 +692,9 @@ procedure TNEDMainForm.btnSelectProfileClick(Sender: TObject);
 var
   NEDDialogProfiles: TNEDDialogProfiles;
 begin
+  if not btnSelectProfile.Enabled then
+    Exit;
+  //
   NEDDialogProfiles := TNEDDialogProfiles(CreateModalDialogForm(TNEDDialogProfiles));
   try
     if NEDDialogProfiles <> Nil then begin

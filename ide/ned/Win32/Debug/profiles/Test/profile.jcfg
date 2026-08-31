@@ -8,29 +8,11 @@
   "TimesOpened" : 0,
   "TimeUsedMinutes" : 0,
   "Context" : {
-    "Favorites" : {
-      "Count" : 1,
-      "List" : [
-        {
-          "ID" : "12345678901234567890123456789012",
-          "Type" : "project",
-          "Name" : "First_Test_Project",
-          "FileName" : "first.npe",
-          "FilePath" : "d:\\Borland Librarys\\NitroPascal\\compiler\\tests\\simple_project",
-          "Description" : "Short description of a project...",
-          "CreateDate" : "2026-07-29T06:10:00+02:00",
-          "ModifyDate" : "2026-07-29T06:10:00+02:00",
-          "LastOpenedDate" : "2026-07-29T06:10:00+02:00",
-          "TimesOpened" : 0,
-          "TimeUsedMinutes" : 0,
-        }
-      ]
-    },
-    "Recents" : {
+    "Projects" : {
       "Count" : 2,
       "List" : [
         {
-          "ID" : "12345678901234567890123456789012",
+          "ID" : "549D6422A20D41238FCCD2623EEB5267",
           "Type" : "project",
           "Name" : "First_Test_Project",
           "FileName" : "first.npe",
@@ -41,9 +23,25 @@
           "LastOpenedDate" : "2026-07-29T06:10:00+02:00",
           "TimesOpened" : 0,
           "TimeUsedMinutes" : 0,
+          "Files" : {
+            "Count" : 1,
+            "List" : [
+              {
+                "Name" : "",
+                "FileName" : "",
+                "FilePath" : "",
+                "FullFilePath" : "",
+                "CreateDate" : "",
+                "ModifyDate" : "",
+                "LastOpenedDate" : "",
+                "TimesOpened" : 0,
+                "TimeUsedMinutes" : 0
+              }
+            ]
+          }
         },
         {
-          "ID" : "12345678901234567890123456789012",
+          "ID" : "01DDFE1A355843678BB7DDEBD6E75464",
           "Type" : "file",
           "Name" : "Source_code_name",
           "FileName" : "first_main.npc",
@@ -56,6 +54,19 @@
           "TimeUsedMinutes" : 0,
         }
       ]
+    },
+    "Favorites" : {
+      "Count" : 1,
+      "List" : {
+        "ID" : "549D6422A20D41238FCCD2623EEB5267"
+      }
+    },
+    "Recents" : {
+      "Count" : 2,
+      "List" : {
+        "ID" : "549D6422A20D41238FCCD2623EEB5267",
+        "ID" : "01DDFE1A355843678BB7DDEBD6E75464"
+      }
     },
     "Layout" : {
     },

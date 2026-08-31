@@ -54,11 +54,11 @@ type
     FError: Boolean;
     FErrorMsg: String;
   private
+    FProjects: TObjectList<TNEDProject>;
     FFavorites: TObjectList<TNEDProject>;
     FRecents: TObjectList<TNEDProject>;
     FLayout: TNEDLayout;
     FSettings: TNEDSettings;
-    FProjects: TObjectList<TNEDProject>;
     //
     function GetFavorite(const AIndex: Integer): TNEDProject;
     function GetRecent(const AIndex: Integer): TNEDProject;
@@ -66,6 +66,7 @@ type
   private
     procedure ReadProfileHeader;
     procedure ReadContext;
+    procedure ReadProjects(const ARootNode: TJSONNode);
     procedure ReadFavorites(const ARootNode: TJSONNode);
     procedure ReadRecents(const ARootNode: TJSONNode);
     procedure ReadWorkspace;
@@ -81,6 +82,7 @@ type
     function ContextAddNew(const AName: String): TNEDProject;
     function ContextRemove(const AIndex: Integer): Boolean;
     function ContextMove(const AFromIndex, AToIndex: Integer): Boolean;
+    function FindProject(const AType: TNEDProjectTypeEnum; const AID: String): TNEDProject;
     function FindFavorite(const AType: TNEDProjectTypeEnum; const AFilePath: String): TNEDProject;
     function FindRecent(const AType: TNEDProjectTypeEnum; const AFilePath: String): TNEDProject;
     function FindRecentFile(const AFilePath: String): TNEDProject;
@@ -159,8 +161,9 @@ begin
   FError := False;
   FErrorMsg := '';
   //
-  FFavorites := TObjectList<TNEDProject>.Create(True);
-  FRecents := TObjectList<TNEDProject>.Create(True);
+  FProjects := TObjectList<TNEDProject>.Create(True);
+  FFavorites := TObjectList<TNEDProject>.Create(False);
+  FRecents := TObjectList<TNEDProject>.Create(False);
   FLayout := TNEDLayout.Create;
   FSettings := TNEDSettings.Create;
 end;
@@ -169,13 +172,11 @@ destructor TNEDSessionContext.Destroy;
 begin
   FErrorMsg := '';
   //
-  FFavorites.Free;
-  FRecents.Free;
-  FLayout.Free;
   FSettings.Free;
-  //
-  if FProjects <> Nil then
-    FProjects.Free;
+  FLayout.Free;
+  FRecents.Free;
+  FFavorites.Free;
+  FProjects.Free;
   FStorageFileName := '';
   FStorage.Free;
   inherited;
@@ -227,6 +228,9 @@ begin
   if DocRoot <> Nil then begin
     Root := DocRoot.FindNode('Context', [jtObject]);
     if Root <> Nil then begin
+      SubRoot := Root.FindNode('Projects', [jtObject]);
+      ReadProjects(SubRoot);
+      //
       SubRoot := Root.FindNode('Favorites', [jtObject]);
       ReadFavorites(SubRoot);
       //
@@ -240,7 +244,7 @@ begin
   end;
 end;
 
-procedure TNEDSessionContext.ReadFavorites(const ARootNode: TJSONNode);
+procedure TNEDSessionContext.ReadProjects(const ARootNode: TJSONNode);
 var
   List, Node: TJSONNode;
   LCount: Integer;
@@ -248,6 +252,32 @@ begin
   if ARootNode <> Nil then begin
     LCount := FStorage.NodeAsInteger(ARootNode, 'Count', 0);
     List := ARootNode.FindNode('List', [jtArray]);
+    if List <> Nil then begin
+      if List.HasChildNodes and (List.ChildNodes.Count <> LCount) then begin // list not complete
+        FError := True;
+        FErrorMsg := Trim(FErrorMsg + #13#10 + Format('Projects list elements count mismatch, expected: %d, but got: %d.', [LCount, List.ChildNodes.Count]));
+        //
+        Exit;
+      end;
+      //
+      Node := List.FirstChild;
+      while Node <> Nil do begin
+        ReadProject(Node, FProjects);
+        Node := Node.NextSibling;
+      end;
+    end;
+  end;
+end;
+
+procedure TNEDSessionContext.ReadFavorites(const ARootNode: TJSONNode);
+var
+  List, Node: TJSONNode;
+  LCount: Integer;
+  Project: TNEDProject;
+begin
+  if ARootNode <> Nil then begin
+    LCount := FStorage.NodeAsInteger(ARootNode, 'Count', 0);
+    List := ARootNode.FindNode('List', [jtObject]);
     if List <> Nil then begin
       if List.HasChildNodes and (List.ChildNodes.Count <> LCount) then begin // list not complete
         FError := True;
@@ -258,7 +288,12 @@ begin
       //
       Node := List.FirstChild;
       while Node <> Nil do begin
-        ReadProject(Node, FFavorites);
+        if SameText(Node.NodeName, 'ID') then begin
+          Project := FindProject(ptUnknown, Node.NodeValue);
+          if Project <> Nil then
+            FFavorites.Add(Project);
+        end;
+        //
         Node := Node.NextSibling;
       end;
     end;
@@ -269,10 +304,11 @@ procedure TNEDSessionContext.ReadRecents(const ARootNode: TJSONNode);
 var
   List, Node: TJSONNode;
   LCount: Integer;
+  Project: TNEDProject;
 begin
   if ARootNode <> Nil then begin
     LCount := FStorage.NodeAsInteger(ARootNode, 'Count', 0);
-    List := ARootNode.FindNode('List', [jtArray]);
+    List := ARootNode.FindNode('List', [jtObject]);
     if List <> Nil then begin
       if List.HasChildNodes and (List.ChildNodes.Count <> LCount) then begin // list not complete
         FError := True;
@@ -283,7 +319,12 @@ begin
       //
       Node := List.FirstChild;
       while Node <> Nil do begin
-        ReadProject(Node, FRecents);
+        if SameText(Node.NodeName, 'ID') then begin
+          Project := FindProject(ptUnknown, Node.NodeValue);
+          if Project <> Nil then
+            FRecents.Add(Project);
+        end;
+        //
         Node := Node.NextSibling;
       end;
     end;
@@ -303,6 +344,7 @@ begin
   if ANode = Nil then
     Exit;
   //
+  Project := Nil; // satisfy compiler
   try
     Project := TNEDProject.Create(FStorage, ANode);
     AList.Add(Project);
@@ -384,6 +426,19 @@ begin
   then begin
     FProjects.Move(AFromIndex, AToIndex);
     Result := True;
+  end;
+end;
+
+function TNEDSessionContext.FindProject(const AType: TNEDProjectTypeEnum; const AID: String): TNEDProject;
+var
+  i: Integer;
+begin
+  Result := Nil;
+  for i := 0 to FProjects.Count - 1 do begin
+    if (((AType > ptUnknown) and (FProjects.Items[i].&Type = AType)) or (AType = ptUnknown)) and SameText(FProjects.Items[i].ID, AID) then begin
+      Result := FProjects.Items[i];
+      Exit;
+    end;
   end;
 end;
 
@@ -474,7 +529,6 @@ end;
 
 procedure TNEDSessionContext.LoadProject(const AProjectPath: String);
 begin
-  FProjects := TObjectList<TNEDProject>.Create(True);
 
 end;
 

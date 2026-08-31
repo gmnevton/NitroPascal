@@ -1059,14 +1059,16 @@ begin
     Line:=Reader.ReadText(',]}'+TJSONSpaces, [jetDeleteToStopChar], False);
     Line:=Quote + Line;
     // checks
-    if nodeType = jtString then
+    if (nodeType = jtString) and (Line <> '}') then
       raise EJSONParseException.CreateFmt(sExpectedNumberAsValue, ['', Line]);
     if (nodeType = jtBoolean) and (((booleanType = btFalse) and (LowerCase(Line) <> 'false')) or ((booleanType = btTrue) and (LowerCase(Line) <> 'true'))) then
       raise EJSONParseException.CreateFmt(sExpectedBooleanAsValue, ['pair ', Line]);
     //
-    Node := Parent.AddChild('', nodeType);
-//    Node.Value:=Unescape(Quote + Line);
-    Node.Value:=Line;
+    if Line <> '}' then begin
+      Node := Parent.AddChild('', nodeType);
+      //Node.Value:=Unescape(Quote + Line);
+      Node.Value:=Line;
+    end;
     Reader.SkipWhitespace;
   end;
 end;

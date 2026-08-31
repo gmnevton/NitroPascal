@@ -397,6 +397,14 @@ var
   EditorContext: TNEDEditorContext;
 begin
   ext := ExtractFileExt(AFilePath);
+  if SameText(ext, '.npg') then begin // NitroPascal project group
+    if not FWorkspace.Empty and AskForWorkspaceClearing then begin
+    end;
+    Project := OpenProjectGroup(AFilePath);
+    Project := AddProjectGroup(Project);
+    Exit;
+  end;
+  //
   if SameText(ext, '.npe') then begin // NitroPascal project
     if not FWorkspace.Empty then begin
       ProjectGroup := FWorkspace.GetFirstProjectGroup;
@@ -411,27 +419,22 @@ begin
       EditorContext.WorkspaceEntry := Entry;
       TNEDProject(Entry.Data).AddEditor(EditorContext);
     end;
-  end
-  else if SameText(ext, '.npg') then begin // NitroPascal project group
-    if not FWorkspace.Empty and AskForWorkspaceClearing then begin
-    end;
-    Project := OpenProjectGroup(AFilePath);
-    Project := AddProjectGroup(Project);
-  end
-  else begin // probably .npc file
-    if not FWorkspace.Empty then begin
-      ProjectGroup := FWorkspace.GetFirstProjectGroup;
-    end
-    else begin
-      ProjectGroup := FWorkspace.CreateProjectGroup('');
-    end;
-    Assert(ProjectGroup <> Nil);
-    Entry := FWorkspace.AddFile(ProjectGroup, AFilePath);
-    ProjectGroup.Expand;
-    NEDViewForm.OpenFile(AFilePath, EditorContext, SplitType);
-    EditorContext.WorkspaceEntry := Entry;
-    TNEDProject(Entry.Data).AddEditor(EditorContext);
+    Exit;
   end;
+  //
+  // probably .npc file
+  if not FWorkspace.Empty then begin
+    ProjectGroup := FWorkspace.GetFirstProjectGroup;
+  end
+  else begin
+    ProjectGroup := FWorkspace.CreateProjectGroup('');
+  end;
+  Assert(ProjectGroup <> Nil);
+  Entry := FWorkspace.AddFile(ProjectGroup, AFilePath);
+  ProjectGroup.Expand;
+  NEDViewForm.OpenFile(AFilePath, EditorContext, SplitType);
+  EditorContext.WorkspaceEntry := Entry;
+  TNEDProject(Entry.Data).AddEditor(EditorContext);
 end;
 
 function TNEDWorkspaceManager.OpenProjectGroup(const AProjectPath: String): TNEDProject;

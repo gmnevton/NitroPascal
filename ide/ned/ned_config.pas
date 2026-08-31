@@ -30,6 +30,8 @@ type
     FMaximize: Boolean;
     FShowHomePage: Boolean;
     FColorSchema: String;
+    FScreenSnap: Boolean;
+    FScreenSnapBuffer: Word;
     //
     FShowProfileSelection: Boolean;
     FProfilesCount: Integer;
@@ -71,6 +73,8 @@ type
     property Maximize: Boolean read FMaximize write FMaximize;
     property ShowHomePage: Boolean read FShowHomePage write FShowHomePage;
     property ColorSchema: String read FColorSchema write FColorSchema;
+    property ScreenSnap: Boolean read FScreenSnap write FScreenSnap;
+    property ScreenSnapBuffer: Word read FScreenSnapBuffer write FScreenSnapBuffer;
     //
     property ShowProfileSelection: Boolean read FShowProfileSelection write FShowProfileSelection;
     property ProfilesCount: Integer read FProfilesCount write FProfilesCount;
@@ -119,6 +123,8 @@ begin
   FMaximize := True;
   FShowHomePage := True;
   FColorSchema := 'system';
+  FScreenSnap := False;
+  FScreenSnapBuffer := 10;
   //
   FShowProfileSelection := False;
   FProfilesCount := 0;
@@ -161,6 +167,12 @@ begin
       //
       Node := FStorage.EnsureNode(SubRoot, 'ColorSchema', jtString);
       Node.ValueAsString := FColorSchema;
+      //
+      Node := FStorage.EnsureNode(SubRoot, 'ScreenSnap', jtBoolean);
+      Node.ValueAsBoolean := FScreenSnap;
+      //
+      Node := FStorage.EnsureNode(SubRoot, 'ScreenSnapBuffer', jtNumber);
+      Node.ValueAsInteger := FScreenSnapBuffer;
       //
     SubRoot := FStorage.EnsureNode(Root, 'Profiles', jtObject);
     //
@@ -220,6 +232,8 @@ begin
         FMaximize := FStorage.NodeAsBoolean(SubRoot, 'Maximize', True);
         FShowHomePage := FStorage.NodeAsBoolean(SubRoot, 'ShowHomePage', True);
         FColorSchema := FStorage.NodeAsString(SubRoot, 'ColorSchema', 'system');
+        FScreenSnap := FStorage.NodeAsBoolean(SubRoot, 'ScreenSnap', False);
+        FScreenSnapBuffer := FStorage.NodeAsInteger(SubRoot, 'ScreenSnapBuffer', 10);
       end;
       SubRoot := Root.FindNode('Profiles', [jtObject]);
       if SubRoot <> Nil then begin
@@ -265,7 +279,6 @@ begin
       Node := FStorage.EnsureNode(SubRoot, 'OpenedFiles', jtNumber);
       Node.ValueAsInteger := Profile.OpenedFiles;
       //
-
   end;
 end;
 

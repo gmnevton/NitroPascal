@@ -59,7 +59,7 @@ procedure TNEDViewForm.FormCreate(Sender: TObject);
 begin
   SplitManager := TNEDSplittingManager.Create(pnlBaseView);
   Buffers := TObjectList<TNEDEditorBuffer>.Create(True);
-  Views := TObjectList<TNEDEditorForm>.Create(True);
+  Views := TObjectList<TNEDEditorForm>.Create(False);
   MainView := Nil;
 end;
 
