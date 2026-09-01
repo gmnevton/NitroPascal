@@ -64,6 +64,7 @@ type
 //    FPlugins: TNEDPlugins;
 //    FExternalTools: TNEDExternalTools;
   protected
+    procedure ListFiles(const AProject: TNEDProject; const AFilesEntry: TEntryItem);
   public
     constructor Create(const Owner: TNEDWorkspaceManager);
     destructor Destroy; override;
@@ -138,6 +139,21 @@ destructor TNEDWorkspace.Destroy;
 begin
 
   inherited;
+end;
+
+procedure TNEDWorkspace.ListFiles(const AProject: TNEDProject; const AFilesEntry: TEntryItem);
+var
+  i: Integer;
+  Entry: TEntryItem;
+  ProjectFile: TNEDProjectFile;
+begin
+  for i := 0 to AProject.FilesCount - 1 do begin
+    ProjectFile := AProject.&File[i];
+    Entry := AFilesEntry.Items.Add;
+    Entry.Caption := ProjectFile.FileName;
+    Entry.Data := ProjectFile;
+  end;
+  AFilesEntry.Expand;
 end;
 
 procedure TNEDWorkspace.CreateEntries(const AParentControl: TWinControl);
@@ -226,6 +242,7 @@ function TNEDWorkspace.AddProject(const AProjectGroup: TEntryItem; const AProjec
 var
   Project: TNEDProject;
   Entry: TEntryItem;
+  ProjectEntry, FilesEntry: TEntryItem;
 begin
   FWorkspaceEntries.BeginUpdate;
   try
@@ -249,6 +266,16 @@ begin
     Assert(Project <> Nil);
     Result.Data := Project;
     //Result.DataObject := True;
+    //
+    ProjectEntry := Result.Items.Add;
+    ProjectEntry.Caption := 'Project config';
+    ProjectEntry.Data := Project;
+    //
+    FilesEntry := Result.Items.Add;
+    FilesEntry.Caption := 'Files';
+    FilesEntry.Data := Project;
+    ListFiles(Project, FilesEntry);
+    //
     Project.Touch;
   finally
     FWorkspaceEntries.EndUpdate;
@@ -259,6 +286,7 @@ function TNEDWorkspace.AddFile(const AProject: TEntryItem; const AFilePath: Stri
 var
   Project: TNEDProject;
   Entry: TEntryItem;
+  ProjectEntry, FilesEntry: TEntryItem;
 begin
   FWorkspaceEntries.BeginUpdate;
   try
@@ -282,6 +310,16 @@ begin
     Assert(Project <> Nil);
     Result.Data := Project;
     //Result.DataObject := True;
+    //
+    ProjectEntry := Result.Items.Add;
+    ProjectEntry.Caption := 'Project config';
+    ProjectEntry.Data := Project;
+    //
+    FilesEntry := Result.Items.Add;
+    FilesEntry.Caption := 'Files';
+    FilesEntry.Data := Project;
+    ListFiles(Project, FilesEntry);
+    //
     Project.Touch;
   finally
     FWorkspaceEntries.EndUpdate;
@@ -394,7 +432,7 @@ var
   ext: String;
   Project: TNEDProject;
   ProjectGroup, Entry: TEntryItem;
-  EditorContext: TNEDEditorContext;
+  EditorContextReference: TNEDEditorContext;
 begin
   ext := ExtractFileExt(AFilePath);
   if SameText(ext, '.npg') then begin // NitroPascal project group
@@ -415,9 +453,10 @@ begin
     Assert(ProjectGroup <> Nil);
     Entry := FWorkspace.AddProject(ProjectGroup, AFilePath);
     ProjectGroup.Expand;
-    if NEDViewForm.OpenFile(AFilePath, EditorContext, SplitType) then begin
-      EditorContext.WorkspaceEntry := Entry;
-      TNEDProject(Entry.Data).AddEditor(EditorContext);
+    Entry.Expand;
+    if NEDViewForm.OpenFile(AFilePath, EditorContextReference, SplitType) then begin
+      EditorContextReference.WorkspaceEntry := Entry;
+      TNEDProject(Entry.Data).AddEditor(EditorContextReference); // adds to owner list
     end;
     Exit;
   end;
@@ -432,9 +471,10 @@ begin
   Assert(ProjectGroup <> Nil);
   Entry := FWorkspace.AddFile(ProjectGroup, AFilePath);
   ProjectGroup.Expand;
-  NEDViewForm.OpenFile(AFilePath, EditorContext, SplitType);
-  EditorContext.WorkspaceEntry := Entry;
-  TNEDProject(Entry.Data).AddEditor(EditorContext);
+  Entry.Expand;
+  NEDViewForm.OpenFile(AFilePath, EditorContextReference, SplitType);
+  EditorContextReference.WorkspaceEntry := Entry;
+  TNEDProject(Entry.Data).AddEditor(EditorContextReference); // adds to owner list
 end;
 
 function TNEDWorkspaceManager.OpenProjectGroup(const AProjectPath: String): TNEDProject;

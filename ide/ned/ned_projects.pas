@@ -38,7 +38,7 @@ type
     FTimeUsedMinutes: Integer;
     //
     FModified: Boolean;
-    FEditorContext: TNEDEditorContext;
+    FEditorContextReference: TNEDEditorContext;
     FTimer: TTimer;
     //
     procedure TimerTick(Sender: TObject);
@@ -47,6 +47,8 @@ type
   public
     constructor Create(const AOwner: TNEDProject);
     destructor Destroy; override;
+    //
+    procedure Load(const AStorage: TJSONVerySimple; const ANode: TJSONNode);
     //
     property Name: String read FName;
     property FileName: String read FFileName;
@@ -87,12 +89,15 @@ type
     FTimesOpened: Integer;
     FTimeUsedMinutes: Integer;
     //
+    FModified: Boolean;
     FFiles: TObjectList<TNEDProjectFile>;
-    FEditors: TObjectList<TNEDEditorContext>;
+    FEditors: TObjectList<TNEDEditorContext>; // owns TNEDEditorContext
     FTimer: TTimer;
     //
     procedure TimerTick(Sender: TObject);
   protected
+    procedure ReadFiles(const AStorage: TJSONVerySimple; const ARootNode: TJSONNode);
+    procedure ReadFile(const AStorage: TJSONVerySimple; const ANode: TJSONNode; const AList: TObjectList<TNEDProjectFile>);
     function GetFullFilePath: String;
     function GetFilesCount: Integer;
     function GetFile(const Index: Integer): TNEDProjectFile;
@@ -146,7 +151,7 @@ constructor TNEDProjectFile.Create(const AOwner: TNEDProject);
 begin
   FProject := AOwner;
   //
-  FEditorContext := Nil;
+  FEditorContextReference := Nil;
   //
   FTimer := TTimer.Create(Nil);
   FTimer.Enabled := False;
@@ -173,9 +178,24 @@ begin
   FFilePath := '';
   FFullFilePath := '';
   FProject := Nil;
-  FEditorContext := Nil;
+  FEditorContextReference := Nil;
   FTimer.Free;
   inherited;
+end;
+
+procedure TNEDProjectFile.Load(const AStorage: TJSONVerySimple; const ANode: TJSONNode);
+begin
+//  FID := AStorage.NodeAsString(ANode, 'ID', '');
+//  FType := TNEDProjectType.StringToProjectType(AStorage.NodeAsString(ANode, 'Type', 'unknown'));
+  FName := AStorage.NodeAsString(ANode, 'Name', '');
+  FFileName := AStorage.NodeAsString(ANode, 'FileName', '');
+  FFilePath := AStorage.NodeAsString(ANode, 'FilePath', '');
+//  FDescription := AStorage.NodeAsString(ANode, 'Description', '');
+  FCreateDate := AStorage.NodeAsDateTime(ANode, 'CreateDate', 0);
+  FModifyDate := AStorage.NodeAsDateTime(ANode, 'ModifyDate', 0);
+  FLastOpenedDate := AStorage.NodeAsDateTime(ANode, 'LastOpenedDate', 0);
+  FTimesOpened := AStorage.NodeAsInteger(ANode, 'TimesOpened', 0);
+  FTimeUsedMinutes := AStorage.NodeAsInteger(ANode, 'TimeUsedMinutes', 0);
 end;
 
 function TNEDProjectFile.GetFullFilePath: String;
@@ -221,7 +241,7 @@ end;
 constructor TNEDProject.Create;
 begin
   FFiles := TObjectList<TNEDProjectFile>.Create(True);
-  FEditors := TObjectList<TNEDEditorContext>.Create(True);
+  FEditors := TObjectList<TNEDEditorContext>.Create(True); // owner of TNEDEditorContext
   FTimer := TTimer.Create(Nil);
   FTimer.Enabled := False;
   FTimer.Interval := 60 * 1000; // 1 minute
@@ -239,6 +259,8 @@ begin
   FLastOpenedDate := 0;
   FTimesOpened := 0;
   FTimeUsedMinutes := 0;
+  //
+  FModified := False;
 end;
 
 constructor TNEDProject.Create(const AStorage: TJSONVerySimple; const ANode: TJSONNode);
@@ -256,6 +278,8 @@ begin
   FLastOpenedDate := AStorage.NodeAsDateTime(ANode, 'LastOpenedDate', 0);
   FTimesOpened := AStorage.NodeAsInteger(ANode, 'TimesOpened', 0);
   FTimeUsedMinutes := AStorage.NodeAsInteger(ANode, 'TimeUsedMinutes', 0);
+  //
+  ReadFiles(AStorage, ANode.FindNode('Files', [jtObject]));
 end;
 
 constructor TNEDProject.Create(const AType: TNEDProjectTypeEnum; const AProjectPath: String);
@@ -311,6 +335,46 @@ begin
   Inc(FTimeUsedMinutes);
   Save;
   NEDHomeForm.RefreshProjects;
+end;
+
+procedure TNEDProject.ReadFiles(const AStorage: TJSONVerySimple; const ARootNode: TJSONNode);
+var
+  List, Node: TJSONNode;
+  LCount: Integer;
+begin
+  if ARootNode <> Nil then begin
+    LCount := AStorage.NodeAsInteger(ARootNode, 'Count', 0);
+    List := ARootNode.FindNode('List', [jtArray]);
+    if List <> Nil then begin
+      if List.HasChildNodes and (List.ChildNodes.Count = LCount) then begin
+        Node := List.FirstChild;
+        while Node <> Nil do begin
+          ReadFile(AStorage, Node, FFiles);
+          Node := Node.NextSibling;
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure TNEDProject.ReadFile(const AStorage: TJSONVerySimple; const ANode: TJSONNode; const AList: TObjectList<TNEDProjectFile>);
+var
+  //
+  ProjectFile: TNEDProjectFile;
+begin
+  if ANode = Nil then
+    Exit;
+  //
+  ProjectFile := Nil; // satisfy compiler
+  try
+    ProjectFile := TNEDProjectFile.Create(Self);
+    ProjectFile.Load(AStorage, ANode);
+    AList.Add(ProjectFile);
+  except
+    if ProjectFile <> Nil then
+      ProjectFile.Free;
+    raise;
+  end;
 end;
 
 function TNEDProject.GetFullFilePath: String;

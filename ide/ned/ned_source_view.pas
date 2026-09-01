@@ -47,6 +47,7 @@ type
     function OpenNewBuffer(const FilePath: String; out Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
     function OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const View: TNEDEditorForm): TNEDEditorView;
   public
+    // OpenFile creates EditorContext, but not owns it
     function OpenFile(const FilePath: String; out EditorContext: TNEDEditorContext; const SplitType: TNEDSplitViewTypeEnum = stSplitNone): Boolean;
     procedure CloseEditorViews;
   end;

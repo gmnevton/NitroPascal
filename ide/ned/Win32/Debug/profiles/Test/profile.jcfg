@@ -24,15 +24,34 @@
           "TimesOpened" : 0,
           "TimeUsedMinutes" : 0,
           "Files" : {
-            "Count" : 1,
+            "Count" : 3,
             "List" : [
               {
-                "Name" : "",
-                "FileName" : "",
-                "FilePath" : "",
-                "FullFilePath" : "",
-                "CreateDate" : "",
-                "ModifyDate" : "",
+                "Name" : "Source_code_name",
+                "FileName" : "first_main.npc",
+                "FilePath" : ".",
+                "CreateDate" : "2024-02-07T17:39:27+02:00",
+                "ModifyDate" : "2024-02-08T02:16:08+02:00",
+                "LastOpenedDate" : "",
+                "TimesOpened" : 0,
+                "TimeUsedMinutes" : 0
+              },
+              {
+                "Name" : "case statement",
+                "FileName" : "case.npc",
+                "FilePath" : "..\\..\\concepts\\case",
+                "CreateDate" : "2024-04-07T14:36:41+02:00",
+                "ModifyDate" : "2025-04-24T16:04:00+02:00",
+                "LastOpenedDate" : "",
+                "TimesOpened" : 0,
+                "TimeUsedMinutes" : 0
+              },
+              {
+                "Name" : "class properties concept",
+                "FileName" : "property.npc",
+                "FilePath" : "..\\..\\concepts\\class",
+                "CreateDate" : "2024-04-07T14:20:01+02:00",
+                "ModifyDate" : "2026-03-17T02:11:34+02:00",
                 "LastOpenedDate" : "",
                 "TimesOpened" : 0,
                 "TimeUsedMinutes" : 0
