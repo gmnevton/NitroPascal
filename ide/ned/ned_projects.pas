@@ -17,6 +17,7 @@ uses
   ExtCtrls,
   Generics.Collections,
   JSON.VerySimple,
+  uFolders,
   ned_common_simple_types,
   ned_editor_context;
 
@@ -89,6 +90,10 @@ type
     FTimesOpened: Integer;
     FTimeUsedMinutes: Integer;
     //
+    FProjectEntry,
+    FConfigEntry,
+    FFilesEntry: TEntryItem;
+    //
     FModified: Boolean;
     FFiles: TObjectList<TNEDProjectFile>;
     FEditors: TObjectList<TNEDEditorContext>; // owns TNEDEditorContext
@@ -98,6 +103,7 @@ type
   protected
     procedure ReadFiles(const AStorage: TJSONVerySimple; const ARootNode: TJSONNode);
     procedure ReadFile(const AStorage: TJSONVerySimple; const ANode: TJSONNode; const AList: TObjectList<TNEDProjectFile>);
+    procedure ListFiles(const AFilesEntry: TEntryItem);
     function GetFullFilePath: String;
     function GetFilesCount: Integer;
     function GetFile(const Index: Integer): TNEDProjectFile;
@@ -110,6 +116,7 @@ type
     constructor Create(const AType: TNEDProjectTypeEnum; const AProjectPath, AProjectName: String); overload;
     destructor Destroy; override;
     //
+    function  CreateWorkspaceEntries(const AProjectGroup: TEntryItem): TEntryItem;
     function  ContainsFile(const AFilePath: String): Boolean;
     procedure AddEditor(const AEditorContext: TNEDEditorContext);
     procedure OpenEditors;
@@ -132,6 +139,10 @@ type
     property LastOpenedDate: TDateTime read FLastOpenedDate;
     property TimesOpened: Integer read FTimesOpened;
     property TimeUsedMinutes: Integer read FTimeUsedMinutes;
+    //
+    property ProjectEntry: TEntryItem read FProjectEntry;
+    property ConfigEntry: TEntryItem read FConfigEntry;
+    property FilesEntry: TEntryItem read FFilesEntry;
     //
     property FilesCount: Integer read GetFilesCount;
     property &File[const Index: Integer]: TNEDProjectFile read GetFile;
@@ -260,6 +271,10 @@ begin
   FTimesOpened := 0;
   FTimeUsedMinutes := 0;
   //
+  FProjectEntry := Nil;
+  FConfigEntry := Nil;
+  FFilesEntry := Nil;
+  //
   FModified := False;
 end;
 
@@ -377,6 +392,26 @@ begin
   end;
 end;
 
+procedure TNEDProject.ListFiles(const AFilesEntry: TEntryItem);
+var
+  i: Integer;
+  Entry: TEntryItem;
+  ProjectFile: TNEDProjectFile;
+begin
+  AFilesEntry.Items.Clear;
+  for i := 0 to Self.FilesCount - 1 do begin
+    ProjectFile := Self.&File[i];
+    Entry := AFilesEntry.Items.Add;
+    Entry.Caption := ProjectFile.FileName;
+    if SameText(ExtractFileExt(ProjectFile.FileName), '.npe') then
+      Entry.ImageChar := Char($E943) // Code
+    else
+      Entry.ImageChar := Char($F000); // KnowledgeArticle
+    Entry.Data := ProjectFile;
+  end;
+  AFilesEntry.Expand;
+end;
+
 function TNEDProject.GetFullFilePath: String;
 begin
   if Length(FFullFilePath) = 0 then
@@ -406,6 +441,34 @@ begin
   Result := Nil;
   if (FEditors.Count > 0) and (Index >= 0) and (Index < FEditors.Count) then
     Result := FEditors.Items[Index];
+end;
+
+function TNEDProject.CreateWorkspaceEntries(const AProjectGroup: TEntryItem): TEntryItem;
+begin
+  Assert(AProjectGroup <> Nil);
+  if FProjectEntry = Nil then begin
+    FProjectEntry := AProjectGroup.Items.Add;
+    FProjectEntry.Caption := 'Project ' + Self.FileName + ' - ' + Self.Name; // ExtractFileName(AProjectPath)
+    FProjectEntry.ImageChar := Char($E9F9); // ReportDocument
+    FProjectEntry.Data := Self;
+    //Result.DataObject := True;
+  end;
+  Result := FProjectEntry;
+  //
+  if FConfigEntry = Nil then begin
+    FConfigEntry := FProjectEntry.Items.Add;
+    FConfigEntry.Caption := 'Config';
+    FConfigEntry.ImageChar := Char($E713); // Setting
+    FConfigEntry.Data := Self;
+  end;
+  //
+  if FFilesEntry = Nil then begin
+    FFilesEntry := FProjectEntry.Items.Add;
+    FFilesEntry.Caption := 'Files';
+    FFilesEntry.ImageChar := Char($F12B); // FolderHorizontal
+    FFilesEntry.Data := Self;
+  end;
+  ListFiles(FFilesEntry);
 end;
 
 function TNEDProject.ContainsFile(const AFilePath: String): Boolean;

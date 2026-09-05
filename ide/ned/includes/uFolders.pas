@@ -89,6 +89,7 @@ type
     FEnabled: Boolean;
     FVisible: Boolean;
     FImageIndex: Integer;
+    FImageChar: Char;
     FEntryState: TEntryStateEnum;
     FItems: TEntryItems;
     //
@@ -102,6 +103,7 @@ type
     procedure SetEnabled(Value: Boolean);
     procedure SetVisible(Value: Boolean);
     procedure SetImageIndex(Value: Integer);
+    procedure SetImageChar(Value: Char);
     procedure SetEntryState(Value: TEntryStateEnum);
     procedure SetItems(Value: TEntryItems);
     //
@@ -137,6 +139,7 @@ type
     property Enabled: Boolean read FEnabled write SetEnabled default True;
     property Visible: Boolean read GetVisible write SetVisible;
     property ImageIndex: Integer read FImageIndex write SetImageIndex;
+    property ImageChar: Char read FImageChar write SetImageChar;
     property State: TEntryStateEnum read FEntryState write SetEntryState;
     property Items: TEntryItems read FItems write SetItems;
     //
@@ -370,6 +373,10 @@ type
   TEntryItemSelectionEvent = procedure (Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean) of object;
   TEntryItemGetTypeEvent = procedure (Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum) of object;
 
+  TEntryItemExpandIndicatorTypeEnum = (itPlusMinus, itArrow);
+  TEntryItemExpandIndicatorPosEnum = (ipLeft, ipRight);
+  TEntryItemExpandIndicatorSizeType = -1..15;
+
   TCustomEntryView = class(TCustomControl)
   private // fileds that will be accesible by user
     FActiveIndex: Integer;
@@ -394,6 +401,9 @@ type
     FActiveColor: TColor;
     FSelectedColor: TColor;
     FHotColor: TColor;
+    FItemExpandIndicatorType: TEntryItemExpandIndicatorTypeEnum;
+    FItemExpandIndicatorPos: TEntryItemExpandIndicatorPosEnum;
+    FItemExpandIndicatorSize: TEntryItemExpandIndicatorSizeType;
     // events
     FOnChange: TNotifyEvent;
     FOnItemClick: TEntryItemEvent;
@@ -427,6 +437,9 @@ type
     procedure SetActiveColor(Value: TColor);
     procedure SetSelectedColor(Value: TColor);
     procedure SetHotColor(Value: TColor);
+    procedure SetItemExpandIndicatorType(Value: TEntryItemExpandIndicatorTypeEnum);
+    procedure SetItemExpandIndicatorPos(Value: TEntryItemExpandIndicatorPosEnum);
+    procedure SetItemExpandIndicatorSize(Value: TEntryItemExpandIndicatorSizeType);
   private // getters
     procedure ComponentPropertiesChanged;
     //function GetButtonRect(Button: TFolderScrollButton): TRect;
@@ -524,6 +537,9 @@ type
     property ActiveColor: TColor read FActiveColor write SetActiveColor;
     property SelectedColor: TColor read FSelectedColor write SetSelectedColor;
     property HotColor: TColor read FHotColor write SetHotColor;
+    property ItemExpandIndicatorType: TEntryItemExpandIndicatorTypeEnum read FItemExpandIndicatorType write SetItemExpandIndicatorType;
+    property ItemExpandIndicatorPos: TEntryItemExpandIndicatorPosEnum read FItemExpandIndicatorPos write SetItemExpandIndicatorPos;
+    property ItemExpandIndicatorSize: TEntryItemExpandIndicatorSizeType read FItemExpandIndicatorSize write SetItemExpandIndicatorSize;
     // events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnItemClick: TEntryItemEvent read FOnItemClick write FOnItemClick;
@@ -571,6 +587,9 @@ type
     property EntryImages;
     property Entries;
     property HotColor;
+    property ItemExpandIndicatorPos;
+    property ItemExpandIndicatorSize;
+    property ItemExpandIndicatorType;
 //    property ItemImages;
     property MultiSelect;
     property OverlayPicture;
@@ -1378,6 +1397,81 @@ begin
   end;
 end;
 
+// plus
+//   | 0 1 2 X
+// -----------
+// 0 |   x
+// 1 | x x x
+// 2 |   x
+// Y |
+
+// minus
+//   | 0 1 2 X
+// -----------
+// 0 |
+// 1 | x x x
+// 2 |
+// Y |
+
+procedure DrawPlusMinus(const Canvas: TCanvas; const R: TRect; Plus: Boolean; DrawState: TDrawState; Thickness, Size: Integer);
+const
+  // points transformed by -1
+  PlusMinusPoints: Array[Boolean, 0..2] of TPoint = (
+    ((X: -1; Y:  0), (X: 0; Y: 0), (X: 1; Y: 0)), // minus
+    ((X: 0;  Y: -1), (X: 0; Y: 0), (X: 0; Y: 1))  // plus
+  );
+var
+  CX, CY: Integer;
+  I, HalfSize: Integer;
+  P: Array[0..2] of TPoint;
+begin
+  // Clamp values
+  if Thickness < 1 then
+    Thickness := 1;
+
+  if Size < 2 then
+    Size := 2;
+
+  HalfSize := Round(Size * 0.5);
+
+  // Center of drawing rect
+  CX := (R.Left + R.Right) div 2;
+  CY := (R.Top + R.Bottom) div 2 - Thickness div 2;
+
+  // Pen setup
+  Canvas.Pen.Color := clWindow;
+  if dsSelected in DrawState then
+    Canvas.Pen.Color := clWindowText
+  else if dsHot in DrawState then
+    Canvas.Pen.Color := clCaptionText;
+  Canvas.Pen.Style := psSolid;
+  Canvas.Pen.Width := Thickness;
+
+  // Build minus geometry
+  for I := 0 to 2 do begin
+    P[I] := Point(CX + PlusMinusPoints[False, I].X * Size, CY + PlusMinusPoints[False, I].Y * Size);
+  end;
+
+  Canvas.Polyline(P);
+
+  // Fixups
+  if Thickness = 1 then begin
+    Canvas.Pixels[P[0].X, P[0].Y] := Canvas.Pen.Color;
+  end
+  else begin
+    Canvas.Pixels[P[0].X, P[0].Y - 1] := Canvas.Pen.Color;
+  end;
+
+  if Plus then begin
+    // Build plus geometry
+    for I := 0 to 2 do begin
+      P[I] := Point(CX + PlusMinusPoints[True, I].X * Size, CY + PlusMinusPoints[True, I].Y * Size);
+    end;
+
+    Canvas.Polyline(P);
+  end;
+end;
+
 { TEntryItem }
 
 constructor TEntryItem.Create(Collection: TCollection);
@@ -1389,6 +1483,7 @@ begin
   FEnabled := True;
   FVisible := True;
   FImageIndex := -1;
+  FImageChar := #0;
   FEntryState := esCollapsed;
   FItems := TEntryItems.Create(TEntryItems(Collection).Control, Self);
   FData := Nil;
@@ -1403,6 +1498,7 @@ begin
     TObject(FData).Free
   else if (FData <> Nil) and Assigned(FUserFreeProc) then
     FUserFreeProc(FData);
+  FImageChar := #0;
   FItems.Free;
   FParentEntries := Nil;
   FCaption := '';
@@ -1589,6 +1685,14 @@ procedure TEntryItem.SetImageIndex(Value: Integer);
 begin
   if Value <> FImageIndex then begin
     FImageIndex := Value;
+    Changed(False);
+  end;
+end;
+
+procedure TEntryItem.SetImageChar(Value: Char);
+begin
+  if Value <> FImageChar then begin
+    FImageChar := Value;
     Changed(False);
   end;
 end;
@@ -2951,6 +3055,9 @@ begin
   FActiveColor := $0080F080; // xxBBGGRR
   FSelectedColor := clHighlight;
   FHotColor := $00E06464;
+  FItemExpandIndicatorType := itPlusMinus;
+  FItemExpandIndicatorPos  := ipLeft;
+  FItemExpandIndicatorSize := 5;
   //
   FVerticalScrollBar := TEntryViewScrollBar.Create(Self, sbVertical);
   FVerticalScrollBar.Parent := Self;
@@ -4003,10 +4110,11 @@ end;
 procedure TCustomEntryView.DrawEntryItem(const ACanvas: TCanvas; const ARect: TRect; const DrawState: TDrawState; const Item: TEntryItem);
 var
   DC: HDC;
-  DrawRect: TRect;
+  DrawRect, IndicatorRect: TRect;
 //  CheckeredBrush: HBRUSH;
   top: Integer;
   Indent: Integer;
+  SavedFont: TFont;
 begin
   if not Assigned(Item) then
     Exit;
@@ -4030,21 +4138,18 @@ begin
   ACanvas.FillRect(ARect);
 
   // if focused
-  if not (csLoading in ComponentState) and (dsFocused in DrawState) then
-    DrawBorder(ACanvas, ARect, clWhite, 2); // @TODO: fix overlay mode
+//  if not (csLoading in ComponentState) and (dsFocused in DrawState) then
+//    DrawBorder(ACanvas, ARect, clWhite, 2); // @TODO: fix overlay mode
 
-  Inc(DrawRect.Left, 20 * Indent);
+  Inc(DrawRect.Left, 12 * Indent);
 
-  // draw item icon
-  InflateRect(DrawRect, -6, 0);
-  if FEntryImages <> Nil then begin
-    top := (FEntryHeight - FEntryImages.Height) div 2;
-    if Item.ImageIndex > -1 then
-      ImageList_DrawEx(FEntryImages.Handle, Item.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
-    Inc(DrawRect.Left, FEntryImages.Width + 2);
+  if FItemExpandIndicatorPos = ipLeft then begin
+    if FItemExpandIndicatorSize > 0 then
+      Inc(DrawRect.Left, FItemExpandIndicatorSize * 2 + 4)
+    else // <= 0
+      Inc(DrawRect.Left, 14); // default
   end;
-  // draw item caption
-  InflateRect(DrawRect, -1, -1);
+
   ACanvas.Font.Color := clWindow;
   if DrawState * [dsSelected, dsHot] = [dsSelected, dsHot] then
     ACanvas.Font.Color := TWinControlAccess(Parent).Color
@@ -4053,13 +4158,51 @@ begin
   else if dsHot in DrawState then
     ACanvas.Font.Color := clCaptionText;
   SetBkMode(DC, TRANSPARENT);
+
+  // draw item icon
+  InflateRect(DrawRect, -6, 0);
+  if FEntryImages <> Nil then begin
+    top := (FEntryHeight - FEntryImages.Height) div 2;
+    if Item.ImageIndex > -1 then
+      ImageList_DrawEx(FEntryImages.Handle, Item.ImageIndex, DC, DrawRect.Left, DrawRect.Top + top, 0, 0, CLR_NONE, CLR_NONE, ILD_NORMAL);
+    Inc(DrawRect.Left, FEntryImages.Width + 2);
+  end
+  else if Item.ImageChar <> #0 then begin
+    SavedFont := TFont.Create;
+    SavedFont.Assign(ACanvas.Font);
+    try
+      ACanvas.Font.Name := 'Segoe MDL2 Assets';
+      ACanvas.Font.Size := ACanvas.Font.Size + 3;
+      top := (FEntryHeight - ACanvas.TextHeight(Item.ImageChar)) div 2;
+      ACanvas.TextOut(DrawRect.Left, DrawRect.Top + top, Item.ImageChar);
+    finally
+      ACanvas.Font.Assign(SavedFont);
+      SavedFont.Free;
+    end;
+    Inc(DrawRect.Left, ACanvas.TextHeight(Item.ImageChar) + 2);
+  end;
+  // draw item caption
+  InflateRect(DrawRect, -1, -1);
   DrawCaption(ACanvas, Item.Caption, DrawRect, drLeft);
   // draw expand indicator if item has children
   if Item.Items.Count > 0 then begin
-    if Item.State = esCollapsed then
-      DrawArrow(ACanvas, Rect(ARect.Right - 20, ARect.Top, ARect.Right, ARect.Bottom), daDown, DrawState, 2, 5)
-    else // esExpanded
-      DrawArrow(ACanvas, Rect(ARect.Right - 20, ARect.Top, ARect.Right, ARect.Bottom), daUp, DrawState, 2, 5);
+    if FItemExpandIndicatorPos = ipLeft then
+      IndicatorRect := Rect(ARect.Left + (12 * Indent), ARect.Top, ARect.Left + (12 * Indent) + 20, ARect.Bottom)
+    else
+      IndicatorRect := Rect(ARect.Right - 20, ARect.Top, ARect.Right, ARect.Bottom);
+    //
+    if FItemExpandIndicatorType = itPlusMinus then begin
+      if Item.State = esCollapsed then
+        DrawPlusMinus(ACanvas, IndicatorRect, True, DrawState, 2, FItemExpandIndicatorSize)
+      else // esExpanded
+        DrawPlusMinus(ACanvas, IndicatorRect, False, DrawState, 2, FItemExpandIndicatorSize);
+    end
+    else begin // Arrow
+      if Item.State = esCollapsed then
+        DrawArrow(ACanvas, IndicatorRect, daDown, DrawState, 2, FItemExpandIndicatorSize)
+      else // esExpanded
+        DrawArrow(ACanvas, IndicatorRect, daUp, DrawState, 2, FItemExpandIndicatorSize);
+    end;
   end;
 end;
 
@@ -4506,6 +4649,33 @@ procedure TCustomEntryView.SetHotColor(Value: TColor);
 begin
   if FHotColor <> Value then begin
     FHotColor := Value;
+    Repaint;
+    ComponentPropertiesChanged;
+  end;
+end;
+
+procedure TCustomEntryView.SetItemExpandIndicatorType(Value: TEntryItemExpandIndicatorTypeEnum);
+begin
+  if FItemExpandIndicatorType <> Value then begin
+    FItemExpandIndicatorType := Value;
+    Repaint;
+    ComponentPropertiesChanged;
+  end;
+end;
+
+procedure TCustomEntryView.SetItemExpandIndicatorPos(Value: TEntryItemExpandIndicatorPosEnum);
+begin
+  if FItemExpandIndicatorPos <> Value then begin
+    FItemExpandIndicatorPos := Value;
+    Repaint;
+    ComponentPropertiesChanged;
+  end;
+end;
+
+procedure TCustomEntryView.SetItemExpandIndicatorSize(Value: TEntryItemExpandIndicatorSizeType);
+begin
+  if FItemExpandIndicatorSize <> Value then begin
+    FItemExpandIndicatorSize := Value;
     Repaint;
     ComponentPropertiesChanged;
   end;

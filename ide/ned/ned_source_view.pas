@@ -44,8 +44,9 @@ type
     Views: TObjectList<TNEDEditorForm>;
     MainView: TNEDEditorForm;
     //
+    function FindBuffer(const FilePath: String; out FoundBuffer: TNEDEditorBuffer): Boolean;
     function OpenNewBuffer(const FilePath: String; out Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
-    function OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const View: TNEDEditorForm): TNEDEditorView;
+    function OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean; // TNEDEditorView;
   public
     // OpenFile creates EditorContext, but not owns it
     function OpenFile(const FilePath: String; out EditorContext: TNEDEditorContext; const SplitType: TNEDSplitViewTypeEnum = stSplitNone): Boolean;
@@ -132,16 +133,24 @@ begin
     View := Nil;
   end;
   //
-  if OpenNewBuffer(FilePath, Buffer, host_ctrl, View, Info) then begin
-    Buffers.Add(Buffer);
-    Views.Add(View);
-    if MainView = Nil then
-      MainView := View;
+  Info := Nil;
+  if FindBuffer(FilePath, Buffer) then begin
+    if OpenExistingBuffer(Buffer, host_ctrl, View, Info) then begin
+      Views.Add(View);
+      if MainView = Nil then
+        MainView := View;
+    end;
   end
   else begin
-
+    if OpenNewBuffer(FilePath, Buffer, host_ctrl, View, Info) then begin
+      Buffers.Add(Buffer);
+      Views.Add(View);
+      if MainView = Nil then
+        MainView := View;
+    end;
   end;
   //
+  Assert(Info <> Nil);
   EditorContext := TNEDEditorContext.Create(Buffer, Info);
 end;
 
@@ -154,6 +163,23 @@ begin
     View := Views[i];
     Views[i] := Nil;
     View.Free;
+  end;
+end;
+
+function TNEDViewForm.FindBuffer(const FilePath: String; out FoundBuffer: TNEDEditorBuffer): Boolean;
+var
+  i: Integer;
+  Buffer: TNEDEditorBuffer;
+begin
+  Result := False;
+  FoundBuffer := Nil;
+  for i := 0 to Buffers.Count - 1 do begin
+    Buffer := Buffers.Items[i];
+    if SameText(Buffer.FilePath, FilePath) then begin
+      FoundBuffer := Buffer;
+      Result := True;
+      Exit;
+    end;
   end;
 end;
 
@@ -184,9 +210,29 @@ begin
   end;
 end;
 
-function TNEDViewForm.OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const View: TNEDEditorForm): TNEDEditorView;
+function TNEDViewForm.OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
+var
+  Editor: TNEDEditorView;
 begin
-
+  try
+    if View = Nil then begin
+      View := TNEDEditorForm.Create(Self);
+      View.Parent := HostControl;
+      View.Align := alClient;
+      View.Show;
+      View.BringToFront;
+    end;
+    //
+    Editor := View.NewEditor(Buffer, Info);
+    //
+    Buffer.Reload;
+    //
+    Editor.SetFocus;
+    //
+    Result := True;
+  except
+    Result := False;
+  end;
 end;
 
 end.

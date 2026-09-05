@@ -457,7 +457,7 @@ object NEDHomeForm: TNEDHomeForm
           AlignWithMargins = True
           Left = 0
           Top = 0
-          Width = 371
+          Width = 145
           Height = 28
           Margins.Left = 0
           Margins.Top = 0
@@ -474,7 +474,6 @@ object NEDHomeForm: TNEDHomeForm
           Transparent = True
           StyleElements = []
           TextKind = tkHeading
-          ExplicitWidth = 145
         end
         object sbFavoritesList: TUScrollBox
           Left = 0
@@ -519,7 +518,7 @@ object NEDHomeForm: TNEDHomeForm
           AlignWithMargins = True
           Left = 0
           Top = 0
-          Width = 371
+          Width = 107
           Height = 28
           Margins.Left = 0
           Margins.Top = 0
@@ -534,7 +533,6 @@ object NEDHomeForm: TNEDHomeForm
           Font.Style = []
           ParentFont = False
           TextKind = tkHeading
-          ExplicitWidth = 107
         end
         object sbRecentsList: TUScrollBox
           Left = 0

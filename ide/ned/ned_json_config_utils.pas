@@ -79,7 +79,7 @@ var
 begin
   Result := ADefault;
   Node := ARoot.FindNode(ANodeName, [jtString]);
-  if (Node <> Nil) then
+  if (Node <> Nil) and (Length(Node.ValueAsString) > 0) then
     if not TryISO8601ToDate(Node.ValueAsString, Result, False) then
       Result := ADefault;
 end;

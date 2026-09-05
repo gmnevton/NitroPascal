@@ -250,10 +250,10 @@ begin
     ItemButton.Align := alTop;
     ItemButton.ObjectsVisible := [iokCheckBox, iokLeftIcon, iokText, iokDetail];
     ItemButton.LeftIcon := '';
-    if Project.&Type = ptProject then
-      ItemButton.LeftIcon := Char($E9F9) // ReportDocument
-    else if Project.&Type = ptProjectGroup then
+    if Project.&Type = ptProjectGroup then
       ItemButton.LeftIcon := Char($F000) // KnowledgeArticle
+    else if Project.&Type = ptProject then
+      ItemButton.LeftIcon := Char($E9F9) // ReportDocument
     else if Project.&Type = ptFile then
       ItemButton.LeftIcon := Char($E943); // Code
     ItemButton.Detail := ButtonDetailText(Project);

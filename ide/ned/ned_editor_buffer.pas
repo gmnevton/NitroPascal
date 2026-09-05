@@ -461,6 +461,7 @@ type
     procedure Clear;
     //
     procedure LoadFromFile(const FileName: String);
+    procedure Reload;
     procedure SaveToFile;
     procedure SaveToFileAs(const FileName: String);
     //
@@ -1716,6 +1717,11 @@ begin
     EndUpdate;
     NotifyObservers(0, dcLoad, opNone, 0, FLength);
   end;
+end;
+
+procedure TNEDCustomDocument.Reload;
+begin
+  NotifyObservers(0, dcLoad, opNone, 0, FLength);
 end;
 
 procedure TNEDCustomDocument.SaveToFile;

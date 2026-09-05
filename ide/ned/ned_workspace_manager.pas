@@ -64,7 +64,6 @@ type
 //    FPlugins: TNEDPlugins;
 //    FExternalTools: TNEDExternalTools;
   protected
-    procedure ListFiles(const AProject: TNEDProject; const AFilesEntry: TEntryItem);
   public
     constructor Create(const Owner: TNEDWorkspaceManager);
     destructor Destroy; override;
@@ -90,6 +89,7 @@ type
   private
     FWorkspace: TNEDWorkspace;
     //
+    function GetEntries: TEntryView;
     function GetViewForm: TNEDViewForm;
   public
     constructor Create;
@@ -110,6 +110,7 @@ type
     function OpenProject(const AProjectPath: String): TNEDProject;
     function OpenFile(const AFilePath: String): TNEDProject;
     //
+    property NEDEntries: TEntryView read GetEntries;
     property NEDViewForm: TNEDViewForm read GetViewForm;
   end;
 
@@ -139,21 +140,6 @@ destructor TNEDWorkspace.Destroy;
 begin
 
   inherited;
-end;
-
-procedure TNEDWorkspace.ListFiles(const AProject: TNEDProject; const AFilesEntry: TEntryItem);
-var
-  i: Integer;
-  Entry: TEntryItem;
-  ProjectFile: TNEDProjectFile;
-begin
-  for i := 0 to AProject.FilesCount - 1 do begin
-    ProjectFile := AProject.&File[i];
-    Entry := AFilesEntry.Items.Add;
-    Entry.Caption := ProjectFile.FileName;
-    Entry.Data := ProjectFile;
-  end;
-  AFilesEntry.Expand;
 end;
 
 procedure TNEDWorkspace.CreateEntries(const AParentControl: TWinControl);
@@ -242,7 +228,6 @@ function TNEDWorkspace.AddProject(const AProjectGroup: TEntryItem; const AProjec
 var
   Project: TNEDProject;
   Entry: TEntryItem;
-  ProjectEntry, FilesEntry: TEntryItem;
 begin
   FWorkspaceEntries.BeginUpdate;
   try
@@ -254,27 +239,11 @@ begin
       end
       else
         Project := TNEDProject(Entry.Data);
-      //
-      Result := AProjectGroup.Items.Add;
-      Result.Caption := ExtractFileName(AProjectPath);
-    end
-    else begin
-      Result := AProjectGroup.Items.Add;
-      Result.Caption := ExtractFileName(AProjectPath);
     end;
     //
     Assert(Project <> Nil);
-    Result.Data := Project;
-    //Result.DataObject := True;
-    //
-    ProjectEntry := Result.Items.Add;
-    ProjectEntry.Caption := 'Project config';
-    ProjectEntry.Data := Project;
-    //
-    FilesEntry := Result.Items.Add;
-    FilesEntry.Caption := 'Files';
-    FilesEntry.Data := Project;
-    ListFiles(Project, FilesEntry);
+    Result := Project.CreateWorkspaceEntries(AProjectGroup);
+    FWorkspaceEntries.Selected := Result;
     //
     Project.Touch;
   finally
@@ -298,27 +267,11 @@ begin
       end
       else
         Project := TNEDProject(Entry.Data);
-      //
-      Result := AProject.Items.Add;
-      Result.Caption := ExtractFileName(AFilePath);
-    end
-    else begin
-      Result := AProject.Items.Add;
-      Result.Caption := ExtractFileName(AFilePath);
     end;
     //
     Assert(Project <> Nil);
-    Result.Data := Project;
-    //Result.DataObject := True;
-    //
-    ProjectEntry := Result.Items.Add;
-    ProjectEntry.Caption := 'Project config';
-    ProjectEntry.Data := Project;
-    //
-    FilesEntry := Result.Items.Add;
-    FilesEntry.Caption := 'Files';
-    FilesEntry.Data := Project;
-    ListFiles(Project, FilesEntry);
+    Result := Project.CreateWorkspaceEntries(AProject);
+    FWorkspaceEntries.Selected := Result;
     //
     Project.Touch;
   finally
@@ -353,6 +306,11 @@ destructor TNEDWorkspaceManager.Destroy;
 begin
   FWorkspace.Free;
   inherited;
+end;
+
+function TNEDWorkspaceManager.GetEntries: TEntryView;
+begin
+  Result := FWorkspace.Entries;
 end;
 
 function TNEDWorkspaceManager.GetViewForm: TNEDViewForm;

@@ -1,0 +1,18 @@
+﻿code 'wyciwyg - code to assembly';
+
+// @asis directive
+//
+// this directive forces compiler to translate your code exactly as you want it to be executed in assembly,
+// normally the compiler would optimize this two statements, dropping the MemZero statement, 
+// because at the end of the code block, variable SomeSecret is automatically out of scope, so it can't be accesed further
+// down the source code, but we need the memory to be zeroed, because of security reasons, for example some cryptography
+// library might need it for clearing the memory occupied by private key data or something equally important
+
+SomeTestProc() {
+  @asis: {
+    SomeSecret := 'owerfhowhfgnwerfgou;hwrghn;kjerwgjhnwrgiukhnwrg8uhwergjn';
+    MemZero(SomeSecret, SomeSecret.Length);
+  };
+};
+
+end.

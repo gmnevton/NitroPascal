@@ -1,6 +1,9 @@
 # ![NitroPascal](./git_res/NitroPascal.png)
 
 NitroPascal is a new data/object oriented programming (DOOP) language based on Pascal / Delphi.  
+The compiler has the ability to translate your code into assembly exactly how you coded it,   
+it can deliver WYCIWYG assembly - What You Coded is What You Get - @asis directive enables this feature.  
+More info in [this file](d:\Borland Librarys\NitroPascal\compiler\concepts\asis\asis.npc).
 
 ![NitroPascal1](./git_res/NitroPascal1.png)
 

@@ -13,7 +13,7 @@
       "Maximize" : true,
       "ShowHomePage" : true,
       "ColorSchema" : "system",
-      "ScreenSnap" : false,
+      "ScreenSnap" : true,
       "ScreenSnapBuffer" : 10
     },
     "Profiles" : {

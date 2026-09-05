@@ -259,9 +259,9 @@ begin
     for EditorInfo in NEDEditors do begin
       if EditorInfo.Editor = TNEDEditorView(Msg.WParam) then begin
         if SameText(ExtractFileExt(EditorInfo.Editor.Document.FilePath), '.npe') then
-          EditorInfo.Thumbstone.SymbolChar := ''
+          EditorInfo.Thumbstone.SymbolChar := Char($E943) // Code
         else
-          EditorInfo.Thumbstone.SymbolChar := '';
+          EditorInfo.Thumbstone.SymbolChar := Char($F000); // KnowledgeArticle
         EditorInfo.Thumbstone.Detail := EditorInfo.Editor.EditorFileType;
         EditorInfo.Thumbstone.Text := ExtractFileName(EditorInfo.Editor.Document.FilePath);
       end;

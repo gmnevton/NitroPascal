@@ -43,6 +43,7 @@ uses
   SynEdit,
   VirtualTrees,
   SplitEx,
+  uFolders,
   ned_dialog_base,
   ned_editor_view,
   ned_profiles,
@@ -229,6 +230,8 @@ type
     procedure DisableWindowControls;
     procedure EnableWindowControls;
   private
+    procedure WorkspaceViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum); // event
+    procedure WorkspaceViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean); // event
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure WMGetDlgCode(var Msg: TWMGetDlgCode); message WM_GETDLGCODE;
@@ -647,9 +650,30 @@ begin
   barCaption.MenuController.Enabled := True;
 end;
 
+procedure TNEDMainForm.WorkspaceViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum);
+begin
+  if (Item.Data <> Nil) and (TObject(Item.Data) is TNEDProjectFile) then
+    ItemType := etFile;
+end;
+
+procedure TNEDMainForm.WorkspaceViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean);
+var
+  ProjectFile: TNEDProjectFile;
+begin
+  if IsSubDirectory then begin
+    // for future use
+  end
+  else begin
+    ProjectFile := TNEDProjectFile(Pointer(Item.Data));
+    CreateWorkSpaceAndOpenFile(ProjectFile.FullFilePath, stSplitNone);
+  end;
+end;
+
 procedure TNEDMainForm.CreateWorkSpaceAndOpenFile(const FileName: String; const SplitType: TNEDSplitViewTypeEnum);
 begin
   FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
+  FWorkspaceManager.NEDEntries.OnItemGetType := WorkspaceViewItemGetType;
+  FWorkspaceManager.NEDEntries.OnItemSelection := WorkspaceViewItemSelection;
   FWorkspaceManager.Open(FileName, SplitType);
 end;
 
@@ -659,6 +683,8 @@ var
 begin
   FileName := IncludeTrailingPathDelimiter(Project.FilePath) + Project.FileName;
   FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
+  FWorkspaceManager.NEDEntries.OnItemGetType := WorkspaceViewItemGetType;
+  FWorkspaceManager.NEDEntries.OnItemSelection := WorkspaceViewItemSelection;
   FWorkspaceManager.Open(FileName, SplitType);
 end;
 
