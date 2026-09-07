@@ -48,6 +48,7 @@ uses
   ned_editor_view,
   ned_profiles,
   ned_projects,
+  ned_source_editor,
   ned_splitview_manager,
   ned_workspace_manager;
 
@@ -240,6 +241,7 @@ type
     function  DestroyModalDialogForm(var ADialogForm: TNEDDialogBase): Boolean;
     procedure CreateWorkSpaceAndOpenFile(const FileName: String; const SplitType: TNEDSplitViewTypeEnum); overload;
     procedure CreateWorkSpaceAndOpenFile(const Project: TNEDProject; const SplitType: TNEDSplitViewTypeEnum); overload;
+    procedure SelectWorkspaceProjectEntry(const EditorInfo: TNEDEditorInfo); // (const Editor: TNEDEditorView);
   end;
 
 var
@@ -255,7 +257,7 @@ uses
   ned_home_page,
   ned_dialog_profiles,
   ned_source_view,
-  ned_source_editor,
+//  ned_source_editor,
   ned_dialog_open,
   ned_dialog_message,
   ned_config;
@@ -493,26 +495,26 @@ begin
 
   if CurrentEditor <> Nil then begin
     idx := -1;
-    for i := 0 to NEDEditors.Count - 1 do begin
-      if NEDEditors.Items[i].Editor = CurrentEditor then begin
+    for i := 0 to NEDEditorsInfo.Count - 1 do begin
+      if NEDEditorsInfo.Items[i].Editor = CurrentEditor then begin
         idx := i;
         Break;
       end;
     end;
     //
     if idx > -1 then begin
-      if (MoveDirection = 1) and (idx + 1 < NEDEditors.Count) then begin
+      if (MoveDirection = 1) and (idx + 1 < NEDEditorsInfo.Count) then begin
         TNEDEditorForm.SelectEditorByIndex(idx + 1);
       end
       else if (MoveDirection = -1) and (idx - 1 >= 0) then begin
         TNEDEditorForm.SelectEditorByIndex(idx - 1);
       end
       else begin // wrap around
-        if (MoveDirection = 1) and (idx + 1 = NEDEditors.Count) then begin
+        if (MoveDirection = 1) and (idx + 1 = NEDEditorsInfo.Count) then begin
           TNEDEditorForm.SelectEditorByIndex(0);
         end
         else if (MoveDirection = -1) and (idx - 1 < 0) then begin
-          TNEDEditorForm.SelectEditorByIndex(NEDEditors.Count - 1);
+          TNEDEditorForm.SelectEditorByIndex(NEDEditorsInfo.Count - 1);
         end;
       end;
     end;
@@ -669,25 +671,6 @@ begin
   end;
 end;
 
-procedure TNEDMainForm.CreateWorkSpaceAndOpenFile(const FileName: String; const SplitType: TNEDSplitViewTypeEnum);
-begin
-  FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
-  FWorkspaceManager.NEDEntries.OnItemGetType := WorkspaceViewItemGetType;
-  FWorkspaceManager.NEDEntries.OnItemSelection := WorkspaceViewItemSelection;
-  FWorkspaceManager.Open(FileName, SplitType);
-end;
-
-procedure TNEDMainForm.CreateWorkSpaceAndOpenFile(const Project: TNEDProject; const SplitType: TNEDSplitViewTypeEnum);
-var
-  FileName: String;
-begin
-  FileName := IncludeTrailingPathDelimiter(Project.FilePath) + Project.FileName;
-  FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
-  FWorkspaceManager.NEDEntries.OnItemGetType := WorkspaceViewItemGetType;
-  FWorkspaceManager.NEDEntries.OnItemSelection := WorkspaceViewItemSelection;
-  FWorkspaceManager.Open(FileName, SplitType);
-end;
-
 function TNEDMainForm.CreateModalDialogForm(const AFormClass: TNEDDialogBaseClass): TNEDDialogBase;
 begin
   Result := Nil;
@@ -712,6 +695,30 @@ begin
   end;
   EnableWindowControls;
   Result := True;
+end;
+
+procedure TNEDMainForm.CreateWorkSpaceAndOpenFile(const FileName: String; const SplitType: TNEDSplitViewTypeEnum);
+begin
+  FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
+  FWorkspaceManager.NEDEntries.OnItemGetType := WorkspaceViewItemGetType;
+  FWorkspaceManager.NEDEntries.OnItemSelection := WorkspaceViewItemSelection;
+  FWorkspaceManager.Open(FileName, SplitType);
+end;
+
+procedure TNEDMainForm.CreateWorkSpaceAndOpenFile(const Project: TNEDProject; const SplitType: TNEDSplitViewTypeEnum);
+var
+  FileName: String;
+begin
+  FileName := IncludeTrailingPathDelimiter(Project.FilePath) + Project.FileName;
+  FWorkspaceManager.CreateWorkspace(boxWorkSpace, pnlWorkSpace);
+  FWorkspaceManager.NEDEntries.OnItemGetType := WorkspaceViewItemGetType;
+  FWorkspaceManager.NEDEntries.OnItemSelection := WorkspaceViewItemSelection;
+  FWorkspaceManager.Open(FileName, SplitType);
+end;
+
+procedure TNEDMainForm.SelectWorkspaceProjectEntry(const EditorInfo: TNEDEditorInfo);
+begin
+  FWorkspaceManager.SelectWorkspaceProjectEntry(TNEDProject(EditorInfo.Project), EditorInfo.Editor.Document);
 end;
 
 procedure TNEDMainForm.btnSelectProfileClick(Sender: TObject);

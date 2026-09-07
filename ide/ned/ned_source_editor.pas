@@ -36,6 +36,7 @@ uses
 type
   TNEDEditorInfo = class
   public
+    Project: TObject;
     Thumbstone: TUSymbolButton;
     Editor: TNEDEditorView;
   public
@@ -45,15 +46,15 @@ type
 
   TNEDEditorForm = class(TUForm)
     SynEdit1: TSynEdit; // this will be removed
-    SynGeneralSyn1: TSynGeneralSyn;
+    SynGeneralSyn1: TSynGeneralSyn; // this will be removed
     UPanel4: TUPanel;
     UScrollBox1: TUScrollBox;
     UPopupMenu1: TUPopupMenu;
     _mnuShowNonVisibleLines: TMenuItem;
     PopupMenu1: TPopupMenu;
     mnuShowNonVisibleLines: TMenuItem;
-    USymbolButton1: TUSymbolButton;
-    USymbolButton2: TUSymbolButton;
+    USymbolButton1: TUSymbolButton; // this will be removed
+    USymbolButton2: TUSymbolButton; // this will be removed
     //
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -71,42 +72,46 @@ type
   end;
 
 var
-  NEDEditors: TObjectList<TNEDEditorInfo>;
+  NEDEditorsInfo: TObjectList<TNEDEditorInfo>;
 
 implementation
 
 {$R *.dfm}
 
-//uses
+uses
 //  Windows,
 //  Dialogs;
+  ned_main;
+//  ned_workspace_manager;
 
 var
   NEDUniqueEditorNumber: Integer = 0;
 
 procedure CreateEditorsList;
 begin
-  NEDEditors := TObjectList<TNEDEditorInfo>.Create(True);
+  NEDEditorsInfo := TObjectList<TNEDEditorInfo>.Create(True);
 end;
 
 procedure DestroyEditorsList;
 begin
-  NEDEditors.Clear;
-  NEDEditors.Free;
+  NEDEditorsInfo.Clear;
+  NEDEditorsInfo.Free;
 end;
 
 { TNEDEditorInfo }
 
 constructor TNEDEditorInfo.Create(const AThumbstone: TUSymbolButton; const AEditor: TNEDEditorView);
 begin
+  Project := Nil;
   Thumbstone := AThumbstone;
   Editor := AEditor;
 end;
 
 destructor TNEDEditorInfo.Destroy;
 begin
-//  Thumbstone.Free;
-//  Editor.Free;
+  Project := Nil;
+  Thumbstone := Nil;
+  Editor := Nil;
   inherited;
 end;
 
@@ -165,7 +170,7 @@ begin
   SymbolButton.OnClick := btnEditorThumbClick;
   //
   Info := TNEDEditorInfo.Create(SymbolButton, Result);
-  NEDEditors.Add(Info);
+  NEDEditorsInfo.Add(Info);
 end;
 
 class procedure TNEDEditorForm.SelectEditorByThumbstone(const Thumbstone: TUSymbolButton);
@@ -175,16 +180,17 @@ var
   EditorView: TNEDEditorView;
 begin
   EditorInfo := Nil;
-  for i := 0 to NEDEditors.Count - 1 do begin
-    if (EditorInfo = Nil) and (NEDEditors.Items[i].Thumbstone = Thumbstone) then begin
-      EditorInfo := NEDEditors.Items[i];
+  for i := 0 to NEDEditorsInfo.Count - 1 do begin
+    if (EditorInfo = Nil) and (NEDEditorsInfo.Items[i].Thumbstone = Thumbstone) then begin
+      EditorInfo := NEDEditorsInfo.Items[i];
       EditorInfo.Thumbstone.IsToggled := True;
     end
     else
-      NEDEditors.Items[i].Thumbstone.IsToggled := False;
+      NEDEditorsInfo.Items[i].Thumbstone.IsToggled := False;
   end;
   //
   if EditorInfo <> Nil then begin
+    NEDMainForm.SelectWorkspaceProjectEntry(EditorInfo);
     EditorView := EditorInfo.Editor;
     EditorView.BringToFront;
     EditorView.ReportEditorInfo;
@@ -199,13 +205,13 @@ var
   EditorView: TNEDEditorView;
 begin
   EditorInfo := Nil;
-  for i := 0 to NEDEditors.Count - 1 do begin
-    if (EditorInfo = Nil) and (NEDEditors.Items[i].Editor = Editor) then begin
-      EditorInfo := NEDEditors.Items[i];
+  for i := 0 to NEDEditorsInfo.Count - 1 do begin
+    if (EditorInfo = Nil) and (NEDEditorsInfo.Items[i].Editor = Editor) then begin
+      EditorInfo := NEDEditorsInfo.Items[i];
       EditorInfo.Thumbstone.IsToggled := True;
     end
     else
-      NEDEditors.Items[i].Thumbstone.IsToggled := False;
+      NEDEditorsInfo.Items[i].Thumbstone.IsToggled := False;
   end;
   //
   if EditorInfo <> Nil then begin
@@ -223,13 +229,13 @@ var
   EditorView: TNEDEditorView;
 begin
   EditorInfo := Nil;
-  for i := 0 to NEDEditors.Count - 1 do begin
+  for i := 0 to NEDEditorsInfo.Count - 1 do begin
     if (EditorInfo = Nil) and (i = Index) then begin
-      EditorInfo := NEDEditors.Items[i];
+      EditorInfo := NEDEditorsInfo.Items[i];
       EditorInfo.Thumbstone.IsToggled := True;
     end
     else
-      NEDEditors.Items[i].Thumbstone.IsToggled := False;
+      NEDEditorsInfo.Items[i].Thumbstone.IsToggled := False;
   end;
   //
   if EditorInfo <> Nil then begin
@@ -256,7 +262,7 @@ begin
 
   end
   else begin
-    for EditorInfo in NEDEditors do begin
+    for EditorInfo in NEDEditorsInfo do begin
       if EditorInfo.Editor = TNEDEditorView(Msg.WParam) then begin
         if SameText(ExtractFileExt(EditorInfo.Editor.Document.FilePath), '.npe') then
           EditorInfo.Thumbstone.SymbolChar := Char($E943) // Code

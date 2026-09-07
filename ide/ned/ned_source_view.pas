@@ -45,6 +45,7 @@ type
     MainView: TNEDEditorForm;
     //
     function FindBuffer(const FilePath: String; out FoundBuffer: TNEDEditorBuffer): Boolean;
+    function FindView(const Buffer: TNEDEditorBuffer; out View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
     function OpenNewBuffer(const FilePath: String; out Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
     function OpenExistingBuffer(const Buffer: TNEDEditorBuffer; const HostControl: TWinControl; var View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean; // TNEDEditorView;
   public
@@ -125,6 +126,8 @@ var
   Info: TNEDEditorInfo;
   host_ctrl: TWinControl;
 begin
+  Result := False;
+  EditorContext := Nil;
   View := MainView;
   host_ctrl := pnlBaseView;
   SplitWindow := SplitType > stSplitNone;
@@ -135,10 +138,19 @@ begin
   //
   Info := Nil;
   if FindBuffer(FilePath, Buffer) then begin
-    if OpenExistingBuffer(Buffer, host_ctrl, View, Info) then begin
-      Views.Add(View);
-      if MainView = Nil then
-        MainView := View;
+    if FindView(Buffer, View, Info) then begin
+      Assert(View <> Nil);
+      Assert(Info <> Nil);
+      View.SelectEditorByThumbstone(Info.Thumbstone);
+      Result := False;
+      Exit;
+    end
+    else begin
+      if OpenExistingBuffer(Buffer, host_ctrl, View, Info) then begin
+        Views.Add(View);
+        if MainView = Nil then
+          MainView := View;
+      end;
     end;
   end
   else begin
@@ -152,6 +164,7 @@ begin
   //
   Assert(Info <> Nil);
   EditorContext := TNEDEditorContext.Create(Buffer, Info);
+  Result := True;
 end;
 
 procedure TNEDViewForm.CloseEditorViews;
@@ -177,6 +190,22 @@ begin
     Buffer := Buffers.Items[i];
     if SameText(Buffer.FilePath, FilePath) then begin
       FoundBuffer := Buffer;
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+function TNEDViewForm.FindView(const Buffer: TNEDEditorBuffer; out View: TNEDEditorForm; out Info: TNEDEditorInfo): Boolean;
+var
+  EditorInfo: TNEDEditorInfo;
+begin
+  Result := False;
+  Info := Nil;
+  for EditorInfo in NEDEditorsInfo do begin
+    if EditorInfo.Editor.Document = Buffer then begin
+      View := TNEDEditorForm(GetParentForm(EditorInfo.Editor, False));
+      Info := EditorInfo;
       Result := True;
       Exit;
     end;

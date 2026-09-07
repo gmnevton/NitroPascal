@@ -1721,7 +1721,7 @@ end;
 
 procedure TNEDCustomDocument.Reload;
 begin
-  NotifyObservers(0, dcLoad, opNone, 0, FLength);
+  NotifyObservers(0, dcReload, opNone, 0, FLength);
 end;
 
 procedure TNEDCustomDocument.SaveToFile;

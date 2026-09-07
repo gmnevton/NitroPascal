@@ -21,6 +21,7 @@ uses
   uFolders,
   ned_session_context,
   ned_projects,
+  ned_editor_buffer,
   ned_source_view,
   ned_splitview_manager,
   ned_dialog_message;
@@ -109,6 +110,8 @@ type
     function OpenProjectGroup(const AProjectPath: String): TNEDProject;
     function OpenProject(const AProjectPath: String): TNEDProject;
     function OpenFile(const AFilePath: String): TNEDProject;
+    //
+    procedure SelectWorkspaceProjectEntry(const Project: TNEDProject; const Buffer: TNEDEditorBuffer);
     //
     property NEDEntries: TEntryView read GetEntries;
     property NEDViewForm: TNEDViewForm read GetViewForm;
@@ -271,7 +274,7 @@ begin
     //
     Assert(Project <> Nil);
     Result := Project.CreateWorkspaceEntries(AProject);
-    FWorkspaceEntries.Selected := Result;
+    //FWorkspaceEntries.Selected := Result;
     //
     Project.Touch;
   finally
@@ -414,6 +417,7 @@ begin
     Entry.Expand;
     if NEDViewForm.OpenFile(AFilePath, EditorContextReference, SplitType) then begin
       EditorContextReference.WorkspaceEntry := Entry;
+      EditorContextReference.Info.Project := TObject(Entry.Data);
       TNEDProject(Entry.Data).AddEditor(EditorContextReference); // adds to owner list
     end;
     Exit;
@@ -430,9 +434,11 @@ begin
   Entry := FWorkspace.AddFile(ProjectGroup, AFilePath);
   ProjectGroup.Expand;
   Entry.Expand;
-  NEDViewForm.OpenFile(AFilePath, EditorContextReference, SplitType);
-  EditorContextReference.WorkspaceEntry := Entry;
-  TNEDProject(Entry.Data).AddEditor(EditorContextReference); // adds to owner list
+  if NEDViewForm.OpenFile(AFilePath, EditorContextReference, SplitType) then begin
+    EditorContextReference.WorkspaceEntry := Entry;
+    EditorContextReference.Info.Project := TObject(Entry.Data);
+    TNEDProject(Entry.Data).AddEditor(EditorContextReference); // adds to owner list
+  end;
 end;
 
 function TNEDWorkspaceManager.OpenProjectGroup(const AProjectPath: String): TNEDProject;
@@ -441,6 +447,22 @@ begin
   if Result = Nil then
     raise Exception.Create('Not implemented !!!');
 //    Result := TNEDProject.Create(ptProjectGroup, AProjectPath);
+end;
+
+procedure TNEDWorkspaceManager.SelectWorkspaceProjectEntry(const Project: TNEDProject; const Buffer: TNEDEditorBuffer);
+var
+  FilesEntry: TEntryItem;
+  FileEntry: TEntryItem;
+begin
+  FilesEntry := Project.FilesEntry;
+  FileEntry := FilesEntry.Items.GetFirstEntry(FilesEntry);
+  while FileEntry <> Nil do begin
+    if (TObject(FileEntry.Data) is TNEDProjectFile) and SameText(TNEDProjectFile(FileEntry.Data).FullFilePath, Buffer.FilePath) then begin
+      NEDEntries.Selected := FileEntry;
+      Exit;
+    end;
+    FileEntry := FilesEntry.Items.GetNextEntrySibling(FileEntry);
+  end;
 end;
 
 function TNEDWorkspaceManager.OpenProject(const AProjectPath: String): TNEDProject;

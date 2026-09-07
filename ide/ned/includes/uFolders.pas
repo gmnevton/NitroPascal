@@ -154,7 +154,7 @@ type
     procedure Update(Item: TCollectionItem); override; // this tells us, that collection changed after EndUpdate
     function Get(Index: Integer): TEntryItem;
     procedure Put(Index: Integer; Value: TEntryItem);
-    //
+  public
     function GetTreeIndex(Entry: TEntryItem): Integer;
     function GetTreeLevel(Entry: TEntryItem): Integer;
     //
@@ -501,7 +501,7 @@ type
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure Paint; override;
-    procedure DblClick; override;
+//    procedure DblClick; override;
     procedure DrawBackground(const ACanvas: TCanvas; var ARect: TRect); virtual;
     procedure DrawItems(const ACanvas: TCanvas; const ARect: TRect); virtual;
     procedure DrawItem(const ACanvas: TCanvas; const ItemIdx: Integer; const ARect: TRect; DrawState: TDrawState);
@@ -3083,27 +3083,28 @@ begin
   inherited Destroy;
 end;
 
-procedure TCustomEntryView.DblClick;
-var
-  MousePoint: TPoint;
-  Entry: TEntryItem;
-begin
-  MousePoint := Mouse.CursorPos;
-  MousePoint := Self.ScreenToClient(MousePoint);
-  Entry := EntryFromPoint(MousePoint.X, MousePoint.Y);
-  if Entry <> Nil then begin
-    if Entry.Items.Count > 0 then begin // collapse or expand as default behavior when Entry has children; so for now it can't be selected by double click
-      case Entry.State of
-        esCollapsed: Entry.State := esExpanded;
-        esExpanded : Entry.State := esCollapsed;
-      end;
-    end
-    else begin // Entry has no children, if it is a sub-directory - open it, else - select Entry and fire OnSelection event
-      ItemSelection(Entry);
-    end;
-  end;
-  inherited;
-end;
+//procedure TCustomEntryView.DblClick;
+//var
+//  MousePoint: TPoint;
+//  Entry: TEntryItem;
+//begin
+//  MousePoint := Mouse.CursorPos;
+//  MousePoint := Self.ScreenToClient(MousePoint);
+//  Entry := EntryFromPoint(MousePoint.X, MousePoint.Y);
+//  if Entry <> Nil then begin
+//    if Entry.Items.Count > 0 then begin // collapse or expand as default behavior when Entry has children; so for now it can't be selected by double click
+//      case Entry.State of
+//        esCollapsed: Entry.State := esExpanded;
+//        esExpanded : Entry.State := esCollapsed;
+//      end;
+//    end
+//    else begin // Entry has no children, if it is a sub-directory - open it, else - select Entry and fire OnSelection event
+//      ItemSelection(Entry);
+//      Exit;
+//    end;
+//  end;
+//  inherited;
+//end;
 
 procedure TCustomEntryView.ImagesChange(Sender: TObject);
 var
@@ -3520,10 +3521,11 @@ var
   Entry: TEntryItem;
 //  ScrollButton: TFolderScrollButton;
   Rect: TRect;
+//  MousePoint: TPoint;
 begin
   inherited MouseDown(Button, Shift, X, Y);
   if Button = mbLeft then begin
-    if CanFocus then
+    if not (ssDouble in Shift) and CanFocus then
       SetFocus;
     Entry := EntryFromPoint(X, Y);
     if Entry <> Nil then begin
@@ -3537,7 +3539,21 @@ begin
       end
       else
         Selected := Entry; // this does invalidate
-      Exit;
+    end;
+  end;
+  //
+  if (ssDouble in Shift) and (Button = mbLeft) then begin
+    Entry := EntryFromPoint(X, Y);
+    if Entry <> Nil then begin
+      if Entry.Items.Count > 0 then begin // collapse or expand as default behavior when Entry has children; so for now it can't be selected by double click
+        case Entry.State of
+          esCollapsed: Entry.State := esExpanded;
+          esExpanded : Entry.State := esCollapsed;
+        end;
+      end
+      else begin // Entry has no children, if it is a sub-directory - open it, else - select Entry and fire OnSelection event
+        ItemSelection(Entry);
+      end;
     end;
   end;
 end;
