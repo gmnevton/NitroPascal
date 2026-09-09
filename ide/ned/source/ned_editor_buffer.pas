@@ -1843,7 +1843,8 @@ end;
 
 procedure TNEDCustomDocument.RemoveObserver(const Observer: TNEDDocumentObserver);
 begin
-  FObservers.Remove(Observer);
+  if Observer <> Nil then
+    FObservers.Remove(Observer);
 end;
 
 procedure TNEDCustomDocument.Insert(const Position: Integer; const Text: String);

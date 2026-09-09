@@ -59,7 +59,7 @@
         <UWP_DelphiLogo44>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_44.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_150.png</UWP_DelphiLogo150>
         <SanitizedProjectName>ned</SanitizedProjectName>
-        <DCC_UnitSearchPath>D:\Borland Librarys\RADStudioXE10.2\UniversalCL-master\Sources;.\includes;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>D:\Borland Librarys\RADStudioXE10.2\UniversalCL-master\Sources;.\includes;.\source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <VerInfo_Locale>1045</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
     </PropertyGroup>
@@ -107,43 +107,43 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="ned_common_simple_types.pas"/>
-        <DCCReference Include="ned_config.pas"/>
-        <DCCReference Include="ned_profiles.pas"/>
-        <DCCReference Include="ned_session_context.pas"/>
-        <DCCReference Include="ned_main.pas">
+        <DCCReference Include="source\ned_common_simple_types.pas"/>
+        <DCCReference Include="source\ned_config.pas"/>
+        <DCCReference Include="source\ned_profiles.pas"/>
+        <DCCReference Include="source\ned_session_context.pas"/>
+        <DCCReference Include="source\ned_main.pas">
             <Form>NEDMainForm</Form>
         </DCCReference>
-        <DCCReference Include="ned_home_page.pas">
+        <DCCReference Include="source\ned_home_page.pas">
             <Form>NEDHomeForm</Form>
         </DCCReference>
-        <DCCReference Include="ned_settings.pas">
+        <DCCReference Include="source\ned_settings.pas">
             <Form>NEDSettingsForm</Form>
         </DCCReference>
-        <DCCReference Include="ned_workspace_manager.pas"/>
-        <DCCReference Include="ned_projects.pas"/>
-        <DCCReference Include="ned_editor_buffer.pas"/>
-        <DCCReference Include="ned_editor_view.pas"/>
-        <DCCReference Include="ned_splitview_manager.pas"/>
-        <DCCReference Include="ned_source_view.pas">
+        <DCCReference Include="source\ned_workspace_manager.pas"/>
+        <DCCReference Include="source\ned_projects.pas"/>
+        <DCCReference Include="source\ned_editor_buffer.pas"/>
+        <DCCReference Include="source\ned_editor_view.pas"/>
+        <DCCReference Include="source\ned_splitview_manager.pas"/>
+        <DCCReference Include="source\ned_source_view.pas">
             <Form>NEDViewForm</Form>
         </DCCReference>
-        <DCCReference Include="ned_source_editor.pas">
+        <DCCReference Include="source\ned_source_editor.pas">
             <Form>NEDEditorForm</Form>
         </DCCReference>
-        <DCCReference Include="ned_dialog_base.pas">
+        <DCCReference Include="source\ned_dialog_base.pas">
             <Form>NEDDialogBase</Form>
         </DCCReference>
-        <DCCReference Include="ned_dialog_open.pas">
+        <DCCReference Include="source\ned_dialog_open.pas">
             <Form>NEDDialogOpen</Form>
         </DCCReference>
-        <DCCReference Include="ned_dialog_save.pas">
+        <DCCReference Include="source\ned_dialog_save.pas">
             <Form>NEDDialogSave</Form>
         </DCCReference>
-        <DCCReference Include="ned_dialog_profiles.pas">
+        <DCCReference Include="source\ned_dialog_profiles.pas">
             <Form>NEDDialogProfiles</Form>
         </DCCReference>
-        <DCCReference Include="ned_dialog_message.pas">
+        <DCCReference Include="source\ned_dialog_message.pas">
             <Form>NEDDialogMessage</Form>
         </DCCReference>
         <BuildConfiguration Include="Release">
