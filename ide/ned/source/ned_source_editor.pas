@@ -64,6 +64,8 @@ type
   private
     procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
+    function FindEditorInfoByThumbstone(const Thumbstone: TUSymbolButton): TNEDEditorInfo;
+    procedure RemoveEditorInfo(const Info: TNEDEditorInfo);
   public
     function NewEditor(const Buffer: TNEDEditorBuffer; out Info: TNEDEditorInfo): TNEDEditorView;
     class procedure SelectEditorByThumbstone(const Thumbstone: TUSymbolButton);
@@ -167,6 +169,7 @@ begin
   SymbolButton.IsToggled := True;
   SymbolButton.Detail := '---';
   SymbolButton.Text := '---';
+  SymbolButton.RightCloseVisible := True;
   SymbolButton.OnClick := btnEditorThumbClick;
   //
   Info := TNEDEditorInfo.Create(SymbolButton, Result);
@@ -276,6 +279,31 @@ begin
   end;
 end;
 
+function TNEDEditorForm.FindEditorInfoByThumbstone(const Thumbstone: TUSymbolButton): TNEDEditorInfo;
+var
+  i: Integer;
+begin
+  Result := Nil;
+  for i := 0 to NEDEditorsInfo.Count - 1 do begin
+    if NEDEditorsInfo.Items[i].Thumbstone = Thumbstone then begin
+      Result := NEDEditorsInfo.Items[i];
+      Exit;
+    end;
+  end;
+end;
+
+procedure TNEDEditorForm.RemoveEditorInfo(const Info: TNEDEditorInfo);
+var
+  i: Integer;
+begin
+  if Info = Nil then
+    Exit;
+  //
+  i := NEDEditorsInfo.IndexOf(Info);
+  if i > -1 then
+    NEDEditorsInfo.Delete(i);
+end;
+
 procedure TNEDEditorForm.mnuShowNonVisibleLinesClick(Sender: TObject);
 var
   Editor: TNEDEditorView;
@@ -296,8 +324,21 @@ begin
 end;
 
 procedure TNEDEditorForm.btnEditorThumbClick(Sender: TObject);
+var
+  EditorInfo: TNEDEditorInfo;
+  EditorView: TNEDEditorView;
 begin
-  SelectEditorByThumbstone(TUSymbolButton(Sender));
+  if TUSymbolButton(Sender).CloseClicked then begin
+    EditorInfo := FindEditorInfoByThumbstone(TUSymbolButton(Sender));
+    if EditorInfo <> Nil then begin
+      EditorView := EditorInfo.Editor;
+      EditorView.Free;
+      TUSymbolButton(Sender).Free;
+      RemoveEditorInfo(EditorInfo);
+    end;
+  end
+  else
+    SelectEditorByThumbstone(TUSymbolButton(Sender));
 end;
 
 initialization

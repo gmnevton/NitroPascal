@@ -1445,6 +1445,8 @@ destructor TNEDEditorCaret.Destroy;
 begin
   CaretClearMultiMarks;
   FreeAndNil(FMultiCarets);
+  CaretHide;
+  CaretDestroy;
   FEditorControl := Nil;
   inherited;
 end;
@@ -1680,7 +1682,7 @@ end;
 procedure TNEDEditorCaret.CaretShow;
 begin
   if FCaretCreated and not FCaretVisible then begin
-    if Windows.ShowCaret(FEditorControl.Handle) then
+    if FEditorControl.HandleAllocated and Windows.ShowCaret(FEditorControl.Handle) then
       FCaretVisible := True;
   end;
 end;
@@ -1688,7 +1690,7 @@ end;
 procedure TNEDEditorCaret.CaretHide;
 begin
   if FCaretCreated and FCaretVisible then begin
-    if Windows.HideCaret(FEditorControl.Handle) then
+    if FEditorControl.HandleAllocated and Windows.HideCaret(FEditorControl.Handle) then
       FCaretVisible := False;
   end;
 end;
