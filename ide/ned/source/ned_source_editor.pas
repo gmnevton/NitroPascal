@@ -64,13 +64,19 @@ type
   private
     procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
+    procedure NEDEditorFocus(Sender: TNEDCustomEditorView; const FocusType: TNEDCustomEditorViewFocusEnum);
+    //
     function FindEditorInfoByThumbstone(const Thumbstone: TUSymbolButton): TNEDEditorInfo;
+    function FindEditorInfoByEditor(const Editor: TNEDEditorView): TNEDEditorInfo;
     procedure RemoveEditorInfo(const Info: TNEDEditorInfo);
   public
+    function HasEditors: Boolean;
     function NewEditor(const Buffer: TNEDEditorBuffer; out Info: TNEDEditorInfo): TNEDEditorView;
+    procedure DisposeEditor(var EditorView: TNEDEditorView);
     class procedure SelectEditorByThumbstone(const Thumbstone: TUSymbolButton);
     class procedure SelectEditorByEditor(const Editor: TNEDEditorView);
     class procedure SelectEditorByIndex(const Index: Integer);
+    class procedure SelectThumbstoneByEditor(const Editor: TNEDEditorView);
   end;
 
 var
@@ -83,7 +89,8 @@ implementation
 uses
 //  Windows,
 //  Dialogs;
-  ned_main;
+  ned_main,
+  ned_source_view;
 //  ned_workspace_manager;
 
 var
@@ -134,6 +141,17 @@ begin
   //
 end;
 
+function TNEDEditorForm.HasEditors: Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  for i := 0 to Self.ComponentCount - 1 do begin
+    if Self.Components[i] is TNEDEditorView then
+      Result := True;
+  end;
+end;
+
 function TNEDEditorForm.NewEditor(const Buffer: TNEDEditorBuffer; out Info: TNEDEditorInfo): TNEDEditorView;
 var
   Button, SymbolButton: TUSymbolButton;
@@ -147,6 +165,7 @@ begin
   Result.Align := alClient;
   Result.Document := Buffer;
   Result.PopupMenu := PopupMenu1;
+  Result.OnFocus := NEDEditorFocus;
   //
   ctrl_left := 0;
   for i := 0 to UScrollBox1.ControlCount - 1 do begin
@@ -174,6 +193,15 @@ begin
   //
   Info := TNEDEditorInfo.Create(SymbolButton, Result);
   NEDEditorsInfo.Add(Info);
+end;
+
+procedure TNEDEditorForm.DisposeEditor(var EditorView: TNEDEditorView);
+begin
+  EditorView.Free;
+  EditorView := Nil;
+  if not Self.HasEditors then begin
+    TNEDViewForm(Self.Owner).DisposeEditorForm(Self);
+  end;
 end;
 
 class procedure TNEDEditorForm.SelectEditorByThumbstone(const Thumbstone: TUSymbolButton);
@@ -249,6 +277,31 @@ begin
   end;
 end;
 
+class procedure TNEDEditorForm.SelectThumbstoneByEditor(const Editor: TNEDEditorView);
+var
+  i: Integer;
+  EditorInfo: TNEDEditorInfo;
+  EditorView: TNEDEditorView;
+begin
+  EditorInfo := Nil;
+  for i := 0 to NEDEditorsInfo.Count - 1 do begin
+    if (EditorInfo = Nil) and (NEDEditorsInfo.Items[i].Editor = Editor) then begin
+      EditorInfo := NEDEditorsInfo.Items[i];
+      EditorInfo.Thumbstone.IsToggled := True;
+    end
+    else
+      NEDEditorsInfo.Items[i].Thumbstone.IsToggled := False;
+  end;
+  //
+  if EditorInfo <> Nil then begin
+    NEDMainForm.SelectWorkspaceProjectEntry(EditorInfo);
+//    EditorView := EditorInfo.Editor;
+//    EditorView.BringToFront;
+//    EditorView.ReportEditorInfo;
+//    EditorView.SetFocus;
+  end;
+end;
+
 procedure TNEDEditorForm.CMDialogKey(var Msg: TCMDialogKey);
 begin
   inherited;
@@ -279,6 +332,18 @@ begin
   end;
 end;
 
+procedure TNEDEditorForm.NEDEditorFocus(Sender: TNEDCustomEditorView; const FocusType: TNEDCustomEditorViewFocusEnum);
+var
+  EditorInfo: TNEDEditorInfo;
+begin
+  if FocusType = vfSetFocus then begin
+    EditorInfo := FindEditorInfoByEditor(TNEDEditorView(Sender));
+    if (EditorInfo <> Nil) and not EditorInfo.Thumbstone.IsToggled then begin
+      SelectThumbstoneByEditor(TNEDEditorView(Sender));
+    end;
+  end;
+end;
+
 function TNEDEditorForm.FindEditorInfoByThumbstone(const Thumbstone: TUSymbolButton): TNEDEditorInfo;
 var
   i: Integer;
@@ -286,6 +351,19 @@ begin
   Result := Nil;
   for i := 0 to NEDEditorsInfo.Count - 1 do begin
     if NEDEditorsInfo.Items[i].Thumbstone = Thumbstone then begin
+      Result := NEDEditorsInfo.Items[i];
+      Exit;
+    end;
+  end;
+end;
+
+function TNEDEditorForm.FindEditorInfoByEditor(const Editor: TNEDEditorView): TNEDEditorInfo;
+var
+  i: Integer;
+begin
+  Result := Nil;
+  for i := 0 to NEDEditorsInfo.Count - 1 do begin
+    if NEDEditorsInfo.Items[i].Editor = Editor then begin
       Result := NEDEditorsInfo.Items[i];
       Exit;
     end;
@@ -331,10 +409,11 @@ begin
   if TUSymbolButton(Sender).CloseClicked then begin
     EditorInfo := FindEditorInfoByThumbstone(TUSymbolButton(Sender));
     if EditorInfo <> Nil then begin
+      TUSymbolButton(Sender).Free; // remove thumbstone
       EditorView := EditorInfo.Editor;
-      EditorView.Free;
-      TUSymbolButton(Sender).Free;
-      RemoveEditorInfo(EditorInfo);
+      //EditorView.Free;
+      DisposeEditor(EditorView); // close editor view and if no other editors open, close editor form
+      RemoveEditorInfo(EditorInfo); // remove editor info
     end;
   end
   else

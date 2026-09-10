@@ -1,3 +1,13 @@
+//
+// Nitro EDitor
+// version 1.0
+//
+// Author: Grzegorz Molenda
+// Created: 2024-12-27
+// Modified: 2026-06
+// All rights reserved.
+//
+
 unit ned_source_view;
 
 interface
@@ -18,10 +28,10 @@ uses
   UCL.Panel,
   UCL.PopupMenu,
   ned_splitview_manager,
-  ned_source_editor,
   ned_editor_buffer,
   ned_editor_view,
-  ned_editor_context;
+  ned_editor_context,
+  ned_source_editor;
 
 type
   TNEDViewForm = class(TUForm)
@@ -52,11 +62,15 @@ type
     // OpenFile creates EditorContext, but not owns it
     function OpenFile(const FilePath: String; out EditorContext: TNEDEditorContext; const SplitType: TNEDSplitViewTypeEnum = stSplitNone): Boolean;
     procedure CloseEditorViews;
+    procedure DisposeEditorForm(var EditorForm: TNEDEditorForm);
   end;
 
 implementation
 
 {$R *.dfm}
+
+uses
+  ned_home_page;
 
 procedure TNEDViewForm.FormCreate(Sender: TObject);
 begin
@@ -68,9 +82,9 @@ end;
 
 procedure TNEDViewForm.FormDestroy(Sender: TObject);
 begin
-  Views.Free;
-  Buffers.Free;
-  SplitManager.Free;
+  FreeAndNil(Views);
+  FreeAndNil(Buffers);
+  FreeAndNil(SplitManager);
 end;
 
 procedure TNEDViewForm.FormActivate(Sender: TObject);
@@ -147,7 +161,8 @@ begin
     end
     else begin
       if OpenExistingBuffer(Buffer, host_ctrl, View, Info) then begin
-        Views.Add(View);
+        if not Views.Contains(View) then
+          Views.Add(View);
         if MainView = Nil then
           MainView := View;
       end;
@@ -156,7 +171,8 @@ begin
   else begin
     if OpenNewBuffer(FilePath, Buffer, host_ctrl, View, Info) then begin
       Buffers.Add(Buffer);
-      Views.Add(View);
+      if not Views.Contains(View) then
+        Views.Add(View);
       if MainView = Nil then
         MainView := View;
     end;
@@ -176,6 +192,27 @@ begin
     View := Views[i];
     Views[i] := Nil;
     View.Free;
+  end;
+end;
+
+procedure TNEDViewForm.DisposeEditorForm(var EditorForm: TNEDEditorForm);
+var
+  i: Integer;
+begin
+  if EditorForm = Nil then
+    Exit;
+  //
+  i := Views.IndexOf(EditorForm);
+  if i > -1 then begin
+    Views.Delete(i);
+    if MainView = EditorForm then begin
+      MainView := Nil;
+      if not NEDHomeForm.Visible then
+        NEDHomeForm.Show;
+      NEDHomeForm.BringToFront;
+    end;
+    EditorForm.Free;
+    EditorForm := Nil;
   end;
 end;
 

@@ -451,7 +451,7 @@ begin
     FProjectEntry.Caption := 'Project ' + Self.FileName + ' - ' + Self.Name; // ExtractFileName(AProjectPath)
     FProjectEntry.ImageChar := Char($E9F9); // ReportDocument
     FProjectEntry.Data := Self;
-    //Result.DataObject := True;
+    //FProjectEntry.DataObject := True;
   end;
   Result := FProjectEntry;
   //

@@ -621,6 +621,9 @@ type
   end;
   PNEDEditorInfoDetails = ^TNEDEditorInfoDetails;
 
+  TNEDCustomEditorViewFocusEnum = (vfSetFocus, vfKillFocus);
+  TNEDCustomEditorViewFocusEvent = procedure (Sender: TNEDCustomEditorView; const FocusType: TNEDCustomEditorViewFocusEnum) of object;
+
   // this control will not have any non-client area
   // everything will be drawn into clent area,
   // things like:
@@ -666,6 +669,7 @@ type
     FWindowSwitchQueryNext: Boolean;
     FUpdatingScrollBars: Boolean;
     FAutoRangeCount: Integer;
+    FOnFocus: TNEDCustomEditorViewFocusEvent;
     //
     // setters
 
@@ -787,6 +791,8 @@ type
     property ActiveLineIndex: Integer read FActiveLineIndex write SetActiveLineIndex;
     property CaretPosition: TNEDCaretPosition read GetCaretPosition;
     property EditorFileType: String read GetEditorFileTypeStr;
+    //
+    property OnFocus: TNEDCustomEditorViewFocusEvent read FOnFocus write FOnFocus;
   end;
 
   TNEDEditorView = class(TNEDCustomEditorView)
@@ -3979,6 +3985,8 @@ begin
   inherited;
   FCaret.CaretCreate;
   Invalidate;
+  if Assigned(FOnFocus) then
+    FOnFocus(Self, vfSetFocus);
 end;
 
 procedure TNEDCustomEditorView.WMKillFocus(var Msg: TWMKillFocus);
@@ -3989,6 +3997,8 @@ begin
 //  FMouseCapture := False;
 //  FDownIndex := -1;
   Invalidate;
+  if Assigned(FOnFocus) then
+    FOnFocus(Self, vfKillFocus);
   // Added check for focused to prevent caret disappearing problem
   if Focused {or FAlwaysShowCaret} then
     Exit;

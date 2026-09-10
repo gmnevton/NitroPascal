@@ -3541,6 +3541,23 @@ begin
         Selected := Entry; // this does invalidate
     end;
   end;
+  if Button = mbRight then begin
+    if not (ssDouble in Shift) and CanFocus then
+      SetFocus;
+    Entry := EntryFromPoint(X, Y);
+    if Entry <> Nil then begin
+      if MultiSelect and (ssShift in Shift) then begin
+        // ok, now we have to check if selected Entry is on the list, if it is not, than add, else remove
+        if not ItemSelected(Entry) then // add
+          FSelectedItems.Add(Entry)
+        else // remove
+          FSelectedItems.Remove(Entry);
+        CaptureItem := Entry; // this does invalidate
+      end
+      else
+        Selected := Entry; // this does invalidate
+    end;
+  end;
   //
   if (ssDouble in Shift) and (Button = mbLeft) then begin
     Entry := EntryFromPoint(X, Y);
