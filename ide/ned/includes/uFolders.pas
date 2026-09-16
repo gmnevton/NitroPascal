@@ -3520,28 +3520,11 @@ var
 //  Point: TPoint;
   Entry: TEntryItem;
 //  ScrollButton: TFolderScrollButton;
-  Rect: TRect;
+  EntryRect, IndicatorRect: TRect;
 //  MousePoint: TPoint;
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  if Button = mbLeft then begin
-    if not (ssDouble in Shift) and CanFocus then
-      SetFocus;
-    Entry := EntryFromPoint(X, Y);
-    if Entry <> Nil then begin
-      if MultiSelect and (ssShift in Shift) then begin
-        // ok, now we have to check if selected Entry is on the list, if it is not, than add, else remove
-        if not ItemSelected(Entry) then // add
-          FSelectedItems.Add(Entry)
-        else // remove
-          FSelectedItems.Remove(Entry);
-        CaptureItem := Entry; // this does invalidate
-      end
-      else
-        Selected := Entry; // this does invalidate
-    end;
-  end;
-  if Button = mbRight then begin
+  if Button in [mbLeft, mbRight] then begin
     if not (ssDouble in Shift) and CanFocus then
       SetFocus;
     Entry := EntryFromPoint(X, Y);
@@ -3562,7 +3545,20 @@ begin
   if (ssDouble in Shift) and (Button = mbLeft) then begin
     Entry := EntryFromPoint(X, Y);
     if Entry <> Nil then begin
-      if Entry.Items.Count > 0 then begin // collapse or expand as default behavior when Entry has children; so for now it can't be selected by double click
+      EntryRect := Entry.RelativeDisplayRect;
+      Inc(EntryRect.Left, 12 * Entry.TreeLevel);
+//      if FItemExpandIndicatorPos = ipLeft then begin
+//        if FItemExpandIndicatorSize > 0 then
+//          Inc(EntryRect.Left, FItemExpandIndicatorSize * 2 + 4)
+//        else // <= 0
+//          Inc(EntryRect.Left, 14); // default
+//      end;
+      if FItemExpandIndicatorPos = ipLeft then
+        IndicatorRect := Rect(EntryRect.Left, EntryRect.Top, EntryRect.Left + 20, EntryRect.Bottom)
+      else
+        IndicatorRect := Rect(EntryRect.Right - 20, EntryRect.Top, EntryRect.Right, EntryRect.Bottom);
+      //
+      if (Entry.Items.Count > 0) and (PtInRect(IndicatorRect, Point(X, Y))) then begin // collapse or expand as default behavior when Entry has children; so for now it can't be selected by double click
         case Entry.State of
           esCollapsed: Entry.State := esExpanded;
           esExpanded : Entry.State := esCollapsed;
@@ -4205,7 +4201,7 @@ begin
     SavedFont.Assign(ACanvas.Font);
     try
       ACanvas.Font.Name := 'Segoe MDL2 Assets';
-      ACanvas.Font.Size := ACanvas.Font.Size + 3;
+      ACanvas.Font.Size := ACanvas.Font.Size + 2;
       top := (FEntryHeight - ACanvas.TextHeight(Item.ImageChar)) div 2;
       ACanvas.TextOut(DrawRect.Left, DrawRect.Top + top, Item.ImageChar);
     finally
@@ -4214,8 +4210,9 @@ begin
     end;
     Inc(DrawRect.Left, ACanvas.TextHeight(Item.ImageChar) + 2);
   end;
+  InflateRect(DrawRect, 6, 0);
   // draw item caption
-  InflateRect(DrawRect, -1, -1);
+  InflateRect(DrawRect, -8, -1);
   DrawCaption(ACanvas, Item.Caption, DrawRect, drLeft);
   // draw expand indicator if item has children
   if Item.Items.Count > 0 then begin

@@ -1775,6 +1775,7 @@ begin
       FUndo.Pop;
 
       TopOp.Text := TopOp.Text + Op.Text;
+      TopOp.Length := Length(TopOp.Text);
 
       FUndo.Push(TopOp);
 
@@ -1800,6 +1801,7 @@ begin
       TopOp.Position := Op.Position;
 
       TopOp.Text := Op.Text + TopOp.Text;
+      TopOp.Length := Length(TopOp.Text);
 
       FUndo.Push(TopOp);
 

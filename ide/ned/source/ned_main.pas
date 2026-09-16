@@ -50,7 +50,7 @@ uses
   ned_projects,
   ned_source_editor,
   ned_splitview_manager,
-  ned_workspace_manager;
+  ned_workspace_manager, UCL.PopupMenu;
 
 const
   WM_AFTERSHOW = $BF00; // max $BFFF
@@ -170,7 +170,7 @@ type
     Openandsplittobottom1: TMenuItem;
     txtProfile: TUText;
     USeparator8: TUSeparator;
-    mnuWorkSpace: TPopupMenu;
+    mnuWorkSpace: TUPopupMenu;
     //
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -658,8 +658,32 @@ begin
 end;
 
 procedure TNEDMainForm.CreateProjectPopupMenu(const PopupMenu: TPopupMenu; const Project: TNEDProject);
+var
+  MenuItem: TMenuItem;
 begin
-  PopupMenu.Items.Add(NewItem('Edit project source', 0, False, True, OnEditProjectSourceClick, 0, 'mnuEditProjectSource'));
+  PopupMenu.Items.Add(NewItem('Edit project source', 0, False, True, OnEditProjectSourceClick, 0, 'mnuProjectEditProjectSource'));
+  PopupMenu.Items.Add(NewLine);
+  //
+  PopupMenu.Items.Add(NewItem('Add to project...', 0, False, True, Nil, 0, 'mnuProjectAddToProject'));
+  MenuItem := NewSubMenu('Add new', 0, 'mnuProjectAddNew', [
+                NewItem('Source file', 0, False, True, Nil, 0, 'mnuProjectAddNewSource'),
+                NewItem('Other...', 0, False, True, Nil, 0, 'mnuProjectAddNewOther')
+              ]);
+  PopupMenu.Items.Add(MenuItem);
+  PopupMenu.Items.Add(NewItem('Remove from project group', 0, False, True, Nil, 0, 'mnuProjectRemoveFromProjectGroup'));
+  PopupMenu.Items.Add(NewLine);
+  //
+  PopupMenu.Items.Add(NewItem('Save', 0, False, True, Nil, 0, 'mnuProjectSave'));
+  PopupMenu.Items.Add(NewItem('Save as...', 0, False, True, Nil, 0, 'mnuProjectSaveAs'));
+  PopupMenu.Items.Add(NewItem('Rename', 0, False, True, Nil, 0, 'mnuProjectRename'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
+//  PopupMenu.Items.Add(NewItem('', 0, False, True, Nil, 0, 'mnuProject'));
 end;
 
 procedure TNEDMainForm.CreateProjectFilePopupMenu(const PopupMenu: TPopupMenu; const ProjectFile: TNEDProjectFile);
@@ -669,20 +693,30 @@ end;
 
 procedure TNEDMainForm.WorkspaceViewItemGetType(Sender: TObject; Item: TEntryItem; var ItemType: TEntryItemTypeEnum);
 begin
-  if (Item.Data <> Nil) and (TObject(Item.Data) is TNEDProjectFile) then
-    ItemType := etFile;
+  if Item.Data <> Nil then begin
+    if Item.Caption.StartsWith('project', True) and (TObject(Item.Data) is TNEDProject) then
+      ItemType := etFile
+    else if (TObject(Item.Data) is TNEDProjectFile) then
+      ItemType := etFile;
+  end;
 end;
 
 procedure TNEDMainForm.WorkspaceViewItemSelection(Sender: TObject; Item: TEntryItem; IsSubDirectory: Boolean);
 var
-  ProjectFile: TNEDProjectFile;
+  FileToOpen: String;
 begin
   if IsSubDirectory then begin
     // for future use
   end
   else begin
-    ProjectFile := TNEDProjectFile(Pointer(Item.Data));
-    CreateWorkSpaceAndOpenFile(ProjectFile.FullFilePath, stSplitNone);
+    if TObject(Item.Data) is TNEDProject then
+      FileToOpen := TNEDProject(Item.Data).FullFilePath
+    else if TObject(Item.Data) is TNEDProjectFile then
+      FileToOpen := TNEDProjectFile(Item.Data).FullFilePath
+    else
+      FileToOpen := '';
+    if Length(FileToOpen) > 0 then
+      CreateWorkSpaceAndOpenFile(FileToOpen, stSplitNone);
   end;
 end;
 
@@ -948,7 +982,7 @@ begin
   mnuWorkSpace.Items.Clear;
   Entry := FWorkspaceManager.NEDEntries.Selected;
   if (Entry <> Nil) and (Entry.Data <> Nil) then begin
-    if TObject(Entry.Data) is TNEDProject then
+    if Entry.Caption.StartsWith('project', True) and (TObject(Entry.Data) is TNEDProject) then
       CreateProjectPopupMenu(mnuWorkSpace, TNEDProject(Entry.Data))
     else if TObject(Entry.Data) is TNEDProjectFile then
       CreateProjectFilePopupMenu(mnuWorkSpace, TNEDProjectFile(Entry.Data));
