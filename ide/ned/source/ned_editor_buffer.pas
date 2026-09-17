@@ -66,6 +66,7 @@ type
   end;
   PNEDPieceOrigin = ^TNEDPieceOrigin;
 
+  PNEDPiece = ^TNEDPiece;
   TNEDPiece = packed record
   public
     // source buffer
@@ -77,8 +78,8 @@ type
     Origin: PNEDPieceOrigin;
   public
     procedure CreateOrigin(const Line, Column: Integer);
+    function Clone: PNEDPiece;
   end;
-  PNEDPiece = ^TNEDPiece;
 
   TNEDPieces = class
   private
@@ -112,7 +113,7 @@ type
     property Count: Integer read GetCount;
     property LineNo: Integer read FLineNo write SetLineNo;
     //
-    property Pieces[Index: Integer]: PNEDPiece read GetPiece; default;
+    property Piece[Index: Integer]: PNEDPiece read GetPiece; default;
   end;
 
   // line state flags
@@ -373,7 +374,7 @@ type
     procedure DocumentChanged(const Change: TNEDDocumentChangeInfo); overload; virtual;
     //
     // line notifications
-    procedure LineInserted(LineIndex: Integer; const NewLine: Boolean); virtual;
+    procedure LineInserted(LineIndex: Integer); virtual;
     procedure LineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer); virtual;
     procedure LineChanged(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer); virtual;
     //
@@ -429,7 +430,7 @@ type
     procedure NotifyObservers(Position: Integer; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer); overload;
     procedure NotifyObservers(const LineColumn: TNEDTextPosition; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer); overload;
     //
-    procedure NotifyLineInserted(LineIndex: Integer; const NewLine: Boolean);
+    procedure NotifyLineInserted(LineIndex: Integer);
     procedure NotifyLineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
     procedure NotifyLineChanged(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
     //
@@ -550,8 +551,25 @@ end;
 procedure TNEDPiece.CreateOrigin(const Line, Column: Integer);
 begin
   New(Origin);
+  //
   Origin.Line := Line;
   Origin.Column := Column;
+end;
+
+function TNEDPiece.Clone: PNEDPiece;
+begin
+  New(Result);
+  FillChar(Result^, SizeOf(TNEDPiece), 0);
+  //
+  Result.Buffer := Self.Buffer;
+  Result.Offset := Self.Offset;
+  Result.Length := Self.Length;
+  Result.Origin := Nil;
+  if Self.Origin <> Nil then begin
+    New(Result.Origin);
+    Result.Origin.Line   := Self.Origin.Line;
+    Result.Origin.Column := Self.Origin.Column;
+  end;
 end;
 
 { TNEDPieces }
@@ -809,7 +827,7 @@ var
 begin
   I := 0;
 
-  while I < FList.Count - 2 do begin
+  while I <= FList.Count - 2 do begin
     A := FList[I];
     B := FList[I + 1];
 
@@ -1225,7 +1243,7 @@ begin
   DoDocumentChanged(Change);
 end;
 
-procedure TNEDDocumentObserver.LineInserted(LineIndex: Integer; const NewLine: Boolean);
+procedure TNEDDocumentObserver.LineInserted(LineIndex: Integer);
 begin
   if not FEnabled then
     Exit;
@@ -1233,7 +1251,7 @@ begin
   if IsUpdating then
     Exit;
 
-  DoLineInserted(LineIndex + IfThen(NewLine, 1), LineIndex, LineIndex + 1);
+  DoLineInserted(LineIndex, LineIndex - 1, LineIndex);
 end;
 
 procedure TNEDDocumentObserver.LineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
@@ -1413,7 +1431,7 @@ begin
     Observer.DocumentChanged(LineColumn, Kind, Operation, DeletedLen, InsertedLen);
 end;
 
-procedure TNEDCustomDocument.NotifyLineInserted(LineIndex: Integer; const NewLine: Boolean);
+procedure TNEDCustomDocument.NotifyLineInserted(LineIndex: Integer);
 var
   Observer: TNEDDocumentObserver;
 begin
@@ -1421,7 +1439,7 @@ begin
     Exit;
 
   for Observer in FObservers do
-    Observer.LineInserted(LineIndex, NewLine);
+    Observer.LineInserted(LineIndex);
 end;
 
 procedure TNEDCustomDocument.NotifyLineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
@@ -1565,7 +1583,7 @@ begin
   RebuildLineNumbers;
   RebuildCaches;
 
-  NotifyLineInserted(LineIndex, Length(LineText) = 0);
+  NotifyLineInserted(LineIndex);
 end;
 
 procedure TNEDCustomDocument.DeleteLine(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
@@ -1593,6 +1611,7 @@ var
   A: TNEDLineProperties;
   B: TNEDLineProperties;
   I: Integer;
+  Piece: PNEDPiece;
 begin
   if (FirstLine < 0) or (SecondLine < 0) then
     Exit;
@@ -1610,9 +1629,10 @@ begin
   // move all pieces from B to A
   if not A.Deleted then begin
     for I := 0 to B.Pieces.Count - 1 do begin
-      if B.Pieces.Pieces[I].Origin = Nil then
-        B.Pieces.Pieces[I].CreateOrigin(SecondLine, 0);
-      A.Pieces.Add(B.Pieces.Pieces[I]);
+      Piece := B.Pieces.Piece[I].Clone;
+      A.Pieces.Add(Piece);
+      if B.Pieces.Piece[I].Origin = Nil then
+        Piece.CreateOrigin(SecondLine, 0);
     end;
     A.UpdateLength;
     DeleteLine(Operation, SecondLine);
@@ -2351,8 +2371,8 @@ begin
       for I := 0 to Line.Pieces.Count - 1 do begin
         Piece := Line.Pieces[I];
         TempLineIndex := LineIndex;
-        if Piece.Origin <> Nil then
-          TempLineIndex := Piece.Origin.Line;
+//        if Piece.Origin <> Nil then
+//          TempLineIndex := Piece.Origin.Line;
         case Piece.Buffer of
           pbOriginal: begin
             OriginalLineText := GetOriginalLineText(TempLineIndex);
