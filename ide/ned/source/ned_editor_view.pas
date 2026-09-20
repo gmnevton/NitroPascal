@@ -1258,7 +1258,7 @@ begin
   LineOffset := 0;
   Y := 0; // render height accumulator
   while Y < ARect.Height do begin // divide client-area into horizontal strips and render Lines
-    if I + FEditorControl.TopIndex > FEditorControl.VisibleLinesCount - 1 then
+    if I + FEditorControl.TopIndex > FEditorControl.Document.LinesCount - 1 then
       Break;
 
     LineProperties := FEditorControl.Document.Lines[I + FEditorControl.TopIndex];
@@ -1365,7 +1365,7 @@ begin
   I := 0;
   Y := 0; // render height accumulator
   while Y < ARect.Height do begin // divide client-area into horizontal strips and render Lines
-    if I + FEditorControl.TopIndex > FEditorControl.VisibleLinesCount - 1 then
+    if I + FEditorControl.TopIndex > FEditorControl.Document.LinesCount - 1 then
       Break;
 
     LineProperties := FEditorControl.Document.Lines[I + FEditorControl.TopIndex];
@@ -1628,7 +1628,7 @@ begin
     Exit;
 
   if DeltaLine > 0 then begin
-    if FCaretPosition.Y + DeltaLine < FEditorControl.VisibleLinesCount then
+    if FCaretPosition.Y + DeltaLine < FEditorControl.Document.LinesCount then
       Inc(FCaretPosition.Y, DeltaLine);
     Exit;
   end
@@ -3343,7 +3343,7 @@ begin
         if (LTextPos.Line < FTopIndex) or (LTextPos.Line > (FTopIndex + FEditorLines)) then
           ScrollLineIntoView(ActiveLineIndex);
         //
-        LCaretPos.Y := Min(LCaretPos.Y + 1, LineColumnToCaret(VisibleLinesCount - 1, 0).Y);
+        LCaretPos.Y := Min(LCaretPos.Y + 1, LineColumnToCaret(Document.LinesCount - 1, 0).Y);
         LTextPos := CaretToLineColumn(LCaretPos);
         if LTextPos.Line = FTopIndex + FEditorLines + 1 then
           ScrollBy(0, 1);
@@ -3408,7 +3408,7 @@ begin
 
       cmdCursorPageDown: begin
         //LTopOffset := Min(FTopIndex + FEditorLines + 1, VisibleLinesCount - 1);
-        LCaretPos.Y := Min(LCaretPos.Y + FEditorLines + 1, LineColumnToCaret(VisibleLinesCount - 1, 0).Y);
+        LCaretPos.Y := Min(LCaretPos.Y + FEditorLines + 1, LineColumnToCaret(Document.LinesCount - 1, 0).Y);
         //SetTopIndex(LTopOffset);
         ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
         SetHandled;
@@ -3428,7 +3428,7 @@ begin
         LLastLine := FEditorLines;
         if LLastLine * LineHeight > GetLinesArea.Height then
           Dec(LLastLine);
-        LCaretPos.Y := Min(LCaretPos.Y + LineColumnToCaret(LLastLine - LTopOffset - 1, 0).Y, LineColumnToCaret(VisibleLinesCount - 1, 0).Y);
+        LCaretPos.Y := Min(LCaretPos.Y + LineColumnToCaret(LLastLine - LTopOffset - 1, 0).Y, LineColumnToCaret(Document.LinesCount - 1, 0).Y);
         ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
         SetHandled;
       end;
@@ -3447,7 +3447,7 @@ begin
 
       cmdCursorEditorBottom: begin
         if FVisibleLinesCount > 0 then begin
-          LCaretPos := LineColumnToCaret(FVisibleLinesCount - 1, 0);
+          LCaretPos := LineColumnToCaret(Document.LinesCount - 1, 0);
           ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
           SetHandled;
         end;
@@ -4307,7 +4307,7 @@ begin
   Y := 0; // render height accumulator
   while Y < ARect.Height do begin // divide client-area into horizontal strips and render Lines
     // ARect.Height div (LineHeight)
-    if I + FTopIndex > VisibleLinesCount - 1 then
+    if I + FTopIndex > Document.LinesCount - 1 then
       Break;
 
     // set strip dimmensions
@@ -4796,7 +4796,7 @@ begin
 
   Ascending := CaretY > Line;
 
-  while (Ascending and (Line < FVisibleLinesCount)) or (not Ascending and (Line >= 0)) do begin
+  while (Ascending and (Line < Document.LinesCount)) or (not Ascending and (Line >= 0)) do begin
     LineProp := Document.Lines[Line];
     if not LineProp.IsVisible and not (epShowNonVisibleLines in Options.EditorProperties) then begin
       if Ascending then begin
@@ -4879,6 +4879,10 @@ end;
 procedure TNEDCustomEditorView.DocumentChanged(const Change: TNEDDocumentChangeInfo);
 var
   LCaretPos: TNEDCaretPosition;
+  pieces_list: TStringList;
+  i, j: Integer;
+  properties: TNEDLineProperties;
+  line, line_props: String;
 begin
   // @TODO - ??? do something ???
   FVisibleLinesCount := Document.VisibleLinesCount;
@@ -4930,6 +4934,52 @@ begin
   UpdateScrollBars;
   ShowModernScrollBars;
   Invalidate;
+
+  pieces_list := TStringList.Create;
+  try
+    for i := 0 to Document.LinesCount - 1 do begin
+      line := Document.GetLineText(i);
+      pieces_list.Add(line);
+    end;
+    //
+    pieces_list.Add('');
+    pieces_list.Add('---');
+    pieces_list.Add('');
+    //
+    for i := 0 to Document.LinesCount - 1 do begin
+      properties :=  Document.Lines[i];
+      line_props := 'Line#' + IntToStr(i) + ': ';
+      line_props := line_props + '[';
+      if properties.Modified then
+        line_props := line_props + 'Modified; ';
+      if properties.Deleted then
+        line_props := line_props + 'Deleted; ';
+      if properties.Hidden then
+        line_props := line_props + 'Hidden; ';
+      line_props := line_props + 'Len: ' + IntToStr(properties.Length) + '; ';
+      for j := 0 to properties.Pieces.Count - 1 do begin
+        line_props := line_props + 'Piece#' + IntToStr(j) + ': (';
+        if properties.Pieces.Piece[j].Buffer = pbOriginal then
+          line_props := line_props + 'Buffer: Orgin; '
+        else
+          line_props := line_props + 'Buffer: Input; ';
+        line_props := line_props + 'Offset: ' + IntToStr(properties.Pieces.Piece[j].Offset) + '; ';
+        line_props := line_props + 'Length: ' + IntToStr(properties.Pieces.Piece[j].Length);
+        if properties.Pieces.Piece[j].Origin <> Nil then begin
+          line_props := line_props + '; ';
+          line_props := line_props + 'Origin.L: ' + IntToStr(properties.Pieces.Piece[j].Origin.Line) + '; ';
+          line_props := line_props + 'Origin.C: ' + IntToStr(properties.Pieces.Piece[j].Origin.Column);
+        end;
+        line_props := line_props + '), ';
+      end;
+      line_props := line_props + ']';
+      pieces_list.Add(line_props);
+      line_props := '';
+    end;
+    pieces_list.SaveToFile('pieces.txt');
+  finally
+    pieces_list.Free;
+  end;
 
   ReportEditorInfo;
 end;

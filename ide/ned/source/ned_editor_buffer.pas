@@ -90,6 +90,7 @@ type
     //
     function GetCount: Integer;
     function GetPiece(Index: Integer): PNEDPiece;
+    function SameOrigin(const OriginA, OriginB: PNEDPieceOrigin): Boolean;
   public
     constructor Create;
     destructor Destroy; override;
@@ -374,7 +375,7 @@ type
     procedure DocumentChanged(const Change: TNEDDocumentChangeInfo); overload; virtual;
     //
     // line notifications
-    procedure LineInserted(LineIndex: Integer); virtual;
+    procedure LineInserted(LineIndex, MoveCursorToLine: Integer); virtual;
     procedure LineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer); virtual;
     procedure LineChanged(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer); virtual;
     //
@@ -430,7 +431,7 @@ type
     procedure NotifyObservers(Position: Integer; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer); overload;
     procedure NotifyObservers(const LineColumn: TNEDTextPosition; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer); overload;
     //
-    procedure NotifyLineInserted(LineIndex: Integer);
+    procedure NotifyLineInserted(LineIndex, MoveCursorToLine: Integer);
     procedure NotifyLineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
     procedure NotifyLineChanged(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
     //
@@ -440,6 +441,7 @@ type
     function GetLine(Index: Integer): TNEDLineProperties;
     //
     // internal helpers
+    procedure ShiftOrgins(const AfterLine: Integer; const Offset: Integer);
     procedure RebuildCaches;
     procedure RebuildLineNumbers;
     procedure MarkModified;
@@ -451,7 +453,7 @@ type
     function GetNextLineId: Integer;
     function CreateLine: TNEDLineProperties;
     function CreatePiece: PNEDPiece;
-    procedure InsertLine(LineIndex: Integer; const LineText: String; const Line: TNEDLineProperties);
+    procedure InsertLine(LineIndex, MoveCursorToLine: Integer; const LineText: String; const Line: TNEDLineProperties);
     procedure DeleteLine(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
     procedure MergeLines(const Operation: TNEDEditOperationKindEnum; FirstLine: Integer; var SecondLine: Integer);
   public
@@ -624,6 +626,11 @@ begin
     Exit;
   //
   Result := FList[Index];
+end;
+
+function TNEDPieces.SameOrigin(const OriginA, OriginB: PNEDPieceOrigin): Boolean;
+begin
+  Result := ((OriginA = Nil) and (OriginB = Nil)) or ((OriginA <> Nil) and (OriginB <> Nil) and (OriginA.Line = OriginB.Line));
 end;
 
 procedure TNEDPieces.Add(const Piece: PNEDPiece);
@@ -833,7 +840,7 @@ begin
 
     // Adjacent fragments from the same source buffer
     // can be merged into one larger piece
-    if (A.Buffer = B.Buffer) and (A.Offset + A.Length = B.Offset) then begin
+    if (A.Buffer = B.Buffer) and (A.Offset + A.Length = B.Offset) and SameOrigin(A.Origin, B.Origin) then begin
       A.Length := A.Length + B.Length;
 
       FList[I] := A;
@@ -1243,7 +1250,7 @@ begin
   DoDocumentChanged(Change);
 end;
 
-procedure TNEDDocumentObserver.LineInserted(LineIndex: Integer);
+procedure TNEDDocumentObserver.LineInserted(LineIndex, MoveCursorToLine: Integer);
 begin
   if not FEnabled then
     Exit;
@@ -1251,7 +1258,7 @@ begin
   if IsUpdating then
     Exit;
 
-  DoLineInserted(LineIndex, LineIndex - 1, LineIndex);
+  DoLineInserted(MoveCursorToLine, LineIndex - 1, LineIndex);
 end;
 
 procedure TNEDDocumentObserver.LineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
@@ -1431,7 +1438,7 @@ begin
     Observer.DocumentChanged(LineColumn, Kind, Operation, DeletedLen, InsertedLen);
 end;
 
-procedure TNEDCustomDocument.NotifyLineInserted(LineIndex: Integer);
+procedure TNEDCustomDocument.NotifyLineInserted(LineIndex, MoveCursorToLine: Integer);
 var
   Observer: TNEDDocumentObserver;
 begin
@@ -1439,7 +1446,7 @@ begin
     Exit;
 
   for Observer in FObservers do
-    Observer.LineInserted(LineIndex);
+    Observer.LineInserted(LineIndex, MoveCursorToLine);
 end;
 
 procedure TNEDCustomDocument.NotifyLineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
@@ -1513,6 +1520,23 @@ begin
   Result := FLines.Objects[Index];
 end;
 
+procedure TNEDCustomDocument.ShiftOrgins(const AfterLine, Offset: Integer);
+var
+  I, J: Integer;
+  LineProperties: TNEDLineProperties;
+  Piece: PNEDPiece;
+begin
+  for I := 0 to FLines.Count - 1 do begin
+    LineProperties := Lines[I];
+    for J := 0 to LineProperties.Pieces.Count - 1 do begin
+      Piece := LineProperties.Pieces.Piece[J];
+      if (Piece.Origin <> Nil) and (Piece.Origin.Line >= AfterLine) then begin
+        Inc(Piece.Origin.Line, Offset);
+      end;
+    end;
+  end;
+end;
+
 procedure TNEDCustomDocument.RebuildCaches;
 var
   I: Integer;
@@ -1575,7 +1599,7 @@ begin
 //  Inc(FNextPieceId);
 end;
 
-procedure TNEDCustomDocument.InsertLine(LineIndex: Integer; const LineText: String; const Line: TNEDLineProperties);
+procedure TNEDCustomDocument.InsertLine(LineIndex, MoveCursorToLine: Integer; const LineText: String; const Line: TNEDLineProperties);
 begin
   FLines.InsertObject(LineIndex, LineText, Line);
   Line.UpdateLength;
@@ -1583,7 +1607,7 @@ begin
   RebuildLineNumbers;
   RebuildCaches;
 
-  NotifyLineInserted(LineIndex);
+  NotifyLineInserted(LineIndex, MoveCursorToLine);
 end;
 
 procedure TNEDCustomDocument.DeleteLine(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
@@ -1631,8 +1655,8 @@ begin
     for I := 0 to B.Pieces.Count - 1 do begin
       Piece := B.Pieces.Piece[I].Clone;
       A.Pieces.Add(Piece);
-      if B.Pieces.Piece[I].Origin = Nil then
-        Piece.CreateOrigin(SecondLine, 0);
+      //if B.Pieces.Piece[I].Origin = Nil then
+      Piece.CreateOrigin(SecondLine, 0);
     end;
     A.UpdateLength;
     DeleteLine(Operation, SecondLine);
@@ -1902,6 +1926,7 @@ var
   UndoOp: TNEDEditOperation;
   RemainingLineText: String;
   RemainingLineTextLen: Integer;
+//  Kind: TNEDDocumentChangeKindEnum;
 begin
   RemainingLineText := '';
   if Text = '' then
@@ -1945,7 +1970,8 @@ begin
       NewLine := CreateLine;
       NewLine.Modified := True;
       // new empty line does not need any pieces created
-      InsertLine(Line, '', NewLine);
+      ShiftOrgins(Line, 1);
+      InsertLine(Line, Line + 1, '', NewLine);
     end
     else begin
       // copy all remaining text from current line
@@ -1977,7 +2003,8 @@ begin
 
         NewLine.Pieces.Add(Piece);
       end;
-      InsertLine(Line + 1, RemainingLineText, NewLine);
+      ShiftOrgins(Line + 1, 1);
+      InsertLine(Line + 1, Line + 1, RemainingLineText, NewLine);
       RemainingLineText := '';
     end;
 
@@ -2036,7 +2063,8 @@ begin
 
       NewLine.UpdateLength;
 
-      InsertLine(Line + I, '', NewLine); // @FIX: there should be LineText provided
+      ShiftOrgins(Line + I, 1);
+      InsertLine(Line + I, Line + I, '', NewLine); // @FIX: there should be LineText provided
     end;
   finally
     Parts.Free;
@@ -2351,7 +2379,7 @@ var
   I: Integer;
   SB: TStringBuilder;
   OriginalLineText: String;
-  TempLineIndex: Integer;
+  OrginLineIndex, OrginLineColumn: Integer;
 begin
   Result := '';
 
@@ -2370,13 +2398,16 @@ begin
     else begin
       for I := 0 to Line.Pieces.Count - 1 do begin
         Piece := Line.Pieces[I];
-        TempLineIndex := LineIndex;
-//        if Piece.Origin <> Nil then
-//          TempLineIndex := Piece.Origin.Line;
         case Piece.Buffer of
           pbOriginal: begin
-            OriginalLineText := GetOriginalLineText(TempLineIndex);
-            SB.Append(Copy(OriginalLineText, Piece.Offset + 1, Piece.Length));
+            OrginLineIndex := LineIndex;
+            OrginLineColumn := 0;
+            if (Piece.Origin <> Nil) and (LineIndex <> Piece.Origin.Line) and Lines[Piece.Origin.Line].Deleted then begin
+              OrginLineIndex := Piece.Origin.Line;
+              OrginLineColumn := Piece.Origin.Column;
+            end;
+            OriginalLineText := GetOriginalLineText(OrginLineIndex);
+            SB.Append(Copy(OriginalLineText, Piece.Offset + 1 + OrginLineColumn, Piece.Length));
             OriginalLineText := '';
           end;
           pbInputBuffer: SB.Append(Copy(FInputBuffer, Piece.Offset + 1, Piece.Length));
