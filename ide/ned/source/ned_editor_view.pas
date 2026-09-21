@@ -238,7 +238,7 @@ type
     //
     procedure CaretCreate;
     procedure CaretDestroy;
-    procedure CaretMove(const DeltaLine, DeltaColumn: Integer);
+    procedure CaretMove(const DeltaLine, DeltaColumn: Integer; const RollToLineEnd: Boolean);
     procedure CaretScroll(const DeltaLine, DeltaColumn: Integer);
     procedure CaretShow;
     procedure CaretHide;
@@ -1619,9 +1619,9 @@ begin
   FCaretCreated := False;
 end;
 
-procedure TNEDEditorCaret.CaretMove(const DeltaLine, DeltaColumn: Integer);
+procedure TNEDEditorCaret.CaretMove(const DeltaLine, DeltaColumn: Integer; const RollToLineEnd: Boolean);
 var
-  LineLength: Integer;
+  Line, LineLength: Integer;
 begin
   // this function can't exit from Editor line-area rect, it's for placing caret inside this rect only
   if FEditorControl = Nil then
@@ -1633,12 +1633,14 @@ begin
     Exit;
   end
   else if DeltaLine < 0 then begin
-    if FCaretPosition.Y + DeltaLine > 1 then
+    if FCaretPosition.Y + DeltaLine >= 1 then
       Inc(FCaretPosition.Y, DeltaLine);
-    Exit;
+    if not RollToLineEnd then
+      Exit;
   end;
 
-  LineLength := FEditorControl.Document.Lines[FEditorControl.CaretToLineColumn(FCaretPosition).Line].Length;
+  Line := FEditorControl.CaretToLineColumn(FCaretPosition).Line;
+  LineLength := FEditorControl.Document.Lines[Line].Length;
   if DeltaColumn > 0 then begin
     if epScrollPastEol in FEditorControl.Options.EditorProperties then begin
       Inc(FCaretPosition.X, DeltaColumn);
@@ -1651,6 +1653,9 @@ begin
   else if DeltaColumn < 0 then begin
     if FCaretPosition.X + DeltaColumn > 0 then
       Inc(FCaretPosition.X, DeltaColumn);
+  end
+  else if RollToLineEnd then begin
+    FCaretPosition.X := LineLength + 1;
   end;
 end;
 
@@ -3458,12 +3463,15 @@ begin
         if epReadOnly in Options.EditorProperties then
           Exit;
 
+        LTextPos := CaretToLineColumn(LCaretPos);
         if Document.Lines[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
           Exit;
 
         FCaret.CaretHide;
         FDocument.Delete(LTextPos, 1, True);
         FCaret.CaretShow;
+
+        Exit;
       end;
 
       cmdEditDeleteInPlace: begin // delete
@@ -4032,15 +4040,14 @@ var
 begin
   inherited;
 
-  if (Key = 0) or (FDocument = Nil) then
+  // VK_BACK // it can't be handled and disabled in this place, so we have to do it by the book, at KeyPress event
+  if (Key = 0) or (Key = VK_BACK) or (FDocument = Nil) then
     Exit;
 
   if Options.ReadOnly then begin
     Key := 0;
     Exit;
   end;
-
-// VK_BACK // it can't be handled and disabled in this place, so we have to do it by the book, at KeyPress event
 
   try
     if FProcessNextKeyMap and FKeyboardMap.IsComplexCommand(Key, Shift) then begin
@@ -4094,7 +4101,7 @@ begin
     LCaretPos := CaretPosition;
     LTextPos := CaretToLineColumn(LCaretPos);
 
-    if Key = #8 then begin // backspace
+    if Key = #8 then begin // VK_BACK - backspace
       Shift := KeyboardStateToShiftState;
       Cmd := FKeyboardMap.GetCommand(VK_BACK, Shift);
       if (Cmd <> Nil) then
@@ -4887,7 +4894,7 @@ begin
   // @TODO - ??? do something ???
   FVisibleLinesCount := Document.VisibleLinesCount;
   if Change.Kind = dcInsert then begin
-    FCaret.CaretMove(0, Change.InsertedLength);
+    FCaret.CaretMove(0, Change.InsertedLength, False);
     FCaret.CaretUpdate(False);
 //    LCaretPos := LineColumnToCaret(Change.Position);
 //    if (CaretPos.X <> LCaretPos.X) or (CaretPos.Y <> LCaretPos.Y) then begin
@@ -4899,9 +4906,9 @@ begin
     if Change.Operation = opDeleteBKSP then begin
       LCaretPos := CaretPosition;
       if LCaretPos.X - Change.DeletedLength = 0 then
-        FCaret.CaretMove(-1, 0)
+        FCaret.CaretMove(-1, 0, True)
       else
-        FCaret.CaretMove(0, -Change.DeletedLength);
+        FCaret.CaretMove(0, -Change.DeletedLength, False);
       FCaret.CaretUpdate(False);
     end;
   end
@@ -4913,10 +4920,20 @@ begin
     end;
   end
   else if Change.Kind = dcLineDelete then begin
-    LCaretPos := LineColumnToCaret(Change.Position);
-    if (CaretPosition.X <> LCaretPos.X) or (CaretPosition.Y <> LCaretPos.Y) then begin
-      FCaret.CaretSetLocation(LCaretPos);
+    if Change.Operation = opDeleteBKSP then begin
+      LCaretPos := CaretPosition;
+      if LCaretPos.X - Change.DeletedLength = 0 then
+        FCaret.CaretMove(-1, 0, True)
+      else
+        FCaret.CaretMove(0, -Change.DeletedLength, False);
       FCaret.CaretUpdate(False);
+    end
+    else begin
+      LCaretPos := LineColumnToCaret(Change.Position);
+      if (CaretPosition.X <> LCaretPos.X) or (CaretPosition.Y <> LCaretPos.Y) then begin
+        FCaret.CaretSetLocation(LCaretPos);
+        FCaret.CaretUpdate(False);
+      end;
     end;
   end
   else if Change.Kind = dcLineChanged then begin

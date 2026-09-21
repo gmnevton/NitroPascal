@@ -376,6 +376,12 @@ var
   FocusedControl: TWinControl;
   NextControl: TWinControl;
 begin
+  if FModalForm <> Nil then begin
+    if Assigned(FModalForm.OnKeyDown) then
+      FModalForm.OnKeyDown(Sender, Key, Shift);
+    Exit;
+  end;
+  //
   if Key = VK_TAB then begin
     FocusedControl := ActiveControl;
     if (FocusedControl <> Nil) and (FModalForm <> Nil) then begin

@@ -70,6 +70,7 @@ type
     procedure edProfileInputImportPathChange(Sender: TObject);
     procedure cbProfileInputSetDefaultClick(Sender: TObject);
     procedure edProfileInputNameKeyPress(Sender: TObject; var Key: Char);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
     FProfilesPath: String;
     ProfilesView: TEntryView;
@@ -90,6 +91,7 @@ implementation
 {$R *.dfm}
 
 uses
+  Windows,
   Graphics,
   ned_config;
 
@@ -123,6 +125,15 @@ begin
   FProfilesPath := '';
   ProfilesView.Free;
   inherited;
+end;
+
+procedure TNEDDialogProfiles.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  inherited;
+  if (Shift = []) and (Key = VK_RETURN) then begin
+    Key := 0;
+    btnOK.Click;
+  end;
 end;
 
 procedure TNEDDialogProfiles.FormShow(Sender: TObject);

@@ -2106,6 +2106,9 @@ var
   DeletedText: String;
   ChangeKind: TNEDDocumentChangeKindEnum;
   Operation: TNEDEditOperationKindEnum;
+
+label
+  skip;
 begin
   StartLine := Line;
   StartColumn := Column;
@@ -2122,7 +2125,7 @@ begin
     Exit;
 
   // capture text before deletion
-  DeletedText := GetTextRange(StartLine, StartColumn, Count); // @TODO: check if this needs to be trimed
+  DeletedText := TrimRight(GetTextRange(StartLine, StartColumn, Count)); // @TODO: check if this needs to be trimed
 
   // record user edit
   if not FInUndoRedo then begin
@@ -2148,10 +2151,20 @@ begin
     //Lines[StartLine].UpdateLength;
   end
   else begin
+    ChangeKind := dcLineChanged;
+
     // remove tail from first line
-    if Lines[StartLine].Length = 0 then
-      Lines[StartLine].Deleted := True
-    else// if StartColumn >= 0 then
+    if Lines[StartLine].Length = 0 then begin
+      Lines[StartLine].Deleted := True;
+      ChangeKind := dcLineDelete;
+    end
+    else if Backspace and (Column + CharCount < 0) then begin
+      Dec(StartLine);
+      ChangeKind := dcLineDelete;
+      MergeLines(Operation, StartLine, EndLine);
+      goto skip;
+    end
+    else // if StartColumn >= 0 then
       Lines[StartLine].DeleteRange(StartColumn, Lines[StartLine].Length - StartColumn, False); // Trim or not ???
 
     //
@@ -2163,8 +2176,10 @@ begin
     else
       Lines[EndLine].DeleteRange(0, EndColumn, False); // Trim or not ???
 
-    if Backspace and (Column + CharCount < 0) then
-      StartColumn := Lines[StartLine].Length
+    if Backspace and (Column + CharCount < 0) then begin
+      StartColumn := 0; // Lines[StartLine].Length;
+      Inc(EndLine);
+    end
     else begin
       if not Backspace and (EndColumn > StartColumn) then begin
         EndColumn := StartColumn;
@@ -2177,28 +2192,17 @@ begin
 
     //
     // merge both remaining fragments
-
     MergeLines(Operation, StartLine, EndLine);
-
-    ChangeKind := dcLineChanged;
 
     //
     // delete lines in between
-//    while FLines.Count > StartLine + 1 do begin
-//      if StartLine + 1 >= EndLine then
-//        Break;
-//
-//      DeleteLine(StartLine + 1);
-//      Dec(EndLine);
-//    end;
-    if EndLine > StartLine then begin
-      while EndLine > StartLine do begin
-        DeleteLine(Operation, EndLine);
-        Dec(EndLine);
-      end;
+    while EndLine > StartLine do begin
+      DeleteLine(Operation, EndLine);
+      Dec(EndLine);
     end;
   end;
 
+  skip:
   MarkModified;
   RebuildCaches;
 
