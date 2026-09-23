@@ -393,6 +393,7 @@ object NEDEditorForm: TNEDEditorForm
     Detail = 'FileType'
     IsToggleButton = True
     KeepOrginalColor = False
+    RightCloseVisible = False
   end
   object USymbolButton2: TUSymbolButton
     Left = 8
@@ -415,6 +416,8 @@ object NEDEditorForm: TNEDEditorForm
     Detail = 'FileType'
     IsToggleButton = True
     KeepOrginalColor = False
+    RightCloseVisible = False
+    Color = clBtnFace
   end
   object SynGeneralSyn1: TSynGeneralSyn
     CommentAttri.Foreground = clGray
@@ -502,6 +505,21 @@ object NEDEditorForm: TNEDEditorForm
     Top = 632
   end
   object UPopupMenu1: TUPopupMenu
+    IconFont.Charset = DEFAULT_CHARSET
+    IconFont.Color = clWhite
+    IconFont.Height = -16
+    IconFont.Name = 'Segoe MDL2 Assets'
+    IconFont.Style = []
+    TextFont.Charset = DEFAULT_CHARSET
+    TextFont.Color = clWhite
+    TextFont.Height = -13
+    TextFont.Name = 'Segoe UI'
+    TextFont.Style = []
+    DetailFont.Charset = DEFAULT_CHARSET
+    DetailFont.Color = clGray
+    DetailFont.Height = -13
+    DetailFont.Name = 'Segoe UI'
+    DetailFont.Style = []
     AniSet.AniKind = akOut
     AniSet.AniFunctionKind = afkQuartic
     AniSet.DelayStartTime = 0

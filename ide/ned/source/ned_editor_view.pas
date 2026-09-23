@@ -3348,7 +3348,8 @@ begin
         if (LTextPos.Line < FTopIndex) or (LTextPos.Line > (FTopIndex + FEditorLines)) then
           ScrollLineIntoView(ActiveLineIndex);
         //
-        LCaretPos.Y := Min(LCaretPos.Y + 1, LineColumnToCaret(Document.LinesCount - 1, 0).Y);
+        LCaretPos.Y := Min(LCaretPos.Y + 1, VisibleLinesCount);
+        //
         LTextPos := CaretToLineColumn(LCaretPos);
         if LTextPos.Line = FTopIndex + FEditorLines + 1 then
           ScrollBy(0, 1);
@@ -4801,7 +4802,7 @@ begin
   Column := 0;
   TopOffset := 0;
 
-  Ascending := CaretY > Line;
+  Ascending := CaretY >= Line;
 
   while (Ascending and (Line < Document.LinesCount)) or (not Ascending and (Line >= 0)) do begin
     LineProp := Document.Lines[Line];
@@ -4920,21 +4921,21 @@ begin
     end;
   end
   else if Change.Kind = dcLineDelete then begin
-    if Change.Operation = opDeleteBKSP then begin
-      LCaretPos := CaretPosition;
-      if LCaretPos.X - Change.DeletedLength = 0 then
-        FCaret.CaretMove(-1, 0, True)
-      else
-        FCaret.CaretMove(0, -Change.DeletedLength, False);
-      FCaret.CaretUpdate(False);
-    end
-    else begin
+//    if Change.Operation = opDeleteBKSP then begin
+//      LCaretPos := CaretPosition;
+//      if LCaretPos.X - Change.DeletedLength = 0 then
+//        FCaret.CaretMove(-1, 0, True)
+//      else
+//        FCaret.CaretMove(0, -Change.DeletedLength, False);
+//      FCaret.CaretUpdate(False);
+//    end
+//    else begin
       LCaretPos := LineColumnToCaret(Change.Position);
       if (CaretPosition.X <> LCaretPos.X) or (CaretPosition.Y <> LCaretPos.Y) then begin
         FCaret.CaretSetLocation(LCaretPos);
         FCaret.CaretUpdate(False);
       end;
-    end;
+//    end;
   end
   else if Change.Kind = dcLineChanged then begin
     LCaretPos := LineColumnToCaret(Change.Position);

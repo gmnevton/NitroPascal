@@ -384,13 +384,15 @@ end;
 
 procedure TNEDEditorForm.mnuShowNonVisibleLinesClick(Sender: TObject);
 var
+  LPopupMenu: TPopupMenu;
   Editor: TNEDEditorView;
   EditorProp: TNEDEditorProperties;
 begin
   if Sender = Nil then
     Exit;
   //
-  Editor := TNEDEditorView(Sender);
+  LPopupMenu := TPopupMenu(TMenuItem(Sender).GetParentMenu);
+  Editor := TNEDEditorView(LPopupMenu.PopupComponent);
   EditorProp := Editor.Options.EditorProperties;
   if mnuShowNonVisibleLines.Checked then begin
     Include(EditorProp, epShowNonVisibleLines);

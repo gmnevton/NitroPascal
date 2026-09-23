@@ -2106,9 +2106,6 @@ var
   DeletedText: String;
   ChangeKind: TNEDDocumentChangeKindEnum;
   Operation: TNEDEditOperationKindEnum;
-
-label
-  skip;
 begin
   StartLine := Line;
   StartColumn := Column;
@@ -2119,6 +2116,10 @@ begin
     CharCount := -Count;
     if not FindLine(LineColumnToPosition(Line, Column) + CharCount, StartLine, StartColumn) then
       Exit;
+  end
+  else begin
+//    while (StartLine < LinesCount) and Lines[StartLine].Deleted do
+//      Inc(StartLine);
   end;
 
   if not FindLine(LineColumnToPosition(StartLine, StartColumn) + Count, EndLine, EndColumn) then
@@ -2153,56 +2154,61 @@ begin
   else begin
     ChangeKind := dcLineChanged;
 
-    // remove tail from first line
-    if Lines[StartLine].Length = 0 then begin
-      Lines[StartLine].Deleted := True;
-      ChangeKind := dcLineDelete;
-    end
-    else if Backspace and (Column + CharCount < 0) then begin
+    // merge current line with fragments from previous line
+    if Backspace and (Column + CharCount < 0) then begin
       Dec(StartLine);
+      while (StartLine > 0) and Lines[StartLine].Deleted do
+        Dec(StartLine);
+      StartColumn := Lines[StartLine].Length;
       ChangeKind := dcLineDelete;
       MergeLines(Operation, StartLine, EndLine);
-      goto skip;
-    end
-    else // if StartColumn >= 0 then
-      Lines[StartLine].DeleteRange(StartColumn, Lines[StartLine].Length - StartColumn, False); // Trim or not ???
-
-    //
-    // remove head from last line
-    if (Lines[EndLine].Length = 0) and not Lines[EndLine].Deleted then begin
-      Lines[EndLine].Deleted := True;
-      Inc(EndLine);
-    end
-    else
-      Lines[EndLine].DeleteRange(0, EndColumn, False); // Trim or not ???
-
-    if Backspace and (Column + CharCount < 0) then begin
-      StartColumn := 0; // Lines[StartLine].Length;
-      Inc(EndLine);
     end
     else begin
-      if not Backspace and (EndColumn > StartColumn) then begin
-        EndColumn := StartColumn;
-        Inc(EndLine);
+      // remove tail from first line
+      if Lines[StartLine].Length = 0 then begin
+        Lines[StartLine].Deleted := True;
+        ChangeKind := dcLineDelete;
+      end
+      else begin // if StartColumn >= 0 then
+        Lines[StartLine].DeleteRange(StartColumn, Lines[StartLine].Length - StartColumn, False); // Trim or not ???
+
+        //
+        // remove head from last line
+        if (Lines[EndLine].Length = 0) and not Lines[EndLine].Deleted then begin
+          Lines[EndLine].Deleted := True;
+          //Inc(EndLine);
+        end
+        else
+          Lines[EndLine].DeleteRange(0, EndColumn, False); // Trim or not ???
       end;
 
-      if EndColumn >= 0 then
-        StartColumn := EndColumn;
-    end;
+      if Backspace and (Column + CharCount < 0) then begin
+        StartColumn := 0; // Lines[StartLine].Length;
+        Inc(EndLine);
+      end
+      else begin
+        if not Backspace and (EndColumn > StartColumn) then begin
+          EndColumn := StartColumn;
+          Inc(EndLine);
+        end;
 
-    //
-    // merge both remaining fragments
-    MergeLines(Operation, StartLine, EndLine);
+        if EndColumn >= 0 then
+          StartColumn := EndColumn;
+      end;
 
-    //
-    // delete lines in between
-    while EndLine > StartLine do begin
-      DeleteLine(Operation, EndLine);
-      Dec(EndLine);
+      //
+      // merge both remaining fragments
+      MergeLines(Operation, StartLine, EndLine);
+
+      //
+      // delete lines in between
+      while EndLine > StartLine do begin
+        DeleteLine(Operation, EndLine);
+        Dec(EndLine);
+      end;
     end;
   end;
 
-  skip:
   MarkModified;
   RebuildCaches;
 
