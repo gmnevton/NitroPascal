@@ -23,7 +23,10 @@ uses
   ExtCtrls,
   CommCtrl,
   Generics.Collections,
-  ned_editor_buffer;
+  ned_editor_buffer,
+  ned_editor_lexer,
+  ned_editor_texer,
+  ned_editor_parser;
 
 type
   TNEDCommandShortCut = Low(LongWord)..High(LongWord); // 2 words 0..32767 + 0..32767
@@ -169,15 +172,6 @@ type
     property LineHiddenIndicatorColor: TColor read FLineHiddenIndicatorColor write SetLineHiddenIndicatorColor;
   end;
 
-  TNEDEditorMinimap = class(TPersistent)
-  private
-  protected
-  public
-    constructor Create;
-    destructor Destroy; override;
-  published
-  end;
-
   TNEDEditorCaretTypeEnum = (
     ctVerticalLine,       // "|"
     ctThinVerticalLine,
@@ -264,7 +258,34 @@ type
     property MultiCaretEnabled: Boolean read FMultiCaretEnabled write SetMultiCaretEnabled;
   end;
 
+  TNEDTextSelection = record
+    //StartPos: TNEDTextPosition;
+    //EndPos: TNEDTextPosition;
+    Range: TNEDTextRange;
+    CaretPos: TNEDTextPosition;
+  end;
+
+  TNEDSelectionMode = (
+    smNormal,
+    smColumn,
+    smLine,
+    smMultiRange
+  );
+
   TNEDEditorSelection = class(TPersistent)
+  private
+    FSelectionMode: TNEDSelectionMode;
+    FSimpleSelect: TNEDTextSelection;
+    FItems: TList<TNEDTextSelection>;
+    FActiveIndex: Integer;
+  protected
+  public
+    constructor Create;
+    destructor Destroy; override;
+  published
+  end;
+
+  TNEDEditorMinimap = class(TPersistent)
   private
   protected
   public
@@ -535,6 +556,82 @@ type
     property RightMarginColor: TColor read FRightMarginColor write SetRightMarginColor;
   end;
 
+  TNEDHighlightStyleEnum = (
+    hsDefault,
+    hsKeyword,
+    hsIdentifier,
+    hsString,
+    hsNumber,
+    hsComment,
+    hsOperator,
+    hsDeclaration,
+    hsReference,
+    hsType,
+    hsFunction,
+    hsStructure,
+    hsError
+  );
+
+  TNEDHighlightTokenEvent = procedure(Sender: TObject; const AText: UTF8String; const AToken: TNEDTextToken; const AStyle: TNEDHighlightStyleEnum; var AFormat: TNEDTokenFormat) of object;
+
+  TNEDHighlighter = class(TPersistent)
+  private
+    FEditorControl: TNEDCustomEditorView;
+    //
+    FDefaultFont: TFont;
+    FKeywordFont: TFont;
+    FIdentifierFont: TFont;
+    FStringFont: TFont;
+    FNumberFont: TFont;
+    FCommentFont: TFont;
+    FOperatorFont: TFont;
+    FDeclarationFont: TFont;
+    FReferenceFont: TFont;
+    FTypeFont: TFont;
+    FFunctionFont: TFont;
+    FStructureFont: TFont;
+    FErrorFont: TFont;
+    //
+    FOnHighlightToken: TNEDHighlightTokenEvent;
+  private
+    procedure FontChanged(Sender: TObject);
+    procedure InitializeFont(AFont: TFont);
+    //
+    function GetBaseStyle(const AToken: TNEDTextToken): TNEDHighlightStyleEnum;
+    function GetFont(const AStyle: TNEDHighlightStyleEnum): TFont;
+    function GetDefaultFormat: TNEDTokenFormat;
+    function GetTokenRange(const AToken: TNEDTextToken): TNEDSourceRange;
+    function RangeMatchesToken(const ARange: TNEDSourceRange; const AToken: TNEDTextToken): Boolean;
+    function FindDeclaration(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; out ADeclaration: TNEDSymbolReference): Boolean;
+    function FindReference(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; out AReference: TNEDSymbolReference): Boolean;
+    function FindElement(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; out AElement: TNEDCodeElement): Boolean;
+    function GetSemanticStyle(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; const ABaseStyle: TNEDHighlightStyleEnum): TNEDHighlightStyleEnum;
+    procedure ApplyStyle(const AStyle: TNEDHighlightStyleEnum; var AFormat: TNEDTokenFormat);
+  public
+    constructor Create(const AParentControl: TNEDCustomEditorView); reintroduce;
+    destructor Destroy; override;
+    //
+    procedure Reset;
+    //
+    procedure Highlight(const AText: UTF8String; const AAnalysis: TNEDLineAnalysis);
+    //
+    property DefaultFont: TFont read FDefaultFont write FDefaultFont;
+    property KeywordFont: TFont read FKeywordFont write FKeywordFont;
+    property IdentifierFont: TFont read FIdentifierFont write FIdentifierFont;
+    property StringFont: TFont read FStringFont write FStringFont;
+    property NumberFont: TFont read FNumberFont write FNumberFont;
+    property CommentFont: TFont read FCommentFont write FCommentFont;
+    property OperatorFont: TFont read FOperatorFont write FOperatorFont;
+    property DeclarationFont: TFont read FDeclarationFont write FDeclarationFont;
+    property ReferenceFont: TFont read FReferenceFont write FReferenceFont;
+    property TypeFont: TFont read FTypeFont write FTypeFont;
+    property FunctionFont: TFont read FFunctionFont write FFunctionFont;
+    property StructureFont: TFont read FStructureFont write FStructureFont;
+    property ErrorFont: TFont read FErrorFont write FErrorFont;
+    //
+    property OnHighlightToken: TNEDHighlightTokenEvent read FOnHighlightToken write FOnHighlightToken;
+  end;
+
   TNEDEditorCommand = class;
   TNEDCommandInvokeFunction = procedure (Sender: TNEDEditorCommand; const CommandID: TNEDCommandIDType; var Handled: Boolean) of object;
 
@@ -639,14 +736,15 @@ type
     FDocument: TNEDEditorBuffer;
     FObserver: TNEDDocumentObserver;
     FGutter: TNEDEditorGutter;
-    FMinimap: TNEDEditorMinimap;
     FCaret: TNEDEditorCaret;
     FSelection: TNEDEditorSelection;
+    FMinimap: TNEDEditorMinimap;
     FVerticalScrollBar: TNEDEditorScrollbar;
     FHorizontalScrollBar: TNEDEditorScrollbar;
     //
     FOptions: TNEDEditorOptions;
     FColors: TNEDEditorColors;
+    FHighlighter: TNEDHighlighter;
     FKeyboardMap: TNEDEditorKeyboardMap;
   private
     FModified: Boolean;
@@ -780,6 +878,7 @@ type
     property VerticalScrollBar: TNEDEditorScrollbar read FVerticalScrollBar;
     property Options: TNEDEditorOptions read FOptions;
     property Colors: TNEDEditorColors read FColors;
+    property Highlighter: TNEDHighlighter read FHighlighter;
     //
     property CharWidth: Integer read GetCharWidth;
     property LineHeight: Integer read GetLineHeight;
@@ -974,7 +1073,9 @@ end;
 
 constructor TNEDEditorGutter.Create(const AParentControl: TNEDCustomEditorView);
 begin
+  inherited Create;
   FEditorControl := AParentControl;
+  //
   FVisible := True;
   FWidth := 35;
   FAutoSize := True;
@@ -1261,7 +1362,7 @@ begin
     if I + FEditorControl.TopIndex > FEditorControl.Document.LinesCount - 1 then
       Break;
 
-    LineProperties := FEditorControl.Document.Lines[I + FEditorControl.TopIndex];
+    LineProperties := FEditorControl.Document.LineProperties[I + FEditorControl.TopIndex];
     if not LineProperties.IsVisible and not (epShowNonVisibleLines in FEditorControl.Options.EditorProperties) then begin
       Inc(I);
       Inc(LineOffset);
@@ -1368,7 +1469,7 @@ begin
     if I + FEditorControl.TopIndex > FEditorControl.Document.LinesCount - 1 then
       Break;
 
-    LineProperties := FEditorControl.Document.Lines[I + FEditorControl.TopIndex];
+    LineProperties := FEditorControl.Document.LineProperties[I + FEditorControl.TopIndex];
     if not LineProperties.IsVisible and not (epShowNonVisibleLines in FEditorControl.Options.EditorProperties) then begin
       Inc(I);
       Continue;
@@ -1413,23 +1514,11 @@ begin
   ACanvas.FillRect(ARect);
 end;
 
-{ TNEDEditorMinimap }
-
-constructor TNEDEditorMinimap.Create;
-begin
-
-end;
-
-destructor TNEDEditorMinimap.Destroy;
-begin
-
-  inherited;
-end;
-
 { TNEDEditorCaret }
 
 constructor TNEDEditorCaret.Create(const AParentControl: TNEDCustomEditorView);
 begin
+  inherited Create;
   FEditorControl := AParentControl;
   //
   FCaretCreated := False;
@@ -1640,7 +1729,7 @@ begin
   end;
 
   Line := FEditorControl.CaretToLineColumn(FCaretPosition).Line;
-  LineLength := FEditorControl.Document.Lines[Line].Length;
+  LineLength := FEditorControl.Document.LineProperties[Line].Length;
   if DeltaColumn > 0 then begin
     if epScrollPastEol in FEditorControl.Options.EditorProperties then begin
       Inc(FCaretPosition.X, DeltaColumn);
@@ -1676,7 +1765,7 @@ begin
     Exit;
   end;
 
-  LineLength := FEditorControl.Document.Lines[FEditorControl.CaretToLineColumn(FCaretPosition).Line].Length;
+  LineLength := FEditorControl.Document.LineProperties[FEditorControl.CaretToLineColumn(FCaretPosition).Line].Length;
   if DeltaColumn > 0 then begin
     if epScrollPastEol in FEditorControl.Options.EditorProperties then begin
       Inc(FCaretPosition.X, DeltaColumn);
@@ -1780,7 +1869,7 @@ begin
   if FEditorControl = Nil then
     Exit;
 
-  Result := FCaretPosition.X >= FEditorControl.Document.Lines[FEditorControl.CaretToLineColumn(FCaretPosition).Line].Length;
+  Result := FCaretPosition.X >= FEditorControl.Document.LineProperties[FEditorControl.CaretToLineColumn(FCaretPosition).Line].Length;
 end;
 
 { TNEDEditorSelection }
@@ -1796,10 +1885,24 @@ begin
   inherited;
 end;
 
+{ TNEDEditorMinimap }
+
+constructor TNEDEditorMinimap.Create;
+begin
+
+end;
+
+destructor TNEDEditorMinimap.Destroy;
+begin
+
+  inherited;
+end;
+
 { TNEDEditorScrollbar }
 
 constructor TNEDEditorScrollbar.Create(const AParentControl: TNEDCustomEditorView; AKind: TScrollBarKind);
 begin
+  inherited Create;
   FEditorControl := AParentControl;
   //
   // OS scrollbar width and height
@@ -2726,6 +2829,7 @@ end;
 
 constructor TNEDEditorOptions.Create(const AParentControl: TNEDCustomEditorView);
 begin
+  inherited Create;
   FEditorControl := AParentControl;
   //
   FEncoding := TEncoding.UTF8;
@@ -2920,6 +3024,7 @@ end;
 
 constructor TNEDEditorColors.Create(const AParentControl: TNEDCustomEditorView);
 begin
+  inherited Create;
   FEditorControl := AParentControl;
   //
   FBlockSelectedColor := $3e4451; // rgb(62, 68, 81)
@@ -2972,6 +3077,276 @@ begin
   end;
 end;
 
+{ TNEDHighlighter }
+
+constructor TNEDHighlighter.Create(const AParentControl: TNEDCustomEditorView);
+begin
+  inherited Create;
+  FEditorControl := AParentControl;
+  //
+  FDefaultFont := TFont.Create;
+  FKeywordFont := TFont.Create;
+  FIdentifierFont := TFont.Create;
+  FStringFont := TFont.Create;
+  FNumberFont := TFont.Create;
+  FCommentFont := TFont.Create;
+  FOperatorFont := TFont.Create;
+  //
+  FDeclarationFont := TFont.Create;
+  FReferenceFont := TFont.Create;
+  FTypeFont := TFont.Create;
+  FFunctionFont := TFont.Create;
+  FStructureFont := TFont.Create;
+  FErrorFont := TFont.Create;
+  //
+  Reset;
+end;
+
+destructor TNEDHighlighter.Destroy;
+begin
+  FErrorFont.Free;
+  FStructureFont.Free;
+  FFunctionFont.Free;
+  FTypeFont.Free;
+  FReferenceFont.Free;
+  FDeclarationFont.Free;
+  //
+  FOperatorFont.Free;
+  FCommentFont.Free;
+  FNumberFont.Free;
+  FStringFont.Free;
+  FIdentifierFont.Free;
+  FKeywordFont.Free;
+  FDefaultFont.Free;
+  //
+  inherited Destroy;
+end;
+
+procedure TNEDHighlighter.FontChanged(Sender: TObject);
+begin
+  FEditorControl.Invalidate;
+end;
+
+procedure TNEDHighlighter.InitializeFont(AFont: TFont);
+begin
+  AFont.Assign(FEditorControl.Font); // Name := 'Consolas';
+//  AFont.Size := 10;
+//  AFont.Style := [];
+  AFont.OnChange := FontChanged;
+end;
+
+procedure TNEDHighlighter.Reset;
+begin
+  InitializeFont(FDefaultFont);
+  InitializeFont(FKeywordFont);
+  InitializeFont(FIdentifierFont);
+  InitializeFont(FStringFont);
+  InitializeFont(FNumberFont);
+  InitializeFont(FCommentFont);
+  InitializeFont(FOperatorFont);
+  InitializeFont(FDeclarationFont);
+  InitializeFont(FReferenceFont);
+  InitializeFont(FTypeFont);
+  InitializeFont(FFunctionFont);
+  InitializeFont(FStructureFont);
+  InitializeFont(FErrorFont);
+
+//  FKeywordFont.Style := [fsBold];
+//  FDeclarationFont.Style := [fsBold];
+  FKeywordFont.Color := clMoneyGreen;
+  FIdentifierFont.Color := clSkyBlue;
+  FStringFont.Color := clAqua;
+  FNumberFont.Color := clFuchsia;
+  FCommentFont.Color := clDkGray;
+  FOperatorFont.Color := clYellow;
+  //
+  FDeclarationFont.Color := clGreen;
+  FReferenceFont.Color := clTeal;
+  FTypeFont.Color := clWebOrange;
+  FFunctionFont.Color := clBlue;
+  FStructureFont.Color := clWebGold;
+  FErrorFont.Color := clRed;
+end;
+
+function TNEDHighlighter.GetBaseStyle(const AToken: TNEDTextToken): TNEDHighlightStyleEnum;
+begin
+  case AToken.Kind of
+    ttkKeyword   : Result := hsKeyword;
+    ttkIdentifier: Result := hsIdentifier;
+    ttkString    : Result := hsString;
+    ttkNumber    : Result := hsNumber;
+    ttkComment   : Result := hsComment;
+    ttkOperator  : Result := hsOperator;
+    //hsDeclaration,
+    //hsReference,
+    //hsType,
+    //hsFunction,
+    //hsStructure,
+    //hsError
+  else
+    Result := hsDefault;
+  end;
+end;
+
+function TNEDHighlighter.GetFont(const AStyle: TNEDHighlightStyleEnum): TFont;
+begin
+  case AStyle of
+    hsKeyword    : Result := FKeywordFont;
+    hsIdentifier : Result := FIdentifierFont;
+    hsString     : Result := FStringFont;
+    hsNumber     : Result := FNumberFont;
+    hsComment    : Result := FCommentFont;
+    hsOperator   : Result := FOperatorFont;
+    hsDeclaration: Result := FDeclarationFont;
+    hsReference  : Result := FReferenceFont;
+    hsType       : Result := FTypeFont;
+    hsFunction   : Result := FFunctionFont;
+    hsStructure  : Result := FStructureFont;
+    hsError      : Result := FErrorFont;
+  else
+    Result := FDefaultFont;
+  end;
+end;
+
+function TNEDHighlighter.GetDefaultFormat: TNEDTokenFormat;
+begin
+  Result.Font := FDefaultFont;
+  Result.TextAlignment := taAlignTop; // TVerticalAlignment = (taAlignTop, taAlignBottom, taVerticalCenter);
+  Result.WordBreak := False;
+  Result.WordWrap := False;
+  Result.LineBreak := '';
+  Result.LineBreakType := tlbsNone; // TTextLineBreakStyle = (tlbsLF, tlbsCRLF);
+  Result.LetterSpacing := 0;
+  Result.WordSpacing := 0;
+  Result.TextIndentation := 0;
+end;
+
+function TNEDHighlighter.GetTokenRange(const AToken: TNEDTextToken): TNEDSourceRange;
+begin
+  Result.StartPos.Line := -1;
+  Result.StartPos.Column := AToken.Offset;
+  Result.StartPos.Length := AToken.Length;
+
+  Result.EndPos.Line := -1;
+  Result.EndPos.Column := AToken.Offset + AToken.Length;
+  Result.EndPos.Length := -1;
+end;
+
+function TNEDHighlighter.RangeMatchesToken(const ARange: TNEDSourceRange; const AToken: TNEDTextToken): Boolean;
+var
+  RangeStart: Integer;
+  RangeEnd: Integer;
+  TokenStart: Integer;
+  TokenEnd: Integer;
+begin
+  RangeStart := ARange.StartPos.Column;
+  RangeEnd := ARange.EndPos.Column;
+
+  TokenStart := AToken.Offset;
+  TokenEnd := AToken.Offset + AToken.Length;
+
+  Result := (RangeStart = TokenStart) and (RangeEnd = TokenEnd);
+end;
+
+function TNEDHighlighter.FindDeclaration(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; out ADeclaration: TNEDSymbolReference): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to High(AAnalysis.Declarations) do begin
+    if RangeMatchesToken(AAnalysis.Declarations[I].SourceRange, AToken) then begin
+      ADeclaration := AAnalysis.Declarations[I];
+      Exit(True);
+    end;
+  end;
+end;
+
+function TNEDHighlighter.FindReference(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; out AReference: TNEDSymbolReference): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to High(AAnalysis.References) do begin
+    if RangeMatchesToken(AAnalysis.References[I].SourceRange, AToken) then begin
+      AReference := AAnalysis.References[I];
+      Exit(True);
+    end;
+  end;
+end;
+
+function TNEDHighlighter.FindElement(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; out AElement: TNEDCodeElement): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to High(AAnalysis.Elements) do begin
+    if RangeMatchesToken(AAnalysis.Elements[I].SourceRange, AToken) then begin
+      AElement := AAnalysis.Elements[I];
+      Exit(True);
+    end;
+  end;
+end;
+
+function TNEDHighlighter.GetSemanticStyle(const AAnalysis: TNEDLineAnalysis; const AToken: TNEDTextToken; const ABaseStyle: TNEDHighlightStyleEnum): TNEDHighlightStyleEnum;
+var
+  Declaration: TNEDSymbolReference;
+  Reference: TNEDSymbolReference;
+begin
+  Result := ABaseStyle;
+
+  // Declaration/reference information has priority over the lexical identifier style
+  if ABaseStyle = hsIdentifier then begin
+    if FindDeclaration(AAnalysis, AToken, Declaration) then begin
+      Result := hsDeclaration;
+      Exit;
+    end;
+    //
+    if FindReference(AAnalysis, AToken, Reference) then begin
+      Result := hsReference;
+      Exit;
+    end;
+  end;
+end;
+
+procedure TNEDHighlighter.ApplyStyle(const AStyle: TNEDHighlightStyleEnum; var AFormat: TNEDTokenFormat);
+begin
+  AFormat.Font := GetFont(AStyle);
+end;
+
+procedure TNEDHighlighter.Highlight(const AText: UTF8String; const AAnalysis: TNEDLineAnalysis);
+var
+  I: Integer;
+  Token: TNEDTextToken;
+  Style: TNEDHighlightStyleEnum;
+  Format: TNEDTokenFormat;
+begin
+  if not Assigned(AAnalysis) then
+    Exit;
+
+  for I := 0 to AAnalysis.Tokens.Count - 1 do begin
+    Token := AAnalysis.Tokens.Tokens[I];
+
+    // Start with the default format
+    Format := GetDefaultFormat;
+
+    // Determine lexical style
+    Style := GetBaseStyle(Token);
+
+    // Apply semantic information
+    Style := GetSemanticStyle(AAnalysis, Token, Style);
+
+    // Apply the selected style
+    ApplyStyle(Style, Format);
+
+    // Give the application/editor the final opportunity to modify the format
+    if Assigned(FOnHighlightToken) then
+      FOnHighlightToken(Self, AText, Token, Style, Format);
+
+    // Store the resulting format back into the token
+    AAnalysis.Tokens.SetTokenFormat(I, Format);
+  end;
+end;
+
 { TNEDEditorCommand }
 
 constructor TNEDEditorCommand.Create(const CommandID: TNEDCommandIDType; DisplayName, DisplayHint: String; const InvokeFunction: TNEDCommandInvokeFunction);
@@ -3010,6 +3385,7 @@ end;
 
 constructor TNEDEditorKeyboardMap.Create(const AParentControl: TNEDCustomEditorView);
 begin
+  inherited Create;
   FEditorControl := AParentControl;
   //
   FEditorKeyboardMap := TObjectDictionary<TNEDCommandShortCut, TNEDEditorCommand>.Create([doOwnsValues]);
@@ -3135,6 +3511,7 @@ begin
   //
   FOptions := TNEDEditorOptions.Create(Self);
   FColors := TNEDEditorColors.Create(Self);
+  FHighlighter := TNEDHighlighter.Create(Self);
   FKeyboardMap := TNEDEditorKeyboardMap.Create(Self);
   FProcessNextKeyMap := True;
   FPreviousKeyMap.Key := 0;
@@ -3174,6 +3551,7 @@ begin
   FVerticalScrollBar.Free;
   FOptions.Free;
   FColors.Free;
+  FHighlighter.Free;
   FKeyboardMap.Free;
   inherited;
 end;
@@ -3321,7 +3699,7 @@ begin
           ScrollLineIntoView(ActiveLineIndex);
         //
         if not (epScrollPastEol in Options.EditorProperties) then begin
-          LineLength := Document.Lines[CaretToLineColumn(LCaretPos).Line].Length;
+          LineLength := Document.LineProperties[CaretToLineColumn(LCaretPos).Line].Length;
           if LineLength > 0 then
             LCaretPos.X := Min(LCaretPos.X + 1, LineLength + 1);
         end
@@ -3348,7 +3726,11 @@ begin
         if (LTextPos.Line < FTopIndex) or (LTextPos.Line > (FTopIndex + FEditorLines)) then
           ScrollLineIntoView(ActiveLineIndex);
         //
-        LCaretPos.Y := Min(LCaretPos.Y + 1, VisibleLinesCount);
+        //LCaretPos.Y := Min(LCaretPos.Y + 1, LineColumnToCaret(Document.LinesCount - 1, 0).Y);
+        if epShowNonVisibleLines in Options.EditorProperties then
+          LCaretPos.Y := Min(LCaretPos.Y + 1, Document.LinesCount)
+        else
+          LCaretPos.Y := Min(LCaretPos.Y + 1, VisibleLinesCount);
         //
         LTextPos := CaretToLineColumn(LCaretPos);
         if LTextPos.Line = FTopIndex + FEditorLines + 1 then
@@ -3378,7 +3760,7 @@ begin
       end;
 
       cmdCursorLineEnd: begin
-        LineLength := Document.Lines[CaretToLineColumn(LCaretPos).Line].Length;
+        LineLength := Document.LineProperties[CaretToLineColumn(LCaretPos).Line].Length;
         if epEnhancedEndKey in Options.EditorProperties then begin
           LineText := Document.GetLineText(CaretToLineColumn(LCaretPos).Line);
           FirstChar := LineLength;
@@ -3465,7 +3847,7 @@ begin
           Exit;
 
         LTextPos := CaretToLineColumn(LCaretPos);
-        if Document.Lines[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
+        if Document.LineProperties[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
           Exit;
 
         FCaret.CaretHide;
@@ -3481,7 +3863,7 @@ begin
           Exit;
 
         LTextPos := CaretToLineColumn(LCaretPos);
-        if Document.Lines[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
+        if Document.LineProperties[LTextPos.Line].Deleted and (epShowNonVisibleLines in Options.EditorProperties) then
           Exit;
 
         FCaret.CaretHide;
@@ -3564,7 +3946,10 @@ begin
       LineColumn := CaretToLineColumn(Caret.CaretPosition);
       Line := LineColumn.Line + 1;
       Column := LineColumn.Column + 1;
-      Lines := Document.LinesCount;
+      if epShowNonVisibleLines in Options.EditorProperties then
+        Lines := Document.LinesCount
+      else
+        Lines := VisibleLinesCount;
       MaxColumn := -1;
       LineMaxColumn := -1;
       Words := 0;
@@ -4145,6 +4530,16 @@ procedure TNEDCustomEditorView.MouseDown(Button: TMouseButton; Shift: TShiftStat
         CaretX := MaxPosX;
       if CaretY > MaxPosY then
         CaretY := MaxPosY;
+      //if CaretX > Document.GetMaxLineLength then
+      //  CaretX := Document.GetMaxLineLength;
+      if epShowNonVisibleLines in Options.EditorProperties then begin
+        if CaretY > Document.LinesCount - 1 then
+          CaretY := Document.LinesCount - 1;
+      end
+      else begin
+        if CaretY > VisibleLinesCount - 1 then
+          CaretY := VisibleLinesCount - 1;
+      end;
       LCaretPos := TNEDCaretPosition.Create(CaretX + 1, CaretY + 1);
       ActiveLineIndex := CaretToLineColumn(LCaretPos).Line;
       FCaret.CaretPosition := LCaretPos;
@@ -4319,7 +4714,7 @@ begin
       Break;
 
     // set strip dimmensions
-    LineProperties := Document.Lines[I + FTopIndex];
+    LineProperties := Document.LineProperties[I + FTopIndex];
     if not LineProperties.IsVisible and not (epShowNonVisibleLines in Options.EditorProperties) then begin
       Inc(I);
       Continue;
@@ -4359,8 +4754,11 @@ var
   is_focused, is_selected: Boolean;
   line_bg_color: TColor;
   LineProperties: TNEDLineProperties;
-  LineText: String;
-  LineRect: TRect;
+  LineText, TokenText: String;
+  LineRect, TokenRect: TRect;
+  I: Integer;
+  LineTokens: TNEDLineTokens;
+  Token: TNEDTextToken;
 begin
   // set render state
   is_focused := Focused and (LineIdx = ActiveLineIndex); // draw focused only Line that is active
@@ -4371,7 +4769,7 @@ begin
   if is_selected then
     line_bg_color := FColors.LineSelectedColor;
 
-  LineProperties := Document.Lines[LineIdx];
+  LineProperties := Document.LineProperties[LineIdx];
   if LineProperties.Deleted and (epShowNonVisibleLines in Options.EditorProperties) then begin
     line_bg_color := clRed; // FColors.;
     ACanvas.Brush.Color := line_bg_color;
@@ -4389,8 +4787,17 @@ begin
     ACanvas.FillRect(ARect);
   end;
 
-  ACanvas.Font.Assign(Self.Font);
-  ACanvas.TextRect(LineRect, LineText, [tfLeft, tfTop, tfSingleLine]);
+  //ACanvas.Font.Assign(Self.Font);
+  LineTokens := LineProperties.Analysis.Tokens;
+  for I := 0 to LineTokens.Count - 1 do begin
+    Token := LineTokens.Tokens[I];
+    ACanvas.Font.Assign(Token.Format.Font);
+    TokenText := Copy(LineText, Token.Offset, Token.Length);
+    TokenRect := LineRect;
+    OffsetRect(TokenRect, (Token.Offset - 1) * CharWidth, 0);
+    ACanvas.TextRect(TokenRect, TokenText, [tfLeft, tfTop, tfSingleLine]);
+    TokenText := '';
+  end;
 end;
 
 procedure TNEDCustomEditorView.SetDocument(const DocumentBuffer: TNEDEditorBuffer);
@@ -4706,7 +5113,7 @@ var
 begin
   Result.Y := (LineColumn.Line - TopIndex) * LineHeight;
 
-  LineLen := Document.Lines[LineColumn.Line].Length;
+  LineLen := Document.LineProperties[LineColumn.Line].Length;
   S := Document.GetLineText(LineColumn.Line);
 
   if LineColumn.Column = 0 then
@@ -4805,7 +5212,7 @@ begin
   Ascending := CaretY >= Line;
 
   while (Ascending and (Line < Document.LinesCount)) or (not Ascending and (Line >= 0)) do begin
-    LineProp := Document.Lines[Line];
+    LineProp := Document.LineProperties[Line];
     if not LineProp.IsVisible and not (epShowNonVisibleLines in Options.EditorProperties) then begin
       if Ascending then begin
         Inc(Line);
@@ -4838,7 +5245,7 @@ var
 begin
   Result.Y := (CaretPos.Y - 1 - TopIndex) * LineHeight;
   LineIdx := CaretToLineColumn(CaretPos).Line;
-  LineLen := Document.Lines[LineIdx].Length;
+  LineLen := Document.LineProperties[LineIdx].Length;
   S := Document.GetLineText(LineIdx);
 
   if CaretPos.X = 1 then
@@ -4875,7 +5282,7 @@ begin
 
   if not (epShowNonVisibleLines in Options.EditorProperties) then begin
     for DocLine := 0 to Line - 1 do begin
-      LineProp := Document.Lines[DocLine];
+      LineProp := Document.LineProperties[DocLine];
       if not LineProp.IsVisible then
         Inc(HiddenCount);
     end;
@@ -4891,9 +5298,17 @@ var
   i, j: Integer;
   properties: TNEDLineProperties;
   line, line_props: String;
+  LineText: String;
 begin
   // @TODO - ??? do something ???
   FVisibleLinesCount := Document.VisibleLinesCount;
+  for i := Change.LinesRange.StartPos.Line to Change.LinesRange.EndPos.Line do begin
+    line := Document.GetLineText(i);
+    properties := Document.LineProperties[i];
+    FHighlighter.Highlight(line, properties.Analysis);
+    line := '';
+  end;
+  //
   if Change.Kind = dcInsert then begin
     FCaret.CaretMove(0, Change.InsertedLength, False);
     FCaret.CaretUpdate(False);
@@ -4952,7 +5367,7 @@ begin
   UpdateScrollBars;
   ShowModernScrollBars;
   Invalidate;
-
+{
   pieces_list := TStringList.Create;
   try
     for i := 0 to Document.LinesCount - 1 do begin
@@ -4965,7 +5380,7 @@ begin
     pieces_list.Add('');
     //
     for i := 0 to Document.LinesCount - 1 do begin
-      properties :=  Document.Lines[i];
+      properties :=  Document.LineProperties[i];
       line_props := 'Line#' + IntToStr(i) + ': ';
       line_props := line_props + '[';
       if properties.Modified then
@@ -4998,6 +5413,7 @@ begin
   finally
     pieces_list.Free;
   end;
+}
 
   ReportEditorInfo;
 end;

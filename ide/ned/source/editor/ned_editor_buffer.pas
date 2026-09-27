@@ -52,9 +52,56 @@ uses
   SysUtils,
   Classes,
   Graphics,
-  Generics.Collections;
+  Generics.Collections,
+  ned_editor_lexer,
+  ned_editor_texer,
+  ned_editor_parser;
 
 type
+  TNEDCustomDocument = class;
+
+  TNEDTextPosition = record
+  public
+    Line: Integer;
+    Column: Integer;
+    //
+    class function LineColumn(const ALine, AColumn: Integer): TNEDTextPosition; static;
+  end;
+  PNEDTextPosition = TNEDTextPosition;
+
+  TNEDTextRange = record
+  public
+    StartPos: TNEDTextPosition;
+    EndPos: TNEDTextPosition;
+    //
+    class function LineColumn(const ALine, AColumn: Integer): TNEDTextRange; overload; static;
+    class function LineColumn(const ALineColumn: TNEDTextPosition): TNEDTextRange; overload; static;
+    class function LineColumn(const AStartLine, AStartColumn, AEndLine, AEndColumn: Integer): TNEDTextRange; overload; static;
+    class function LineColumn(const AStart, AEnd: TNEDTextPosition): TNEDTextRange; overload; static;
+  end;
+
+  TNEDEditOperationKindEnum = (
+    opNone,
+    opInsert,
+    opDeleteDEL,
+    opDeleteBKSP,
+    opReplace
+  );
+
+  TNEDEditOperation = record
+    Kind: TNEDEditOperationKindEnum;
+    Position: TNEDTextPosition;
+    Text: String;
+    Length: Integer;
+    // affected line range
+    StartLine: Integer;
+    EndLine: Integer;
+    // document version
+    Version: Integer;
+  end;
+
+{ Pieces }
+
   TNEDPieceBufferTypeEnum = (
     pbOriginal,
     pbInputBuffer
@@ -143,6 +190,9 @@ type
   TNEDLineProperties = class
   private
     FPieces: TNEDPieces;
+    FAnalysis: TNEDLineAnalysis;
+//    FParserContext: TNEDLineContext;
+//    FParserValid: Boolean;
     //FTokens: TList<TNEDTextToken>;
     FFlags: TNEDLineFlags;    // line state
     FLevel: Integer;          // indentation level determined by parser
@@ -166,6 +216,7 @@ type
     function GetModified: Boolean;
     function GetSaved: Boolean;
     function GetSpacer: Boolean;
+    procedure SetAnalysis(const Value: TNEDLineAnalysis);
     procedure SetDeleted(const Value: Boolean);
     procedure SetHidden(const Value: Boolean);
     procedure SetModified(const Value: Boolean);
@@ -190,6 +241,9 @@ type
     //
     // accessors
     property Pieces: TNEDPieces read FPieces;
+    property Analysis: TNEDLineAnalysis read FAnalysis write SetAnalysis;
+//    property ParserContext: TNEDLineContext read FParserContext write FParserContext;
+//    property ParserValid: Boolean read FParserValid write FParserValid;
     property Deleted: Boolean read GetDeleted write SetDeleted;
     property Hidden: Boolean read GetHidden write SetHidden;
     property Modified: Boolean read GetModified write SetModified;
@@ -212,75 +266,20 @@ type
     property Tag: NativeInt read FTag write FTag;
   end;
 
-  TNEDTextPosition = record
+{ TNEDDocumentAnalyzer }
+
+  TNEDDocumentAnalyzer = class
+  private
+    FLexer: TNEDLexer;
+    FTexer: TNEDTexer;
+    FParser: TNEDParser;
   public
-    Line: Integer;
-    Column: Integer;
+    constructor Create;
+    destructor Destroy; override;
     //
-    class function LineColumn(const ALine, AColumn: Integer): TNEDTextPosition; static;
-  end;
-  PNEDTextPosition = TNEDTextPosition;
-
-  TNEDTextRange = record
-    StartPos: TNEDTextPosition;
-    EndPos: TNEDTextPosition;
-  end;
-
-  TNEDTextSelection = record
-    StartPos: TNEDTextPosition;
-    EndPos: TNEDTextPosition;
-    CaretPos: TNEDTextPosition;
-  end;
-
-  TNEDEditOperationKindEnum = (
-    opNone,
-    opInsert,
-    opDeleteDEL,
-    opDeleteBKSP,
-    opReplace
-  );
-
-  TNEDEditOperation = record
-    Kind: TNEDEditOperationKindEnum;
-    Position: TNEDTextPosition;
-    Text: String;
-    Length: Integer;
-    // affected line range
-    StartLine: Integer;
-    EndLine: Integer;
-    // document version
-    Version: Integer;
-  end;
-
-  TNEDTextTokenKindEnum = (
-    ttkKeyword,
-    ttkIdentifier,
-    ttkString,
-    ttkNumber,
-    ttkComment,
-    ttkOperator,
-    ttkType,
-    ttkFunction,
-    ttkClass
-  );
-
-  TNEDTokenFormat = record
-    Font: TFont;
-    TextAlignment: TVerticalAlignment; // vtop, vcenter, vbottom
-    WordBreak: Boolean; // this character token is a line break
-    WordWrap: Boolean; // internal; wrap line in this place while rendering
-    LineBreak: String; // oryginal line break
-    LineBreakType: TTextLineBreakStyle;
-    LetterSpacing: Integer;
-    WordSpacing: Integer;
-    TextIndentation: Integer;
-  end;
-
-  TNEDTextToken = record
-    Kind: TNEDTextTokenKindEnum;
-    Offset: Integer;
-    Length: Integer;
-    Format: TNEDTokenFormat;
+    procedure AnalyzeDocument(ADocument: TNEDCustomDocument);
+    procedure AnalyzeLine(ADocument: TNEDCustomDocument; ALine: Integer; const AInState: TNEDParserState); //; out AAnalysis: TNEDLineAnalysis);
+    procedure AnalyzeRange(ADocument: TNEDCustomDocument; ALineFrom, ALineTo: Integer);
   end;
 
 { TNEDStringList }
@@ -326,14 +325,11 @@ type
     InsertedLength: Integer;
 
     // affected line range
-    StartLine: Integer;
-    EndLine: Integer;
+    LinesRange: TNEDTextRange;
 
     // optional sender
     Sender: TObject;
   end;
-
-  TNEDCustomDocument = class;
 
 { TNEDDocumentObserver }
 
@@ -371,7 +367,7 @@ type
     //
     // main notification entry point
     procedure DocumentChanged(const Position: Integer; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLength: Integer; InsertedLength: Integer); overload; virtual;
-    procedure DocumentChanged(const LineColumn: TNEDTextPosition; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLength: Integer; InsertedLength: Integer); overload; virtual;
+    procedure DocumentChanged(const Range: TNEDTextRange; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLength: Integer; InsertedLength: Integer); overload; virtual;
     procedure DocumentChanged(const Change: TNEDDocumentChangeInfo); overload; virtual;
     //
     // line notifications
@@ -404,6 +400,7 @@ type
     FEncoding: TEncoding;
     FEncodingWriteBOM: Boolean;
     FLines: TNEDStringList; // logical lines
+    FDocumentAnalyzer: TNEDDocumentAnalyzer;
     FInputBuffer: String; // piece table add buffer
     FObservers: TList<TNEDDocumentObserver>; // attached views/services.
     // Undo / Redo
@@ -429,7 +426,7 @@ type
     procedure SetLineBreak(const Value: String);
   protected
     procedure NotifyObservers(Position: Integer; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer); overload;
-    procedure NotifyObservers(const LineColumn: TNEDTextPosition; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer); overload;
+    procedure NotifyObservers(const Range: TNEDTextRange; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer); overload;
     //
     procedure NotifyLineInserted(LineIndex, MoveCursorToLine: Integer);
     procedure NotifyLineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
@@ -438,12 +435,14 @@ type
     //function FindPiece(Position: Integer; out PieceIndex: Integer; out PieceOffset: Integer): Boolean;
     // position conversion
     function FindLine(Position: Integer; out LineIndex: Integer; out Column: Integer): Boolean;
-    function GetLine(Index: Integer): TNEDLineProperties;
+    function GetLineProperties(Index: Integer): TNEDLineProperties;
+    function GetLineTokens(Index: Integer): TNEDLineTokens;
     //
     // internal helpers
     procedure ShiftOrgins(const AfterLine: Integer; const Offset: Integer);
     procedure RebuildCaches;
     procedure RebuildLineNumbers;
+    procedure RebuildLinesContext(const AStartLine, AEndLine: Integer);
     procedure MarkModified;
     function TryMergeUndo(const Op: TNEDEditOperation): Boolean;
     //
@@ -532,7 +531,8 @@ type
     property FileLength: Integer read GetLength;
     property Modified: Boolean read FModified;
     property LineBreak: String read FLineBreak write SetLineBreak;
-    property Lines[Index: Integer]: TNEDLineProperties read GetLine;
+    property LineProperties[Index: Integer]: TNEDLineProperties read GetLineProperties;
+    property LineTokens[Index: Integer]: TNEDLineTokens read GetLineTokens;
     property Version: Integer read FVersion;
   end;
 
@@ -860,6 +860,7 @@ constructor TNEDLineProperties.Create;
 begin
   inherited Create;
   FPieces := TNEDPieces.Create;
+  FAnalysis := TNEDLineAnalysis.Create;
 
   FFlags := [lfDirty, lfSyntaxDirty];
 
@@ -884,6 +885,7 @@ end;
 
 destructor TNEDLineProperties.Destroy;
 begin
+  FAnalysis.Free;
   FPieces.Free;
   inherited;
 end;
@@ -911,6 +913,17 @@ end;
 function TNEDLineProperties.GetSpacer: Boolean;
 begin
   Result := lfSpacer in FFlags;
+end;
+
+procedure TNEDLineProperties.SetAnalysis(const Value: TNEDLineAnalysis);
+begin
+  if Value = Nil then
+    Exit;
+  //
+  FAnalysis.Context := Value.Context;
+  FAnalysis.Elements := Value.Elements;
+  FAnalysis.Declarations := Value.Declarations;
+  FAnalysis.References := Value.References;
 end;
 
 procedure TNEDLineProperties.SetDeleted(const Value: Boolean);
@@ -1047,6 +1060,101 @@ begin
   Result.Column := AColumn;
 end;
 
+{ TNEDTextRange }
+
+class function TNEDTextRange.LineColumn(const ALine, AColumn: Integer): TNEDTextRange;
+begin
+  Result.StartPos.Line := ALine;
+  Result.StartPos.Column := AColumn;
+  Result.EndPos := Result.StartPos;
+end;
+
+class function TNEDTextRange.LineColumn(const ALineColumn: TNEDTextPosition): TNEDTextRange;
+begin
+  Result.StartPos := ALineColumn;
+  Result.EndPos := Result.StartPos;
+end;
+
+class function TNEDTextRange.LineColumn(const AStartLine, AStartColumn, AEndLine, AEndColumn: Integer): TNEDTextRange;
+begin
+  Result.StartPos.Line := AStartLine;
+  Result.StartPos.Column := AStartColumn;
+  Result.EndPos.Line := AEndLine;
+  Result.EndPos.Column := AEndColumn;
+end;
+
+class function TNEDTextRange.LineColumn(const AStart, AEnd: TNEDTextPosition): TNEDTextRange;
+begin
+  Result.StartPos := AStart;
+  Result.EndPos := AEnd;
+end;
+
+{ TNEDDocumentAnalyzer }
+
+constructor TNEDDocumentAnalyzer.Create;
+begin
+  FLexer := TNEDLexer.Create;
+  FTexer := TNEDTexer.Create(FLexer);
+  FParser := TNEDParser.Create;
+end;
+
+destructor TNEDDocumentAnalyzer.Destroy;
+begin
+  FParser.Free;
+  FTexer.Free;
+  FLexer.Free;
+  inherited;
+end;
+
+procedure TNEDDocumentAnalyzer.AnalyzeDocument(ADocument: TNEDCustomDocument);
+begin
+  AnalyzeRange(ADocument, 0, ADocument.LinesCount - 1);
+end;
+
+procedure TNEDDocumentAnalyzer.AnalyzeLine(ADocument: TNEDCustomDocument; ALine: Integer; const AInState: TNEDParserState); //; out AAnalysis: TNEDLineAnalysis);
+var
+  Props: TNEDLineProperties;
+  LineText: UTF8String;
+  Analysis: TNEDLineAnalysis;
+//  Context: TNEDLineContext;
+begin
+  Props := ADocument.LineProperties[ALine];
+  // lfDirty - requires layout recalculation
+  // lfSyntaxDirty - requires syntax reparse
+  if not (lfDirty in Props.FFlags) or not (lfSyntaxDirty in Props.FFlags) then
+    Exit;
+
+  LineText := ADocument.GetLineText(ALine);
+  FTexer.SetText(ALine, LineText);
+  FTexer.Tex;
+
+  Analysis := Nil;
+  try
+    FParser.ParseRange(LineText, FTexer.Tokens, 0, Length(LineText), AInState, Analysis);
+    Props.Analysis := Analysis;
+    Props.Analysis.Tokens.Assign(FTexer.Tokens);
+  finally
+    if Analysis <> Nil then
+      Analysis.Free;
+  end;
+end;
+
+procedure TNEDDocumentAnalyzer.AnalyzeRange(ADocument: TNEDCustomDocument; ALineFrom, ALineTo: Integer);
+var
+  State: TNEDParserState;
+  I: Integer;
+begin
+  if ALineFrom > 0 then
+    State := ADocument.LineProperties[ALineFrom - 1].Analysis.Context.OutState
+  else
+    State := TNEDParser.InitialState;
+  //
+  for I := ALineFrom to ALineTo do begin
+    AnalyzeLine(ADocument, I, State);
+    State := ADocument.LineProperties[I].Analysis.Context.OutState;
+  end;
+end;
+
 { TNEDStringList }
 
 function TNEDStringList.GetObject(Index: Integer): TNEDLineProperties;
@@ -1133,8 +1241,7 @@ begin
   Change.Position := TNEDTextPosition.LineColumn(LineIndex, 0);
   Change.DeletedLength := -1;
   Change.InsertedLength := -1;
-  Change.StartLine := AffectedLineStart;
-  Change.EndLine := AffectedLineEnd;
+  Change.LinesRange := TNEDTextRange.LineColumn(AffectedLineStart, 0, AffectedLineEnd, 0);
 
   if Assigned(FOnLineInserted) then
     FOnLineInserted(Change);
@@ -1151,8 +1258,7 @@ begin
   Change.Position := TNEDTextPosition.LineColumn(LineIndex, 0);
   Change.DeletedLength := -1;
   Change.InsertedLength := -1;
-  Change.StartLine := AffectedLineStart;
-  Change.EndLine := AffectedLineEnd;
+  Change.LinesRange := TNEDTextRange.LineColumn(AffectedLineStart, 0, AffectedLineEnd, 0);
 
   if Assigned(FOnLineDeleted) then
     FOnLineDeleted(Change);
@@ -1169,8 +1275,7 @@ begin
   Change.Position := TNEDTextPosition.LineColumn(LineIndex, 0);
   Change.DeletedLength := -1;
   Change.InsertedLength := -1;
-  Change.StartLine := AffectedLineStart;
-  Change.EndLine := AffectedLineEnd;
+  Change.LinesRange := TNEDTextRange.LineColumn(AffectedLineStart, 0, AffectedLineEnd, 0);
 
   if Assigned(FOnLineChanged) then
     FOnLineChanged(Change);
@@ -1220,11 +1325,12 @@ begin
   Change.Position := LineColumn;
   Change.DeletedLength := DeletedLength;
   Change.InsertedLength := InsertedLength;
+  Change.LinesRange := TNEDTextRange.LineColumn(LineColumn);
 
   DocumentChanged(Change);
 end;
 
-procedure TNEDDocumentObserver.DocumentChanged(const LineColumn: TNEDTextPosition; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLength: Integer; InsertedLength: Integer);
+procedure TNEDDocumentObserver.DocumentChanged(const Range: TNEDTextRange; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLength: Integer; InsertedLength: Integer);
 var
   Change: TNEDDocumentChangeInfo;
 begin
@@ -1232,9 +1338,10 @@ begin
 
   Change.Kind := Kind;
   Change.Operation := Operation;
-  Change.Position := LineColumn;
+  Change.Position := Range.StartPos;
   Change.DeletedLength := DeletedLength;
   Change.InsertedLength := InsertedLength;
+  Change.LinesRange := Range;
 
   DocumentChanged(Change);
 end;
@@ -1320,6 +1427,7 @@ begin
   FEncoding := TEncoding.UTF8;
   FLines := TNEDStringList.Create;
   FLines.SetEncoding(FEncoding);
+  FDocumentAnalyzer := TNEDDocumentAnalyzer.Create;
   FObservers := TList<TNEDDocumentObserver>.Create;
 
   FUndo := TStack<TNEDEditOperation>.Create;
@@ -1349,6 +1457,7 @@ destructor TNEDCustomDocument.Destroy;
 var
   I: Integer;
 begin
+  FDocumentAnalyzer.Free;
   for I := 0 to FLines.Count - 1 do
     FLines.Objects[I].Free;
   FLines.Free;
@@ -1417,6 +1526,7 @@ end;
 procedure TNEDCustomDocument.NotifyObservers(Position: Integer; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer);
 var
   LineColumn: TNEDTextPosition;
+  Range: TNEDTextRange;
 begin
   if IsUpdating then
     Exit;
@@ -1424,10 +1534,12 @@ begin
   if not PositionToLineColumn(Position, LineColumn) then
     Exit;
 
-  NotifyObservers(LineColumn, Kind, Operation, DeletedLen, InsertedLen);
+  Range.StartPos := LineColumn;
+  Range.EndPos := LineColumn;
+  NotifyObservers(Range, Kind, Operation, DeletedLen, InsertedLen);
 end;
 
-procedure TNEDCustomDocument.NotifyObservers(const LineColumn: TNEDTextPosition; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer);
+procedure TNEDCustomDocument.NotifyObservers(const Range: TNEDTextRange; const Kind: TNEDDocumentChangeKindEnum; const Operation: TNEDEditOperationKindEnum; DeletedLen: Integer; InsertedLen: Integer);
 var
   Observer: TNEDDocumentObserver;
 begin
@@ -1435,7 +1547,7 @@ begin
     Exit;
 
   for Observer in FObservers do
-    Observer.DocumentChanged(LineColumn, Kind, Operation, DeletedLen, InsertedLen);
+    Observer.DocumentChanged(Range, Kind, Operation, DeletedLen, InsertedLen);
 end;
 
 procedure TNEDCustomDocument.NotifyLineInserted(LineIndex, MoveCursorToLine: Integer);
@@ -1488,10 +1600,10 @@ begin
   CurrentPos := 0;
 
   for I := 0 to FLines.Count - 1 do begin
-    if Lines[I].Deleted then
+    if LineProperties[I].Deleted then
       Continue;
 
-    LineLen := Lines[I].Length;
+    LineLen := LineProperties[I].Length;
 //    if I < FLines.Count - 1 then
 //      Inc(LineLen, FLineBreakLen);
 
@@ -1510,14 +1622,22 @@ begin
 
   if Position = CurrentPos then begin
     LineIndex := LastLine;
-    Column := Lines[LastLine].Length;
+    Column := LineProperties[LastLine].Length;
     Result := True;
   end;
 end;
 
-function TNEDCustomDocument.GetLine(Index: Integer): TNEDLineProperties;
+function TNEDCustomDocument.GetLineProperties(Index: Integer): TNEDLineProperties;
 begin
   Result := FLines.Objects[Index];
+end;
+
+function TNEDCustomDocument.GetLineTokens(Index: Integer): TNEDLineTokens;
+var
+  Properties: TNEDLineProperties;
+begin
+  Properties := FLines.Objects[Index];
+  Result := Properties.Analysis.Tokens;
 end;
 
 procedure TNEDCustomDocument.ShiftOrgins(const AfterLine, Offset: Integer);
@@ -1527,7 +1647,7 @@ var
   Piece: PNEDPiece;
 begin
   for I := 0 to FLines.Count - 1 do begin
-    LineProperties := Lines[I];
+    LineProperties := Self.LineProperties[I];
     for J := 0 to LineProperties.Pieces.Count - 1 do begin
       Piece := LineProperties.Pieces.Piece[J];
       if (Piece.Origin <> Nil) and (Piece.Origin.Line >= AfterLine) then begin
@@ -1545,16 +1665,16 @@ begin
   FVisibleLinesCount := 0;
 
   for I := 0 to FLines.Count - 1 do begin
-    Lines[I].UpdateLength;
+    LineProperties[I].UpdateLength;
 
-    if not Lines[I].Deleted then begin
-      Inc(FLength, Lines[I].Length);
+    if not LineProperties[I].Deleted then begin
+      Inc(FLength, LineProperties[I].Length);
       // CRLF between lines
       if I < FLines.Count - 1 then
         Inc(FLength, FLineBreakLen);
     end;
 
-    if Lines[I].IsVisible then
+    if LineProperties[I].IsVisible then
       Inc(FVisibleLinesCount);
   end;
 
@@ -1566,7 +1686,12 @@ var
   I: Integer;
 begin
   for I := 0 to FLines.Count - 1 do
-    Lines[I].LineNo := I + 1;
+    LineProperties[I].LineNo := I + 1;
+end;
+
+procedure TNEDCustomDocument.RebuildLinesContext(const AStartLine, AEndLine: Integer);
+begin
+  FDocumentAnalyzer.AnalyzeRange(Self, AStartLine, AEndLine);
 end;
 
 procedure TNEDCustomDocument.MarkModified;
@@ -1619,7 +1744,7 @@ begin
 
 //  FLines.Objects[LineIndex].Free;
 //  FLines.Delete(LineIndex);
-  Prop := Lines[LineIndex];
+  Prop := LineProperties[LineIndex];
   if Prop.Deleted then
     Exit;
   Prop.Deleted := True;
@@ -1646,8 +1771,8 @@ begin
   if SecondLine >= FLines.Count then
     Exit;
 
-  A := Lines[FirstLine];
-  B := Lines[SecondLine];
+  A := LineProperties[FirstLine];
+  B := LineProperties[SecondLine];
 
   //
   // move all pieces from B to A
@@ -1757,15 +1882,16 @@ begin
 
     RebuildLineNumbers;
     RebuildCaches;
+    FDocumentAnalyzer.AnalyzeDocument(Self);
   finally
     EndUpdate;
-    NotifyObservers(0, dcLoad, opNone, 0, FLength);
+    NotifyObservers(TNEDTextRange.LineColumn(0, 0, FLines.Count - 1, 0), dcLoad, opNone, 0, FLength);
   end;
 end;
 
 procedure TNEDCustomDocument.Reload;
 begin
-  NotifyObservers(0, dcReload, opNone, 0, FLength);
+  NotifyObservers(TNEDTextRange.LineColumn(0, 0, FLines.Count - 1, 0), dcReload, opNone, 0, FLength);
 end;
 
 procedure TNEDCustomDocument.SaveToFile;
@@ -1927,6 +2053,8 @@ var
   RemainingLineText: String;
   RemainingLineTextLen: Integer;
 //  Kind: TNEDDocumentChangeKindEnum;
+  AffectedStartLine: Integer;
+  AffectedEndLine: Integer;
 begin
   RemainingLineText := '';
   if Text = '' then
@@ -1960,7 +2088,10 @@ begin
   else
     FInputBuffer := FInputBuffer + Text;
 
-  LineProperties := Lines[Line];
+  AffectedStartLine := Line;
+  AffectedEndLine := Line;
+
+  LineProperties := Self.LineProperties[Line];
 
   if Text = #13 then begin // line break was entered
     if Column = 0 then begin // insert new empty line before current
@@ -1972,6 +2103,8 @@ begin
       // new empty line does not need any pieces created
       ShiftOrgins(Line, 1);
       InsertLine(Line, Line + 1, '', NewLine);
+      //AffectedStartLine := StartLine;
+      AffectedEndLine := Line + 1;
     end
     else begin
       // copy all remaining text from current line
@@ -2006,9 +2139,15 @@ begin
       ShiftOrgins(Line + 1, 1);
       InsertLine(Line + 1, Line + 1, RemainingLineText, NewLine);
       RemainingLineText := '';
+      //AffectedStartLine := StartLine;
+      AffectedEndLine := Line + 1;
     end;
 
     MarkModified;
+    RebuildCaches;
+    RebuildLinesContext(AffectedStartLine, AffectedEndLine);
+
+    NotifyObservers(TNEDTextRange.LineColumn(AffectedStartLine, Column, AffectedEndLine, 0), dcInsert, opInsert, 0, Length(Text));
 
     Exit;
   end;
@@ -2025,8 +2164,9 @@ begin
 
     MarkModified;
     RebuildCaches;
+    RebuildLinesContext(AffectedStartLine, AffectedEndLine);
 
-    NotifyObservers(TNEDTextPosition.LineColumn(Line, Column), dcInsert, opInsert, 0, Length(Text));
+    NotifyObservers(TNEDTextRange.LineColumn(Line, Column), dcInsert, opInsert, 0, Length(Text));
 
     Exit;
   end;
@@ -2045,6 +2185,9 @@ begin
     LineProperties.InsertPiece(Column, Piece);
 
     Inc(AddOffset, Piece.Length + FLineBreakLen); // CRLF
+
+    //AffectedStartLine := StartLine;
+    AffectedEndLine := Line + Parts.Count;
 
     for I := 1 to Parts.Count - 1 do begin
       NewLine := CreateLine;
@@ -2072,8 +2215,9 @@ begin
 
   MarkModified;
   RebuildCaches;
+  RebuildLinesContext(AffectedStartLine, AffectedEndLine);
 
-  NotifyObservers(TNEDTextPosition.LineColumn(Line, Column), dcInsert, opInsert, 0, Length(Text));
+  NotifyObservers(TNEDTextRange.LineColumn(AffectedStartLine, Column, AffectedEndLine, 0), dcInsert, opInsert, 0, Length(Text));
 end;
 
 procedure TNEDCustomDocument.Delete(const Position, Count: Integer; const Backspace: Boolean);
@@ -2106,6 +2250,8 @@ var
   DeletedText: String;
   ChangeKind: TNEDDocumentChangeKindEnum;
   Operation: TNEDEditOperationKindEnum;
+  AffectedStartLine: Integer;
+  AffectedEndLine: Integer;
 begin
   StartLine := Line;
   StartColumn := Column;
@@ -2118,7 +2264,7 @@ begin
       Exit;
   end
   else begin
-//    while (StartLine < LinesCount) and Lines[StartLine].Deleted do
+//    while (StartLine < LinesCount) and LineProperties[StartLine].Deleted do
 //      Inc(StartLine);
   end;
 
@@ -2144,12 +2290,15 @@ begin
     FRedo.Clear;
   end;
 
+  AffectedStartLine := StartLine;
+  AffectedEndLine := EndLine;
+
   ChangeKind := dcDelete;
   //
   // single-line deletion
-  if (StartLine = EndLine) and (StartColumn >= 0) and (Lines[StartLine].Length > 0) and (EndColumn <= Lines[StartLine].Length) then begin // delete operation
-    Lines[StartLine].DeleteRange(StartColumn, Count, Backspace);
-    //Lines[StartLine].UpdateLength;
+  if (StartLine = EndLine) and (StartColumn >= 0) and (LineProperties[StartLine].Length > 0) and (EndColumn <= LineProperties[StartLine].Length) then begin // delete operation
+    LineProperties[StartLine].DeleteRange(StartColumn, Count, Backspace);
+    //LineProperties[StartLine].UpdateLength;
   end
   else begin
     ChangeKind := dcLineChanged;
@@ -2157,39 +2306,45 @@ begin
     // merge current line with fragments from previous line
     if Backspace and (Column + CharCount < 0) then begin
       Dec(StartLine);
-      while (StartLine > 0) and Lines[StartLine].Deleted do
+      while (StartLine > 0) and LineProperties[StartLine].Deleted do
         Dec(StartLine);
-      StartColumn := Lines[StartLine].Length;
+      AffectedStartLine := StartLine;
+      StartColumn := LineProperties[StartLine].Length;
       ChangeKind := dcLineDelete;
       MergeLines(Operation, StartLine, EndLine);
+      AffectedEndLine := EndLine;
     end
     else begin
       // remove tail from first line
-      if Lines[StartLine].Length = 0 then begin
-        Lines[StartLine].Deleted := True;
+      if LineProperties[StartLine].Length = 0 then begin
+        LineProperties[StartLine].Deleted := True;
         ChangeKind := dcLineDelete;
       end
       else begin // if StartColumn >= 0 then
-        Lines[StartLine].DeleteRange(StartColumn, Lines[StartLine].Length - StartColumn, False); // Trim or not ???
+        LineProperties[StartLine].DeleteRange(StartColumn, LineProperties[StartLine].Length - StartColumn, False); // Trim or not ???
 
         //
         // remove head from last line
-        if (Lines[EndLine].Length = 0) and not Lines[EndLine].Deleted then begin
-          Lines[EndLine].Deleted := True;
+        if (LineProperties[EndLine].Length = 0) and not LineProperties[EndLine].Deleted then begin
+          LineProperties[EndLine].Deleted := True;
           //Inc(EndLine);
         end
         else
-          Lines[EndLine].DeleteRange(0, EndColumn, False); // Trim or not ???
+          LineProperties[EndLine].DeleteRange(0, EndColumn, False); // Trim or not ???
       end;
 
       if Backspace and (Column + CharCount < 0) then begin
-        StartColumn := 0; // Lines[StartLine].Length;
+        StartColumn := 0; // LineProperties[StartLine].Length;
         Inc(EndLine);
+        //AffectedStartLine := StartLine;
+        AffectedEndLine := EndLine;
       end
       else begin
         if not Backspace and (EndColumn > StartColumn) then begin
           EndColumn := StartColumn;
           Inc(EndLine);
+          //AffectedStartLine := StartLine;
+          AffectedEndLine := EndLine;
         end;
 
         if EndColumn >= 0 then
@@ -2211,8 +2366,9 @@ begin
 
   MarkModified;
   RebuildCaches;
+  RebuildLinesContext(AffectedStartLine, AffectedEndLine);
 
-  NotifyObservers(TNEDTextPosition.LineColumn(StartLine, StartColumn), ChangeKind, Operation, Count, 0);
+  NotifyObservers(TNEDTextRange.LineColumn(AffectedStartLine, StartColumn, AffectedEndLine, 0), ChangeKind, Operation, Count, 0);
 end;
 
 procedure TNEDCustomDocument.Replace(const Position, Count: Integer; const Text: String);
@@ -2304,7 +2460,7 @@ begin
   try
     for I := 0 to FLines.Count - 1 do begin
       SB.Append(GetLineText(I));
-      LineProp := Lines[I];
+      LineProp := LineProperties[I];
       LineProp.Saved := True;
 
       if I < FLines.Count - 1 then
@@ -2396,7 +2552,7 @@ begin
   if (LineIndex < 0) or (LineIndex >= FLines.Count) then
     Exit;
 
-  Line := Lines[LineIndex];
+  Line := LineProperties[LineIndex];
 
   SB := TStringBuilder.Create;
   try
@@ -2412,7 +2568,7 @@ begin
           pbOriginal: begin
             OrginLineIndex := LineIndex;
             OrginLineColumn := 0;
-            if (Piece.Origin <> Nil) and (LineIndex <> Piece.Origin.Line) and Lines[Piece.Origin.Line].Deleted then begin
+            if (Piece.Origin <> Nil) and (LineIndex <> Piece.Origin.Line) and LineProperties[Piece.Origin.Line].Deleted then begin
               OrginLineIndex := Piece.Origin.Line;
               OrginLineColumn := Piece.Origin.Column;
             end;
@@ -2460,10 +2616,10 @@ begin
   Result := 0;
 
   for I := 0 to Line - 1 do begin
-    if Lines[I].Deleted then
+    if LineProperties[I].Deleted then
       Continue;
 
-    Inc(Result, Lines[I].Length);
+    Inc(Result, LineProperties[I].Length);
     if I < FLines.Count - 1 then
       Inc(Result, FLineBreakLen);
   end;
