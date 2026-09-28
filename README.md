@@ -5,6 +5,8 @@ The compiler has the ability to translate your code into assembly exactly how yo
 it can deliver WYCIWYG assembly - What You Coded is What You Get - @asis directive enables this feature.  
 More info in [this file](./compiler/concepts/asis/asis.npc).
 
+Developing live streamed on YouTube: https://www.youtube.com/@gmnevton/streams
+
 ![NitroPascal1](./git_res/NitroPascal1.png)
 
 The goal is to make this lannguage the best Pascal version there is.  

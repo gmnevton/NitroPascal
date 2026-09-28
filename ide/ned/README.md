@@ -2,6 +2,8 @@
 
 Nitro EDitor for Nitro Pascal programming language.
 
+Developing live streamed on YouTube: https://www.youtube.com/@gmnevton/streams
+
 ---
 
 NED project uses this components:
@@ -13,16 +15,29 @@ NED project uses this components:
 - Code editor made from scratch, by hand:
   
   - dual architecture:
+    
     - document buffer,
     - visual view component
     
-    buffer and view are separate, 
+    buffer and view are separate,  
     one buffer <---> multiple independent views, listening for changes in buffer
 
-![Nitro EDitor](../../git_res/ned.png)
+---    
 
-![Nitro EDitor](../../git_res/ned1.png)
+#### Screen shots
 
-![Nitro EDitor](../../git_res/ned2.png)
+![Nitro EDitor](./../../git_res/ned.png)
 
-![Nitro EDitor](../../git_res/ned3.png)
+![Nitro EDitor](./../../git_res/ned4.png)
+
+![Nitro EDitor](./../../git_res/ned5.png)
+
+![Nitro EDitor](./../../git_res/ned6.png)
+
+![Nitro EDitor](./../../git_res/ned7.png)
+
+![Nitro EDitor](./../../git_res/ned8.png)
+
+![Nitro EDitor](./../../git_res/ned9.png)
+
+![Nitro EDitor](./../../git_res/ned10.png)
