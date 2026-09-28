@@ -548,6 +548,13 @@ begin
     Result := FalseValue;
 end;
 
+function Max(const A, B: Integer): Integer; inline;
+begin
+  Result := B;
+  if A > B then
+    Result := A;
+end;
+
 { TNEDPiece }
 
 procedure TNEDPiece.CreateOrigin(const Line, Column: Integer);
@@ -1365,7 +1372,7 @@ begin
   if IsUpdating then
     Exit;
 
-  DoLineInserted(MoveCursorToLine, LineIndex - 1, LineIndex);
+  DoLineInserted(MoveCursorToLine, Max(LineIndex - 1, 0), LineIndex);
 end;
 
 procedure TNEDDocumentObserver.LineDeleted(const Operation: TNEDEditOperationKindEnum; LineIndex: Integer);
