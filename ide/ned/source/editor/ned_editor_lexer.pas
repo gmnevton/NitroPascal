@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-09
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -13,7 +13,8 @@ unit ned_editor_lexer;
 interface
 
 uses
-  SysUtils;
+  SysUtils,
+  ned_editor_types;
 
 type
   TNEDLexicalModeEnum = (
@@ -22,13 +23,6 @@ type
     lmComment,
     lmDirective,
     lmNotation
-  );
-
-  TNEDLexicalCommentTypeEnum = (
-    lctNotInComment,
-    lctSingleLine,
-    lctMultiLine,
-    lctMixed
   );
 
   TNEDLexicalCommentKindEnum = (
@@ -67,16 +61,46 @@ type
     EndPos: TNEDSourceLocation;
   end;
 
-  TNEDLexicalDelimiterPair = record
-    &Type: TNEDLexicalCommentTypeEnum;
-    StartDelimiter: UTF8String;
-    EndDelimiter: UTF8String; // optional, for single-line comment leave empty
-    CanNest: Boolean; // can nest other comments
-    CanBeNested: Boolean; // can be nested inside other comments
+  TNEDLexicalCommentTypeEnum = TNEDEditorCommentTypeEnum;
+  TNEDLexicalDelimiterPair = TNEDEditorDelimiterPair;
+
+  TNEDLexerConfig = class
+  private
+    FLineBreak: UTF8String; // CRLF or LF or CR
+    FStringDelimiter: UTF8Char; // " or '
+    FAllowStringDelimiterNesting: Boolean;
+    FNestedStringDelimiterEscapeing: Boolean;
+    FCommentsDelimiter: Array of TNEDLexicalDelimiterPair; // see the compiler\concepts\comment\comment.npc file for detail explanation
+    FDirectiveDelimiter: TNEDLexicalDelimiterPair; // '{$' - directive begin; '}' directive end
+    //
+    FAllowNestedComments: Boolean;
+    FAllowMultilineStrings: Boolean;
+    FAllowMultilineComments: Boolean;
+  public
+    constructor Create;
+    procedure Assign(const ASource: TNEDLexerConfig);
+    //
+    procedure Reset;
+    procedure ClearCommentDelimiters;
+    procedure AddCommentDelimiter(const ADelimiter: TNEDLexicalDelimiterPair); overload;
+    procedure AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; const AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean); overload;
+    //
+    // properties
+    property LineBreak: UTF8String read FLineBreak write FLineBreak;
+    property StringDelimiter: UTF8Char read FStringDelimiter write FStringDelimiter;
+    property AllowStringDelimiterNesting: Boolean read FAllowStringDelimiterNesting write FAllowStringDelimiterNesting;
+    property NestedStringDelimiterEscapeing: Boolean read FNestedStringDelimiterEscapeing write FNestedStringDelimiterEscapeing;
+
+    //property FCommentsDelimiter: Array of TNEDLexicalDelimiterPair;
+    property DirectiveDelimiter: TNEDLexicalDelimiterPair read FDirectiveDelimiter write FDirectiveDelimiter;
+    property AllowNestedComments: Boolean read FAllowNestedComments write FAllowNestedComments;
+    property AllowMultilineStrings: Boolean read FAllowMultilineStrings write FAllowMultilineStrings;
+    property AllowMultilineComments: Boolean read FAllowMultilineComments write FAllowMultilineComments;
   end;
 
   TNEDLexer = class
   private
+    FConfig: TNEDLexerConfig;
     FText: UTF8String;
     FTextLength: Integer; // its per line, don't know if anybody has 2GB long code lines, maybe
     FPosition: Integer;
@@ -107,11 +131,6 @@ type
     procedure ProcessCommentCharacter;
     procedure ProcessDirectiveCharacter;
   private
-    FLineBreak: UTF8String; // CRLF or LF or CR
-    FStringDelimiter: UTF8Char; // " or '
-    FCommentsDelimiter: Array of TNEDLexicalDelimiterPair; // see the compiler\concepts\comment\comment.npc file for detail explanation
-    FDirectiveDelimiter: TNEDLexicalDelimiterPair; // '{$' - directive begin; '}' directive end
-
     // this part needs to be parametrized for configuration support
     function IsLineBreak(out AdvanceOffset: Integer): Boolean;
     function IsStringDelimiter: Boolean;
@@ -130,8 +149,6 @@ type
     destructor Destroy; override;
     //
     procedure Reset;
-    procedure ClearCommentDelimiters;
-    procedure AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; const AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean);
 
     procedure SetText(const ALine: Integer; const AText: UTF8String);
 
@@ -147,10 +164,7 @@ type
 
     //
     // properties
-    property LineBreak: UTF8String read FLineBreak write FLineBreak;
-    property StringDelimiter: UTF8Char read FStringDelimiter write FStringDelimiter;
-    //property FCommentsDelimiter: Array of TNEDLexicalDelimiterPair;
-    property DirectiveDelimiter: TNEDLexicalDelimiterPair read FDirectiveDelimiter write FDirectiveDelimiter;
+    property Config: TNEDLexerConfig read FConfig;
 
     //
     // lexer state properties
@@ -164,32 +178,97 @@ type
 
 implementation
 
+{ TNEDLexerConfig }
+
+constructor TNEDLexerConfig.Create;
+begin
+  inherited Create;
+
+  Reset;
+end;
+
+procedure TNEDLexerConfig.Assign(const ASource: TNEDLexerConfig);
+var
+  i: Integer;
+begin
+  if ASource = Nil then
+    Exit;
+
+  FLineBreak := ASource.FLineBreak;
+  FStringDelimiter := ASource.StringDelimiter;
+
+  SetLength(FCommentsDelimiter, 0);
+  for i := 0 to High(ASource.FCommentsDelimiter) do
+    AddCommentDelimiter(ASource.FCommentsDelimiter[i]);
+
+  FDirectiveDelimiter := ASource.FDirectiveDelimiter;
+
+  FAllowNestedComments := ASource.AllowNestedComments;
+  FAllowMultilineStrings := ASource.AllowMultilineStrings;
+  FAllowMultilineComments := ASource.AllowMultilineComments;
+end;
+
+procedure TNEDLexerConfig.Reset;
+begin
+  FLineBreak := #13#10; // CRLF(#13#10) or LF(#10) or CR(#13)
+  FStringDelimiter := ''''; // ' or "
+
+  SetLength(FCommentsDelimiter, 0);
+  AddCommentDelimiter(ectSingleLine, '//', '',     True, True);
+  AddCommentDelimiter(ectMultiLine,  '/.', './',   True, True);
+  AddCommentDelimiter(ectMultiLine,  '{.', '.}',   True, True);
+  AddCommentDelimiter(ectMultiLine,  '(*', '*)',   True, True);
+  // special case comments
+  AddCommentDelimiter(ectSingleLine, '//-', '',    True, False);
+  AddCommentDelimiter(ectMultiLine,  '//+', '+//', True, False);
+
+  FDirectiveDelimiter.&Type          := ectMixed;
+  FDirectiveDelimiter.StartDelimiter := '{$';
+  FDirectiveDelimiter.EndDelimiter   := '}';
+  FDirectiveDelimiter.CanNest        := True;
+  FDirectiveDelimiter.CanBeNested    := True;
+end;
+
+procedure TNEDLexerConfig.ClearCommentDelimiters;
+var
+  i: Integer;
+begin
+  for i := 0 to High(FCommentsDelimiter) do begin
+    FCommentsDelimiter[i].StartDelimiter := '';
+    FCommentsDelimiter[i].EndDelimiter := '';
+  end;
+
+  SetLength(FCommentsDelimiter, 0);
+end;
+
+procedure TNEDLexerConfig.AddCommentDelimiter(const ADelimiter: TNEDLexicalDelimiterPair);
+begin
+  AddCommentDelimiter(ADelimiter.&Type, ADelimiter.StartDelimiter, ADelimiter.EndDelimiter, ADelimiter.CanNest, ADelimiter.CanBeNested);
+end;
+
+procedure TNEDLexerConfig.AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; const AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean);
+var
+  idx: Integer;
+begin
+  idx := Length(FCommentsDelimiter);
+  SetLength(FCommentsDelimiter, idx + 1);
+  //
+  FCommentsDelimiter[idx].&Type          := AType;
+  FCommentsDelimiter[idx].StartDelimiter := AStartDelimiter;
+  FCommentsDelimiter[idx].EndDelimiter   := AEndDelimiter;
+  FCommentsDelimiter[idx].CanNest        := ACanNest;
+  FCommentsDelimiter[idx].CanBeNested    := ACanBeNested;
+end;
+
 { TNEDLexer }
 
 constructor TNEDLexer.Create;
 begin
   inherited Create;
+  FConfig := TNEDLexerConfig.Create;
   //
   FText := '';
   FTextLength := 0;
-  //
-  FLineBreak := #13#10; // CRLF(#13#10) or LF(#10) or CR(#13)
-  FStringDelimiter := ''''; // ' or "
-
-  SetLength(FCommentsDelimiter, 0);
-  AddCommentDelimiter(lctSingleLine, '//', '',     True, True);
-  AddCommentDelimiter(lctMultiLine,  '/.', './',   True, True);
-  AddCommentDelimiter(lctMultiLine,  '{.', '.}',   True, True);
-  AddCommentDelimiter(lctMultiLine,  '(*', '*)',   True, True);
-  // special case comments
-  AddCommentDelimiter(lctSingleLine, '//-', '',    True, False);
-  AddCommentDelimiter(lctMultiLine,  '//+', '+//', True, False);
-
-  FDirectiveDelimiter.&Type          := lctMixed;
-  FDirectiveDelimiter.StartDelimiter := '{$';
-  FDirectiveDelimiter.EndDelimiter   := '}';
-  FDirectiveDelimiter.CanNest        := True;
-  FDirectiveDelimiter.CanBeNested    := True;
   //
   Reset;
 end;
@@ -197,6 +276,7 @@ end;
 destructor TNEDLexer.Destroy;
 begin
   Reset;
+  FConfig.Free;
   inherited Destroy;
 end;
 
@@ -223,32 +303,6 @@ begin
   FTokenStart := 1;
   FTokenStartLine := 1;
   FTokenStartColumn := 1;
-end;
-
-procedure TNEDLexer.ClearCommentDelimiters;
-var
-  i: Integer;
-begin
-  for i := 0 to High(FCommentsDelimiter) do begin
-    FCommentsDelimiter[i].StartDelimiter := '';
-    FCommentsDelimiter[i].EndDelimiter := '';
-  end;
-
-  SetLength(FCommentsDelimiter, 0);
-end;
-
-procedure TNEDLexer.AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; const AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean);
-var
-  idx: Integer;
-begin
-  idx := Length(FCommentsDelimiter);
-  SetLength(FCommentsDelimiter, idx + 1);
-  //
-  FCommentsDelimiter[idx].&Type          := AType;
-  FCommentsDelimiter[idx].StartDelimiter := AStartDelimiter;
-  FCommentsDelimiter[idx].EndDelimiter   := AEndDelimiter;
-  FCommentsDelimiter[idx].CanNest        := ACanNest;
-  FCommentsDelimiter[idx].CanBeNested    := ACanBeNested;
 end;
 
 procedure TNEDLexer.SetText(const ALine: Integer; const AText: UTF8String);
@@ -282,26 +336,26 @@ function TNEDLexer.IsLineBreak(out AdvanceOffset: Integer): Boolean;
 begin
   Result := False; // satisfy compiler
   AdvanceOffset := 1;
-  if Length(FLineBreak) > 1 then begin
-    if GetCurrentChar = FLineBreak[1] then begin // check if it is exactly as our expected line break
-      if PeekChar = FLineBreak[2] then begin
+  if Length(FConfig.FLineBreak) > 1 then begin
+    if GetCurrentChar = FConfig.FLineBreak[1] then begin // check if it is exactly as our expected line break
+      if PeekChar = FConfig.FLineBreak[2] then begin
         AdvanceOffset := 2;
         Result := True;
         Exit;
       end;
     end
     else begin // check for lonely CR or LF
-      if (GetCurrentChar = FLineBreak[1]) or (GetCurrentChar = FLineBreak[2]) then
+      if (GetCurrentChar = FConfig.FLineBreak[1]) or (GetCurrentChar = FConfig.FLineBreak[2]) then
         Exit(True);
     end;
   end
   else
-    Result := GetCurrentChar = FLineBreak; // CR or LF only
+    Result := GetCurrentChar = FConfig.FLineBreak; // CR or LF only
 end;
 
 function TNEDLexer.IsStringDelimiter: Boolean;
 begin
-  Result := GetCurrentChar = FStringDelimiter;
+  Result := GetCurrentChar = FConfig.FStringDelimiter;
 end;
 
 function TNEDLexer.IsInComment: Boolean;
@@ -317,7 +371,7 @@ var
   i: Integer;
 begin
   Result := False;
-  CommentInfo.&Type := lctNotInComment;
+  CommentInfo.&Type := ectNotInComment;
   CommentInfo.StartDelimiter := '';
   CommentInfo.EndDelimiter := '';
   CommentInfo.CanNest := False;
@@ -327,24 +381,24 @@ begin
   CommentOneChar := GetCurrentChar;
   CommentTwoChars := GetCurrentChar + PeekChar;
   CommentThreeChars := GetCurrentChar + PeekChar + PeekChar(2);
-  for i := 0 to Length(FCommentsDelimiter) - 1 do begin
-    if (FCommentsDelimiter[i].&Type = lctSingleLine) or (FCommentsDelimiter[i].&Type = lctMixed) then begin
+  for i := 0 to Length(FConfig.FCommentsDelimiter) - 1 do begin
+    if (FConfig.FCommentsDelimiter[i].&Type = ectSingleLine) or (FConfig.FCommentsDelimiter[i].&Type = ectMixed) then begin
       // to avoid false positives, first check 3 chars comments, than 2 chars, than 1 char
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentThreeChars;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentThreeChars;
       if Result then begin
-        CommentInfo := FCommentsDelimiter[i];
+        CommentInfo := FConfig.FCommentsDelimiter[i];
         AdvanceOffset := 3;
         Break;
       end;
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentTwoChars;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentTwoChars;
       if Result then begin
-        CommentInfo := FCommentsDelimiter[i];
+        CommentInfo := FConfig.FCommentsDelimiter[i];
         AdvanceOffset := 2;
         Break;
       end;
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentOneChar;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentOneChar;
       if Result then begin
-        CommentInfo := FCommentsDelimiter[i];
+        CommentInfo := FConfig.FCommentsDelimiter[i];
         AdvanceOffset := 1;
         Break;
       end;
@@ -363,7 +417,7 @@ var
   i: Integer;
 begin
   Result := False;
-  CommentInfo.&Type := lctNotInComment;
+  CommentInfo.&Type := ectNotInComment;
   CommentInfo.StartDelimiter := '';
   CommentInfo.EndDelimiter := '';
   CommentInfo.CanNest := False;
@@ -373,24 +427,24 @@ begin
   CommentOneChar := GetCurrentChar;
   CommentTwoChars := GetCurrentChar + PeekChar;
   CommentThreeChars := GetCurrentChar + PeekChar + PeekChar(2);
-  for i := 0 to Length(FCommentsDelimiter) - 1 do begin
-    if (FCommentsDelimiter[i].&Type = lctMultiLine) or (FCommentsDelimiter[i].&Type = lctMixed) then begin
+  for i := 0 to Length(FConfig.FCommentsDelimiter) - 1 do begin
+    if (FConfig.FCommentsDelimiter[i].&Type = ectMultiLine) or (FConfig.FCommentsDelimiter[i].&Type = ectMixed) then begin
       // to avoid false positives, first check 3 chars comments, than 2 chars, than 1 char
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentThreeChars;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentThreeChars;
       if Result then begin
-        CommentInfo := FCommentsDelimiter[i];
+        CommentInfo := FConfig.FCommentsDelimiter[i];
         AdvanceOffset := 3;
         Break;
       end;
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentTwoChars;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentTwoChars;
       if Result then begin
-        CommentInfo := FCommentsDelimiter[i];
+        CommentInfo := FConfig.FCommentsDelimiter[i];
         AdvanceOffset := 2;
         Break;
       end;
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentOneChar;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentOneChar;
       if Result then begin
-        CommentInfo := FCommentsDelimiter[i];
+        CommentInfo := FConfig.FCommentsDelimiter[i];
         AdvanceOffset := 1;
         Break;
       end;
@@ -433,20 +487,20 @@ begin
   CommentOneChar := GetCurrentChar;
   CommentTwoChars := GetCurrentChar + PeekChar;
   CommentThreeChars := GetCurrentChar + PeekChar + PeekChar(2);
-  for i := 0 to Length(FCommentsDelimiter) - 1 do begin
-    if FCommentsDelimiter[i].CanBeNested then begin
+  for i := 0 to Length(FConfig.FCommentsDelimiter) - 1 do begin
+    if FConfig.FCommentsDelimiter[i].CanBeNested then begin
       // to avoid false positives, first check 3 chars comments, than 2 chars, than 1 char
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentThreeChars;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentThreeChars;
       if Result then begin
         AdvanceOffset := 3;
         Break;
       end;
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentTwoChars;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentTwoChars;
       if Result then begin
         AdvanceOffset := 2;
         Break;
       end;
-      Result := FCommentsDelimiter[i].StartDelimiter = CommentOneChar;
+      Result := FConfig.FCommentsDelimiter[i].StartDelimiter = CommentOneChar;
       if Result then begin
         AdvanceOffset := 1;
         Break;
@@ -463,7 +517,7 @@ var
   DirectiveTwoChars: UTF8String;
 begin
   Result := False;
-  DirectiveInfo.&Type := lctNotInComment;
+  DirectiveInfo.&Type := ectNotInComment;
   DirectiveInfo.StartDelimiter := '';
   DirectiveInfo.EndDelimiter := '';
   DirectiveInfo.CanNest := False;
@@ -471,9 +525,9 @@ begin
   AdvanceOffset := 0;
   //
   DirectiveTwoChars := GetCurrentChar + PeekChar;
-  Result := FDirectiveDelimiter.StartDelimiter = DirectiveTwoChars;
+  Result := FConfig.FDirectiveDelimiter.StartDelimiter = DirectiveTwoChars;
   if Result then begin
-    DirectiveInfo := FDirectiveDelimiter;
+    DirectiveInfo := FConfig.FDirectiveDelimiter;
     AdvanceOffset := 2;
   end;
   DirectiveTwoChars := '';
@@ -617,7 +671,7 @@ var
   AdvanceOffset: Integer;
 begin
   if IsStringDelimiter then begin
-    EnterStringMode(FStringDelimiter);
+    EnterStringMode(FConfig.FStringDelimiter);
     AdvanceChar(1);
     Exit;
   end;
@@ -708,7 +762,7 @@ begin
   // at this level we deliberately don't interpret the directive semantically,
   // we only maintain the lexical state and collect its textual contents
 
-  if IsDirectiveEnd(FDirectiveDelimiter.EndDelimiter, AdvanceOffset) then begin
+  if IsDirectiveEnd(FConfig.FDirectiveDelimiter.EndDelimiter, AdvanceOffset) then begin
     Dec(FState.DirectiveDepth);
     AdvanceChar(AdvanceOffset);
     if FState.DirectiveDepth <= 0 then

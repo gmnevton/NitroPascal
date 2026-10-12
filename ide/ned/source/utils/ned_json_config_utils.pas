@@ -25,6 +25,7 @@ type
     function NodeAsInteger(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Integer): Integer;
     function NodeAsDateTime(const ARoot: TJSONNode; const ANodeName: String; const ADefault: TDateTime): TDateTime;
     function NodeAsString(const ARoot: TJSONNode; const ANodeName: String; const ADefault: String): String;
+    function NodeAsChar(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Char): Char;
   end;
 
 implementation
@@ -92,6 +93,21 @@ begin
   Node := ARoot.FindNode(ANodeName, [jtString]);
   if Node <> Nil then
     Result := Node.ValueAsString;
+end;
+
+function TJSONVerySimpleHelper.NodeAsChar(const ARoot: TJSONNode; const ANodeName: String; const ADefault: Char): Char;
+var
+  Node: TJSONNode;
+  temp: String;
+begin
+  Result := ADefault;
+  Node := ARoot.FindNode(ANodeName, [jtString]);
+  if Node <> Nil then begin
+    temp := Node.ValueAsString;
+    if Length(temp) > 0 then
+      Result := temp[1];
+    temp := '';
+  end;
 end;
 
 end.

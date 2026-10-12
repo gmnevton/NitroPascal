@@ -122,6 +122,7 @@
         </DCCReference>
         <DCCReference Include="source\utils\ned_workspace_manager.pas"/>
         <DCCReference Include="source\config\ned_projects.pas"/>
+        <DCCReference Include="source\editor\ned_editor_types.pas"/>
         <DCCReference Include="source\editor\ned_editor_buffer.pas"/>
         <DCCReference Include="source\editor\ned_editor_view.pas"/>
         <DCCReference Include="source\utils\ned_splitview_manager.pas"/>
@@ -148,7 +149,9 @@
         </DCCReference>
         <DCCReference Include="source\editor\ned_editor_lexer.pas"/>
         <DCCReference Include="source\editor\ned_editor_texer.pas"/>
-        <DCCReference Include="source\editor\ned_editor_parser.pas"/>
+        <DCCReference Include="source\editor\ned_editor_parser.pas">
+            <Form>$R *.res</Form>
+        </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

@@ -230,6 +230,7 @@ object NEDHomeForm: TNEDHomeForm
     Text = 'Check for updates'
     Detail = 'Up-to-date: v. 1.0'
     KeepOrginalColor = False
+    RightCloseVisible = False
   end
   object rbColorSchemeDark: TURadioButton
     Left = 40

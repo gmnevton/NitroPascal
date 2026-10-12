@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-07
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -558,19 +558,185 @@ type
 
   TNEDHighlightStyleEnum = (
     hsDefault,
+    //
+    // lexical styles
+    hsComment,
     hsKeyword,
     hsIdentifier,
+    hsCharacter,
     hsString,
     hsNumber,
-    hsComment,
+    hsPunctuation,
     hsOperator,
+    //
+    // semantic styles
+    hsNamespace,
+    //
+    hsConstant,
+    hsVariable,
     hsDeclaration,
     hsReference,
     hsType,
     hsFunction,
+    hsProcedure,
+    hsParameter,
+    hsStatement,
+    hsExpression,
+    hsLabel,
+    hsAttribute,
+    hsDirective,
+    hsAnnotation,
+    // operators
+    hsAssignment,
+    hsComparison,
+    hsArithmetic,
+    hsLogical,
+    hsBitwise,
+    hsPointer,
+    //
+    // types
+    hsNil,
+    hsBoolean,
+    hsInteger,
+    hsFloating,
+    hsEnum,
+    hsEnumValue,
+    hsSet,
+    hsSetItem,
+    hsRecord,
     hsStructure,
-    hsError
+    // structures
+    hsModule,
+    hsBlock,
+    hsClass,
+    hsInterface,
+    hsField,
+    hsProperty,
+    hsMethod,
+    hsConstructor,
+    hsDestructor,
+    //
+    // diagnostics
+    hsHint,
+    hsInformation,
+    hsWarning,
+    hsError,
+    hsDeprecated,
+    hsUnresolved,
+    hsInvalid
   );
+
+  TNEDFontDetails = record
+    Background: TColor;
+    Foreground: TColor;
+    //FontSize: Integer;
+    FontStyle: TFontStyles;
+  end;
+
+  TNEDHighlightRule = class
+  private
+    FStyle: TNEDHighlightStyleEnum;
+    //
+    FBackground: TColor;
+    FForeground: TColor;
+    FFontStyle: TFontStyles;
+    //
+    FEnabled: Boolean;
+    //
+    FOnChange: TNotifyEvent;
+    //
+    procedure SetBackground(const Value: TColor);
+    procedure SetForeground(const Value: TColor);
+    procedure SetFontStyle(const Value: TFontStyles);
+    procedure SetEnabled(const Value: Boolean);
+    //
+    procedure Changed;
+  public
+    constructor Create(const AStyle: TNEDHighlightStyleEnum; const ADefaultFont: TFont);
+    destructor Destroy; override;
+    procedure Assign(Source: TNEDHighlightRule);
+    //
+    procedure ApplyTo(var AFormat: TNEDTokenFormat); overload;
+    procedure ApplyTo(var ADetails: TNEDFontDetails); overload;
+    //
+    property Style: TNEDHighlightStyleEnum read FStyle;
+    property FontBackground: TColor read FBackground write SetBackground;
+    property FontForeground: TColor read FForeground write SetForeground;
+    property FontStyle: TFontStyles read FFontStyle write SetFontStyle;
+    property Enabled: Boolean read FEnabled write SetEnabled;
+    //
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+  end;
+
+  TNEDHighlightConfig = class
+  private
+    FRules: TObjectList<TNEDHighlightRule>;
+    FDefaultFont: TFont;
+    //
+    function GetRulesCount: Integer;
+    function GetRule(const AStyle: TNEDHighlightStyleEnum): TNEDHighlightRule;
+    function GetRules(const AIndex: Integer): TNEDHighlightRule;
+  public
+    constructor Create(const ADefaultFont: TFont);
+    destructor Destroy; override;
+    procedure Assign(const ASource: TNEDHighlightConfig);
+    //
+    procedure Clear;
+    //
+    function AddRule(const AStyle: TNEDHighlightStyleEnum; const ADefaultFont: TFont): TNEDHighlightRule;
+    function FindRule(const AStyle: TNEDHighlightStyleEnum): TNEDHighlightRule;
+    //
+    procedure SetDefaultRules(const ADefaultFont: TFont);
+    //
+    property RulesCount: Integer read GetRulesCount;
+    property Rule[const AStyle: TNEDHighlightStyleEnum]: TNEDHighlightRule read GetRule;
+    property Rules[const AIndex: Integer]: TNEDHighlightRule read GetRules;
+  end;
+
+  TNEDHighlighter = class;
+  TNEDLanguageProfile = class;
+  TNEDLanguageProfileAcquireSettingsEvent = procedure (Sender: TNEDLanguageProfile; const Extension: UTF8String) of object;
+
+  TNEDLanguageProfile = class
+  private
+    FID: UTF8String;
+    FName: UTF8String;
+    FDescription: UTF8String;
+    //
+    FDefaultFont: TFont;
+    //
+    FFileExtensions: TStringList;
+    //
+    FLexerConfig: TNEDLexerConfig;
+    FTexerConfig: TNEDTexerConfig;
+    FParserConfig: TNEDParserConfig;
+    FHighlightConfig: TNEDHighlightConfig;
+    //
+    FHighlighter: TNEDHighlighter;
+    //
+    FAcquireSettingsEvent: TNEDLanguageProfileAcquireSettingsEvent;
+  public
+    constructor Create(const ADefaultFont: TFont);
+    destructor Destroy; override;
+    procedure Assign(const ASource: TNEDLanguageProfile);
+    //
+    procedure Reset;
+    function SupportsExtension(const AExtension: UTF8String): Boolean;
+    procedure AcquireProfileByExtension(const APath: UTF8String);
+    //
+    property ID: UTF8String read FID write FID;
+    property Name: UTF8String read FName write FName;
+    property Description: UTF8String read FDescription write FDescription;
+    //
+    property FileExtensions: TStringList read FFileExtensions;
+    //
+    property LexerConfig: TNEDLexerConfig read FLexerConfig;
+    property TexerConfig: TNEDTexerConfig read FTexerConfig;
+    property ParserConfig: TNEDParserConfig read FParserConfig;
+    property HighlightConfig: TNEDHighlightConfig read FHighlightConfig;
+    //
+    property OnAcquireSettings: TNEDLanguageProfileAcquireSettingsEvent read FAcquireSettingsEvent write FAcquireSettingsEvent;
+  end;
 
   TNEDHighlightTokenEvent = procedure(Sender: TObject; const AText: UTF8String; const AToken: TNEDTextToken; const AStyle: TNEDHighlightStyleEnum; var AFormat: TNEDTokenFormat) of object;
 
@@ -578,27 +744,16 @@ type
   private
     FEditorControl: TNEDCustomEditorView;
     //
-    FDefaultFont: TFont;
-    FKeywordFont: TFont;
-    FIdentifierFont: TFont;
-    FStringFont: TFont;
-    FNumberFont: TFont;
-    FCommentFont: TFont;
-    FOperatorFont: TFont;
-    FDeclarationFont: TFont;
-    FReferenceFont: TFont;
-    FTypeFont: TFont;
-    FFunctionFont: TFont;
-    FStructureFont: TFont;
-    FErrorFont: TFont;
+    FLanguageProfile: TNEDLanguageProfile;
     //
     FOnHighlightToken: TNEDHighlightTokenEvent;
   private
-    procedure FontChanged(Sender: TObject);
-    procedure InitializeFont(AFont: TFont);
+    //procedure FontChanged(Sender: TObject);
+    //procedure InitializeFont(AFont: TFont);
+    procedure SetLanguageProfile(const ALanguageProfile: TNEDLanguageProfile);
     //
     function GetBaseStyle(const AToken: TNEDTextToken): TNEDHighlightStyleEnum;
-    function GetFont(const AStyle: TNEDHighlightStyleEnum): TFont;
+    function GetFontDetails(const AStyle: TNEDHighlightStyleEnum): TNEDFontDetails;
     function GetDefaultFormat: TNEDTokenFormat;
     function GetTokenRange(const AToken: TNEDTextToken): TNEDSourceRange;
     function RangeMatchesToken(const ARange: TNEDSourceRange; const AToken: TNEDTextToken): Boolean;
@@ -615,19 +770,7 @@ type
     //
     procedure Highlight(const AText: UTF8String; const AAnalysis: TNEDLineAnalysis);
     //
-    property DefaultFont: TFont read FDefaultFont write FDefaultFont;
-    property KeywordFont: TFont read FKeywordFont write FKeywordFont;
-    property IdentifierFont: TFont read FIdentifierFont write FIdentifierFont;
-    property StringFont: TFont read FStringFont write FStringFont;
-    property NumberFont: TFont read FNumberFont write FNumberFont;
-    property CommentFont: TFont read FCommentFont write FCommentFont;
-    property OperatorFont: TFont read FOperatorFont write FOperatorFont;
-    property DeclarationFont: TFont read FDeclarationFont write FDeclarationFont;
-    property ReferenceFont: TFont read FReferenceFont write FReferenceFont;
-    property TypeFont: TFont read FTypeFont write FTypeFont;
-    property FunctionFont: TFont read FFunctionFont write FFunctionFont;
-    property StructureFont: TFont read FStructureFont write FStructureFont;
-    property ErrorFont: TFont read FErrorFont write FErrorFont;
+    property LanguageProfile: TNEDLanguageProfile read FLanguageProfile write SetLanguageProfile;
     //
     property OnHighlightToken: TNEDHighlightTokenEvent read FOnHighlightToken write FOnHighlightToken;
   end;
@@ -744,11 +887,12 @@ type
     //
     FOptions: TNEDEditorOptions;
     FColors: TNEDEditorColors;
+    FLanguageProfile: TNEDLanguageProfile;
     FHighlighter: TNEDHighlighter;
     FKeyboardMap: TNEDEditorKeyboardMap;
   private
     FModified: Boolean;
-    FCommentLineCount: Integer;
+    FCommentedLineCount: Integer;
     FBlankLineCount: Integer;
     //
     FTopIndex: Integer; // vertical scroll
@@ -760,6 +904,8 @@ type
     FVisibleLinesCount: Integer; // cache
     FLongestLineCharsCount: Integer; // cache
     FActiveLineIndex: Integer;
+    FDefaultFontSize: Integer;
+    FZoom: Integer; // 25 - 500
     //
     FProcessNextKeyMap: Boolean;
     FIgnoreInput: Boolean;
@@ -770,7 +916,8 @@ type
     FOnFocus: TNEDCustomEditorViewFocusEvent;
     //
     // setters
-
+    procedure SetDefaultFontSize(const Value: Integer);
+    procedure SetZoom(const Value: Integer);
     //
     // getters
     function GetCaretPosition: TNEDCaretPosition;
@@ -878,6 +1025,7 @@ type
     property VerticalScrollBar: TNEDEditorScrollbar read FVerticalScrollBar;
     property Options: TNEDEditorOptions read FOptions;
     property Colors: TNEDEditorColors read FColors;
+    property LanguageProfile: TNEDLanguageProfile read FLanguageProfile;
     property Highlighter: TNEDHighlighter read FHighlighter;
     //
     property CharWidth: Integer read GetCharWidth;
@@ -890,6 +1038,8 @@ type
     property ActiveLineIndex: Integer read FActiveLineIndex write SetActiveLineIndex;
     property CaretPosition: TNEDCaretPosition read GetCaretPosition;
     property EditorFileType: String read GetEditorFileTypeStr;
+    property DefaultFontSize: Integer read FDefaultFontSize write SetDefaultFontSize;
+    property Zoom: Integer read FZoom write SetZoom;
     //
     property OnFocus: TNEDCustomEditorViewFocusEvent read FOnFocus write FOnFocus;
   end;
@@ -3077,6 +3227,491 @@ begin
   end;
 end;
 
+{ TNEDHighlightRule }
+
+constructor TNEDHighlightRule.Create(const AStyle: TNEDHighlightStyleEnum; const ADefaultFont: TFont);
+begin
+  inherited Create;
+  FStyle := AStyle;
+
+  FBackground := clDefault;
+  FForeground := clDefault;
+  FFontStyle := ADefaultFont.Style;
+  FEnabled := True;
+end;
+
+destructor TNEDHighlightRule.Destroy;
+begin
+  inherited;
+end;
+
+procedure TNEDHighlightRule.SetBackground(const Value: TColor);
+begin
+  if FBackground <> Value then begin
+    FBackground := Value;
+    Changed;
+  end;
+end;
+
+procedure TNEDHighlightRule.SetForeground(const Value: TColor);
+begin
+  if FForeground <> Value then begin
+    FForeground := Value;
+    Changed;
+  end;
+end;
+
+procedure TNEDHighlightRule.SetFontStyle(const Value: TFontStyles);
+begin
+  if FFontStyle <> Value then begin
+    FFontStyle := Value;
+    Changed;
+  end;
+end;
+
+procedure TNEDHighlightRule.SetEnabled(const Value: Boolean);
+begin
+  if FEnabled <> Value then begin
+    FEnabled := Value;
+    Changed;
+  end;
+end;
+
+procedure TNEDHighlightRule.Assign(Source: TNEDHighlightRule);
+begin
+  if Source = Nil then
+    Exit;
+
+  FStyle := Source.FStyle;
+
+  FBackground := Source.FBackground;
+  FForeground := Source.FForeground;
+  FFontStyle := Source.FFontStyle;
+  FEnabled := Source.FEnabled;
+end;
+
+procedure TNEDHighlightRule.ApplyTo(var AFormat: TNEDTokenFormat);
+begin
+  if not FEnabled then
+    Exit;
+
+  AFormat.FontBackground := FBackground;
+  AFormat.FontForeground := FForeground;
+  AFormat.FontStyle := FFontStyle;
+end;
+
+procedure TNEDHighlightRule.ApplyTo(var ADetails: TNEDFontDetails);
+begin
+  if not FEnabled then
+    Exit;
+
+  ADetails.Background := FBackground;
+  ADetails.Foreground := FForeground;
+  ADetails.FontStyle := FFontStyle;
+end;
+
+procedure TNEDHighlightRule.Changed;
+begin
+  if Assigned(FOnChange) then
+    FOnChange(Self);
+end;
+
+{ TNEDHighlightConfig }
+
+constructor TNEDHighlightConfig.Create(const ADefaultFont: TFont);
+begin
+  inherited Create;
+  FRules := TObjectList<TNEDHighlightRule>.Create(True);
+  FDefaultFont := ADefaultFont;
+  SetDefaultRules(ADefaultFont);
+end;
+
+destructor TNEDHighlightConfig.Destroy;
+begin
+  FRules.Free;
+  inherited Destroy;
+end;
+
+procedure TNEDHighlightConfig.Assign(const ASource: TNEDHighlightConfig);
+var
+  I: Integer;
+  Rule: TNEDHighlightRule;
+begin
+  if ASource = Nil then
+    Exit;
+
+  Clear;
+
+  for I := 0 to ASource.RulesCount - 1 do begin
+    Rule := AddRule(ASource.Rules[I].Style, FDefaultFont);
+    Rule.Assign(ASource.Rules[I]);
+  end;
+end;
+
+function TNEDHighlightConfig.GetRulesCount: Integer;
+begin
+  Result := FRules.Count;
+end;
+
+function TNEDHighlightConfig.GetRule(const AStyle: TNEDHighlightStyleEnum): TNEDHighlightRule;
+begin
+  Result := FindRule(AStyle);
+end;
+
+function TNEDHighlightConfig.GetRules(const AIndex: Integer): TNEDHighlightRule;
+begin
+  Result := FRules.Items[AIndex];
+end;
+
+procedure TNEDHighlightConfig.Clear;
+begin
+  FRules.Clear;
+end;
+
+function TNEDHighlightConfig.AddRule(const AStyle: TNEDHighlightStyleEnum; const ADefaultFont: TFont): TNEDHighlightRule;
+begin
+  Result := FindRule(AStyle);
+  if Result <> Nil then
+    Exit;
+
+  Result := TNEDHighlightRule.Create(AStyle, ADefaultFont);
+  FRules.Add(Result);
+end;
+
+function TNEDHighlightConfig.FindRule(const AStyle: TNEDHighlightStyleEnum): TNEDHighlightRule;
+var
+  I: Integer;
+begin
+  Result := Nil;
+
+  for I := 0 to FRules.Count - 1 do begin
+    if FRules[I].Style = AStyle then begin
+      Result := FRules[I];
+      Exit;
+    end;
+  end;
+end;
+
+procedure TNEDHighlightConfig.SetDefaultRules(const ADefaultFont: TFont);
+var
+  Rule: TNEDHighlightRule;
+begin
+  Clear;
+  //
+  Rule := AddRule(hsDefault, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  //
+  // lexical styles
+  Rule := AddRule(hsComment, ADefaultFont);
+  Rule.FontForeground := clDkGray; // clGray;
+  //Rule.FontStyle := [fsItalic];
+
+  Rule := AddRule(hsKeyword, ADefaultFont);
+  Rule.FontForeground := clLime; // clMoneyGreen; // clBlue;
+  Rule.FontStyle := [fsBold];
+
+  Rule := AddRule(hsIdentifier, ADefaultFont);
+  Rule.FontForeground := clSkyBlue;
+
+  Rule := AddRule(hsCharacter, ADefaultFont);
+  Rule.FontForeground := clWebBlanchedAlmond;
+
+  Rule := AddRule(hsString, ADefaultFont);
+  Rule.FontForeground := clAqua; // clGreen;
+
+  Rule := AddRule(hsNumber, ADefaultFont);
+  Rule.FontForeground := clFuchsia; // clPurple;
+
+  Rule := AddRule(hsPunctuation, ADefaultFont);
+  Rule.FontForeground := clWebOrangeRed;
+
+  Rule := AddRule(hsOperator, ADefaultFont);
+  Rule.FontForeground := clYellow;
+
+  //
+  // semantic styles
+  Rule := AddRule(hsNamespace, ADefaultFont);
+  Rule.FontForeground := clWhite;
+  //
+  Rule := AddRule(hsConstant, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsVariable, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+//  FDeclarationFont.Color := clGreen;
+  Rule := AddRule(hsDeclaration, ADefaultFont);
+  Rule.FontForeground := clNavy;
+  Rule.FontStyle := [fsBold];
+
+  Rule := AddRule(hsReference, ADefaultFont);
+  Rule.FontForeground := clTeal;
+
+  Rule := AddRule(hsType, ADefaultFont);
+  Rule.FontForeground := clWebOrange; // clTeal;
+  Rule.FontStyle := [fsBold];
+
+  Rule := AddRule(hsFunction, ADefaultFont);
+  Rule.FontForeground := clBlue; // clOlive;
+
+  Rule := AddRule(hsProcedure, ADefaultFont);
+  Rule.FontForeground := clBlue;
+
+  Rule := AddRule(hsParameter, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsStatement, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsExpression, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsLabel, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsAttribute, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsDirective, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsAnnotation, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  // operators
+  Rule := AddRule(hsAssignment, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsComparison, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsArithmetic, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsLogical, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsBitwise, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsPointer, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  //
+  // types
+  Rule := AddRule(hsNil, ADefaultFont);
+  Rule.FontForeground := clGreen;
+
+  Rule := AddRule(hsBoolean, ADefaultFont);
+  Rule.FontForeground := clGreen;
+
+  Rule := AddRule(hsInteger, ADefaultFont);
+  Rule.FontForeground := clGreen;
+
+  Rule := AddRule(hsFloating, ADefaultFont);
+  Rule.FontForeground := clGreen;
+
+  Rule := AddRule(hsEnum, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsEnumValue, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsSet, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsSetItem, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsRecord, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsStructure, ADefaultFont);
+  Rule.FontForeground := clWebGold; // clPurple;
+  Rule.FontStyle := [fsBold];
+
+  //
+  // structures
+
+  Rule := AddRule(hsModule, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsBlock, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsClass, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsInterface, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsField, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsProperty, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsMethod, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsConstructor, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsDestructor, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  //
+  // diagnostics
+  Rule := AddRule(hsHint, ADefaultFont);
+  Rule.FontForeground := clWebLightGreen;
+  Rule.FontStyle := [fsUnderline];
+
+  Rule := AddRule(hsInformation, ADefaultFont);
+  Rule.FontForeground := clWebLightCyan;
+  Rule.FontStyle := [fsUnderline];
+
+  Rule := AddRule(hsWarning, ADefaultFont);
+  Rule.FontForeground := clWebLightPink;
+  Rule.FontStyle := [fsUnderline];
+
+//  FErrorFont.Color := clRed;
+  Rule := AddRule(hsError, ADefaultFont);
+  Rule.FontForeground := clRed;
+  Rule.FontStyle := [fsUnderline];
+
+  Rule := AddRule(hsDeprecated, ADefaultFont);
+  Rule.FontForeground := clWebDarkViolet;
+  Rule.FontStyle := [fsUnderline];
+
+  Rule := AddRule(hsUnresolved, ADefaultFont);
+  Rule.FontForeground := clWebDarkOrchid;
+  Rule.FontStyle := [fsUnderline];
+
+  Rule := AddRule(hsInvalid, ADefaultFont);
+  Rule.FontForeground := clWebDarkMagenta;
+  Rule.FontStyle := [fsUnderline];
+end;
+
+{ TNEDLanguageProfile }
+
+constructor TNEDLanguageProfile.Create(const ADefaultFont: TFont);
+begin
+  inherited Create;
+  //
+  FHighlighter := Nil;
+
+  FFileExtensions := TStringList.Create;
+  FDefaultFont := ADefaultFont;
+
+  FLexerConfig := TNEDLexerConfig.Create;
+  FTexerConfig := TNEDTexerConfig.Create;
+  FParserConfig := TNEDParserConfig.Create;
+  FHighlightConfig := TNEDHighlightConfig.Create(ADefaultFont);
+
+  FAcquireSettingsEvent := Nil;
+
+  Reset;
+end;
+
+destructor TNEDLanguageProfile.Destroy;
+begin
+  FHighlightConfig.Free;
+  FParserConfig.Free;
+  FTexerConfig.Free;
+  FLexerConfig.Free;
+
+  FFileExtensions.Free;
+
+  inherited Destroy;
+end;
+
+procedure TNEDLanguageProfile.Assign(const ASource: TNEDLanguageProfile);
+var
+  DocumentAnalyzer: TNEDDocumentAnalyzer;
+begin
+  if ASource = Nil then
+    Exit;
+
+  FID := ASource.ID;
+  FName := ASource.Name;
+  FDescription := ASource.Description;
+
+  FDefaultFont.Assign(ASource.FDefaultFont);
+
+  FFileExtensions.Assign(ASource.FileExtensions);
+
+  FLexerConfig.Assign(ASource.LexerConfig);
+  FTexerConfig.Assign(ASource.TexerConfig);
+  FParserConfig.Assign(ASource.ParserConfig);
+
+  FHighlightConfig.Assign(ASource.HighlightConfig);
+
+  if (FHighlighter <> Nil) and (FHighlighter.FEditorControl <> Nil) then begin
+    DocumentAnalyzer := FHighlighter.FEditorControl.Document.DocumentAnalyzer;
+    DocumentAnalyzer.Lexer.Config.Assign(FLexerConfig);
+    DocumentAnalyzer.Texer.Keywords.Clear;
+    DocumentAnalyzer.Texer.Keywords.AddKeywords(FTexerConfig.Keywords.ToStringArray);
+    //DocumentAnalyzer.Parser.Config.Assign(FLexerConfig);
+
+    FHighlighter.FEditorControl.Invalidate;
+  end;
+end;
+
+procedure TNEDLanguageProfile.Reset;
+begin
+  FID := '';
+  FName := '';
+  FDescription := '';
+
+  FFileExtensions.Clear;
+
+  FLexerConfig.Reset;
+  FTexerConfig.Reset;
+  FParserConfig.Reset;
+
+  FHighlightConfig.SetDefaultRules(FDefaultFont);
+end;
+
+function TNEDLanguageProfile.SupportsExtension(const AExtension: UTF8String): Boolean;
+var
+  I: Integer;
+  Ext: UTF8String;
+begin
+  Ext := AExtension;
+
+  if Ext = '' then begin
+    Result := False;
+    Exit;
+  end;
+
+  if Ext[1] <> '.' then
+    Ext := '.' + Ext;
+
+  for I := 0 to FFileExtensions.Count - 1 do begin
+    if SameText(String(FFileExtensions[I]), String(Ext)) then begin
+      Result := True;
+      Exit;
+    end;
+  end;
+
+  Result := False;
+end;
+
+procedure TNEDLanguageProfile.AcquireProfileByExtension(const APath: UTF8String);
+var
+  ext: UTF8String;
+begin
+  if not Assigned(FAcquireSettingsEvent) then
+    Exit;
+
+  ext := UTF8String(ExtractFileExt(APath));
+  if Length(ext) = 0 then
+    Exit;
+
+  FAcquireSettingsEvent(Self, ext);
+end;
+
 { TNEDHighlighter }
 
 constructor TNEDHighlighter.Create(const AParentControl: TNEDCustomEditorView);
@@ -3084,88 +3719,47 @@ begin
   inherited Create;
   FEditorControl := AParentControl;
   //
-  FDefaultFont := TFont.Create;
-  FKeywordFont := TFont.Create;
-  FIdentifierFont := TFont.Create;
-  FStringFont := TFont.Create;
-  FNumberFont := TFont.Create;
-  FCommentFont := TFont.Create;
-  FOperatorFont := TFont.Create;
-  //
-  FDeclarationFont := TFont.Create;
-  FReferenceFont := TFont.Create;
-  FTypeFont := TFont.Create;
-  FFunctionFont := TFont.Create;
-  FStructureFont := TFont.Create;
-  FErrorFont := TFont.Create;
+  FLanguageProfile := Nil;
   //
   Reset;
 end;
 
 destructor TNEDHighlighter.Destroy;
 begin
-  FErrorFont.Free;
-  FStructureFont.Free;
-  FFunctionFont.Free;
-  FTypeFont.Free;
-  FReferenceFont.Free;
-  FDeclarationFont.Free;
-  //
-  FOperatorFont.Free;
-  FCommentFont.Free;
-  FNumberFont.Free;
-  FStringFont.Free;
-  FIdentifierFont.Free;
-  FKeywordFont.Free;
-  FDefaultFont.Free;
+  // Configuration is NOT owned by the highlighter
   //
   inherited Destroy;
 end;
 
-procedure TNEDHighlighter.FontChanged(Sender: TObject);
-begin
-  FEditorControl.Invalidate;
-end;
+//procedure TNEDHighlighter.FontChanged(Sender: TObject);
+//begin
+//  FEditorControl.Invalidate;
+//end;
+//
+//procedure TNEDHighlighter.InitializeFont(AFont: TFont);
+//begin
+//  AFont.Assign(FEditorControl.Font); // Name := 'Consolas';
+////  AFont.Size := 10;
+////  AFont.Style := [];
+//  AFont.OnChange := FontChanged;
+//end;
 
-procedure TNEDHighlighter.InitializeFont(AFont: TFont);
+procedure TNEDHighlighter.SetLanguageProfile(const ALanguageProfile: TNEDLanguageProfile);
 begin
-  AFont.Assign(FEditorControl.Font); // Name := 'Consolas';
-//  AFont.Size := 10;
-//  AFont.Style := [];
-  AFont.OnChange := FontChanged;
+  if FLanguageProfile <> ALanguageProfile then begin
+    FLanguageProfile := ALanguageProfile;
+    FLanguageProfile.FHighlighter := Self;
+    FEditorControl.Invalidate;
+  end;
 end;
 
 procedure TNEDHighlighter.Reset;
 begin
-  InitializeFont(FDefaultFont);
-  InitializeFont(FKeywordFont);
-  InitializeFont(FIdentifierFont);
-  InitializeFont(FStringFont);
-  InitializeFont(FNumberFont);
-  InitializeFont(FCommentFont);
-  InitializeFont(FOperatorFont);
-  InitializeFont(FDeclarationFont);
-  InitializeFont(FReferenceFont);
-  InitializeFont(FTypeFont);
-  InitializeFont(FFunctionFont);
-  InitializeFont(FStructureFont);
-  InitializeFont(FErrorFont);
+  if FLanguageProfile = Nil then
+    Exit;
 
-//  FKeywordFont.Style := [fsBold];
-//  FDeclarationFont.Style := [fsBold];
-  FKeywordFont.Color := clMoneyGreen;
-  FIdentifierFont.Color := clSkyBlue;
-  FStringFont.Color := clAqua;
-  FNumberFont.Color := clFuchsia;
-  FCommentFont.Color := clDkGray;
-  FOperatorFont.Color := clYellow;
-  //
-  FDeclarationFont.Color := clGreen;
-  FReferenceFont.Color := clTeal;
-  FTypeFont.Color := clWebOrange;
-  FFunctionFont.Color := clBlue;
-  FStructureFont.Color := clWebGold;
-  FErrorFont.Color := clRed;
+  FLanguageProfile.Reset;
+  FEditorControl.Invalidate;
 end;
 
 function TNEDHighlighter.GetBaseStyle(const AToken: TNEDTextToken): TNEDHighlightStyleEnum;
@@ -3188,29 +3782,31 @@ begin
   end;
 end;
 
-function TNEDHighlighter.GetFont(const AStyle: TNEDHighlightStyleEnum): TFont;
+function TNEDHighlighter.GetFontDetails(const AStyle: TNEDHighlightStyleEnum): TNEDFontDetails;
+var
+  Rule: TNEDHighlightRule;
 begin
-  case AStyle of
-    hsKeyword    : Result := FKeywordFont;
-    hsIdentifier : Result := FIdentifierFont;
-    hsString     : Result := FStringFont;
-    hsNumber     : Result := FNumberFont;
-    hsComment    : Result := FCommentFont;
-    hsOperator   : Result := FOperatorFont;
-    hsDeclaration: Result := FDeclarationFont;
-    hsReference  : Result := FReferenceFont;
-    hsType       : Result := FTypeFont;
-    hsFunction   : Result := FFunctionFont;
-    hsStructure  : Result := FStructureFont;
-    hsError      : Result := FErrorFont;
-  else
-    Result := FDefaultFont;
-  end;
+  Result.Background := clDefault;
+  Result.Foreground := clDefault;
+  //Result.FontSize := 12;
+  Result.FontStyle := [];
+
+  if FLanguageProfile = Nil then
+    Exit;
+
+  Rule := FLanguageProfile.HighlightConfig.GetRule(AStyle);
+  if Rule <> Nil then
+    Rule.ApplyTo(Result);
 end;
 
 function TNEDHighlighter.GetDefaultFormat: TNEDTokenFormat;
+var
+  Rule: TNEDHighlightRule;
 begin
-  Result.Font := FDefaultFont;
+  Result.StyleID := -1;
+  Result.FontBackground := clDefault;
+  Result.FontForeground := clDefault;
+  Result.FontStyle := [];
   Result.TextAlignment := taAlignTop; // TVerticalAlignment = (taAlignTop, taAlignBottom, taVerticalCenter);
   Result.WordBreak := False;
   Result.WordWrap := False;
@@ -3219,6 +3815,14 @@ begin
   Result.LetterSpacing := 0;
   Result.WordSpacing := 0;
   Result.TextIndentation := 0;
+
+  if FLanguageProfile = Nil then
+    Exit;
+
+  Rule := FLanguageProfile.HighlightConfig.FindRule(hsDefault);
+
+  if Rule <> Nil then
+    Rule.ApplyTo(Result);
 end;
 
 function TNEDHighlighter.GetTokenRange(const AToken: TNEDTextToken): TNEDSourceRange;
@@ -3309,8 +3913,13 @@ begin
 end;
 
 procedure TNEDHighlighter.ApplyStyle(const AStyle: TNEDHighlightStyleEnum; var AFormat: TNEDTokenFormat);
+var
+  FontDetails: TNEDFontDetails;
 begin
-  AFormat.Font := GetFont(AStyle);
+  FontDetails := GetFontDetails(AStyle);
+  AFormat.FontBackground := FontDetails.Background;
+  AFormat.FontForeground := FontDetails.Foreground;
+  AFormat.FontStyle := FontDetails.FontStyle;
 end;
 
 procedure TNEDHighlighter.Highlight(const AText: UTF8String; const AAnalysis: TNEDLineAnalysis);
@@ -3321,6 +3930,9 @@ var
   Format: TNEDTokenFormat;
 begin
   if not Assigned(AAnalysis) then
+    Exit;
+
+  if FLanguageProfile = Nil then
     Exit;
 
   for I := 0 to AAnalysis.Tokens.Count - 1 do begin
@@ -3492,8 +4104,9 @@ begin
   Color := $00330000; //xxBBGGRR
   //Color := $00333333; //xxBBGGRR
   //
+  FDefaultFontSize := 12;
   Font.Name := 'Source Code Pro Semibold';
-  Font.Size := 12;
+  Font.Size := FDefaultFontSize;
   Font.Color := clWhite;
   //
   FDocument := Nil;
@@ -3511,7 +4124,11 @@ begin
   //
   FOptions := TNEDEditorOptions.Create(Self);
   FColors := TNEDEditorColors.Create(Self);
+
+  FLanguageProfile := TNEDLanguageProfile.Create(Font);
   FHighlighter := TNEDHighlighter.Create(Self);
+  Highlighter.SetLanguageProfile(FLanguageProfile);
+  //
   FKeyboardMap := TNEDEditorKeyboardMap.Create(Self);
   FProcessNextKeyMap := True;
   FPreviousKeyMap.Key := 0;
@@ -3522,7 +4139,7 @@ begin
   //
   //
   FModified := False;
-  FCommentLineCount := 0;
+  FCommentedLineCount := 0;
   FBlankLineCount := 0;
   //
   FTopIndex := 0;
@@ -3534,6 +4151,7 @@ begin
   FVisibleLinesCount := 0;
   FLongestLineCharsCount := 0;
   FActiveLineIndex := 0;
+  FZoom := 100; // 25 - 500
 //  FCaretPos.Line := 1;
 //  FCaretPos.Column := 1;
   //
@@ -3552,6 +4170,7 @@ begin
   FOptions.Free;
   FColors.Free;
   FHighlighter.Free;
+  FLanguageProfile.Free;
   FKeyboardMap.Free;
   inherited;
 end;
@@ -3606,6 +4225,39 @@ begin
   end;
 end;
 
+// setters / getters
+
+procedure TNEDCustomEditorView.SetDefaultFontSize(const Value: Integer);
+begin
+  if FDefaultFontSize <> Value then begin
+    if (Value < 1) or (Value > 100) then
+      Exit;
+    //
+    FDefaultFontSize := Value;
+    Font.Size := MulDiv(FDefaultFontSize, FZoom, 100);
+    Invalidate;
+  end;
+end;
+
+procedure TNEDCustomEditorView.SetZoom(const Value: Integer);
+begin
+  if FZoom <> Value then begin
+    if (Value < 25) or (Value > 500) then
+      Exit;
+    //
+    FZoom := Value;
+    Font.Size := MulDiv(FDefaultFontSize, FZoom, 100);
+    Invalidate;
+  end;
+end;
+
+function TNEDCustomEditorView.GetCaretPosition: TNEDCaretPosition;
+begin
+  Result := FCaret.CaretPosition;
+end;
+
+// public
+
 procedure TNEDCustomEditorView.DisableAutoRange;
 begin
   Inc(FAutoRangeCount);
@@ -3618,11 +4270,6 @@ begin
     if (FAutoRangeCount = 0) and (FHorizontalScrollBar.Visible or FVerticalScrollBar.Visible) then
       CalcAutoRange;
   end;
-end;
-
-function TNEDCustomEditorView.GetCaretPosition: TNEDCaretPosition;
-begin
-  Result := FCaret.CaretPosition;
 end;
 
 procedure TNEDCustomEditorView.InitializeKeyboardMappings;
@@ -3964,9 +4611,9 @@ begin
       Status := '';
       StatusProgress := -1;
       StatusMaxProgress := -1;
-      Zoom := 100;
-      MinZoom := 10;
-      MaxZoom := 1000;
+      Zoom := Self.Zoom;
+      MinZoom := 25;
+      MaxZoom := 500;
       VersionStr := IntToStr(Document.Version);
       Version := Document.Version;
     end;
@@ -4312,6 +4959,11 @@ begin
   Delta := -Msg.WheelDelta div 120;
   Lines := Mouse.WheelScrollLines;
 
+  if Msg.Keys and MK_CONTROL > 0 then begin // zoom
+    Self.Zoom := Self.Zoom + (Lines * -Delta);
+    ReportEditorInfo;
+  end
+  else begin
 //  if Selected <> Nil then begin
 //    if not IsRectEmpty(ButtonRect[fbScrollUp]) and (Delta = -1) then
 //      Selected.TopIndex := Selected.TopIndex - 1
@@ -4322,10 +4974,11 @@ begin
 //      CaptureItem := ItemFromPoint(p.X, p.Y);
 //    end;
 //  end;
-  if Delta > 0 then
-    SetTopIndex(FTopIndex + Lines)
-  else
-    SetTopIndex(FTopIndex - Lines);
+    if Delta > 0 then
+      SetTopIndex(FTopIndex + Lines)
+    else
+      SetTopIndex(FTopIndex - Lines);
+  end;
 
   Msg.Result := 1;
   inherited;
@@ -4791,7 +5444,8 @@ begin
   LineTokens := LineProperties.Analysis.Tokens;
   for I := 0 to LineTokens.Count - 1 do begin
     Token := LineTokens.Tokens[I];
-    ACanvas.Font.Assign(Token.Format.Font);
+    ACanvas.Font.Color := Token.Format.FontForeground;
+    ACanvas.Font.Style := Token.Format.FontStyle;
     TokenText := Copy(LineText, Token.Offset, Token.Length);
     TokenRect := LineRect;
     OffsetRect(TokenRect, (Token.Offset - 1) * CharWidth, 0);
@@ -4809,6 +5463,10 @@ begin
   end;
 
   FDocument := DocumentBuffer;
+  if FDocument <> Nil then begin
+    FLanguageProfile.AcquireProfileByExtension(FDocument.FilePath);
+    //Highlighter.SetLanguageProfile(FLanguageProfile);
+  end;
 
   // bind observer to new document
   if DocumentBuffer <> Nil then begin
@@ -5303,6 +5961,9 @@ begin
   // @TODO - ??? do something ???
   FVisibleLinesCount := Document.VisibleLinesCount;
   for i := Change.LinesRange.StartPos.Line to Change.LinesRange.EndPos.Line do begin
+    if (i < 0) or (i > Document.LastLine) then
+      Break;
+    //
     line := Document.GetLineText(i);
     properties := Document.LineProperties[i];
     FHighlighter.Highlight(line, properties.Analysis);

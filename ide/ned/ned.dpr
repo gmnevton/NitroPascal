@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-07
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -24,6 +24,7 @@ uses
   ned_settings in 'source\views\ned_settings.pas' {NEDSettingsForm},
   ned_workspace_manager in 'source\utils\ned_workspace_manager.pas',
   ned_projects in 'source\config\ned_projects.pas',
+  ned_editor_types in 'source\editor\ned_editor_types.pas',
   ned_editor_buffer in 'source\editor\ned_editor_buffer.pas',
   ned_editor_view in 'source\editor\ned_editor_view.pas',
   ned_splitview_manager in 'source\utils\ned_splitview_manager.pas',

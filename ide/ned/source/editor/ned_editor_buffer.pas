@@ -280,6 +280,10 @@ type
     procedure AnalyzeDocument(ADocument: TNEDCustomDocument);
     procedure AnalyzeLine(ADocument: TNEDCustomDocument; ALine: Integer; const AInState: TNEDParserState); //; out AAnalysis: TNEDLineAnalysis);
     procedure AnalyzeRange(ADocument: TNEDCustomDocument; ALineFrom, ALineTo: Integer);
+    //
+    property Lexer: TNEDLexer read FLexer;
+    property Texer: TNEDTexer read FTexer;
+    property Parser: TNEDParser read FParser;
   end;
 
 { TNEDStringList }
@@ -526,6 +530,7 @@ type
     property FileReadOnly: Boolean read FFileReadOnly write SetFileReadOnly;
     property FileBOM: Boolean read FFileBOM;
     //
+    property DocumentAnalyzer: TNEDDocumentAnalyzer read FDocumentAnalyzer;
     property Encoding: TEncoding read FEncoding write SetEncoding;
     property EncodingWriteBOM: Boolean read FEncodingWriteBOM write SetEncodingWriteBOM;
     property FileLength: Integer read GetLength;
@@ -1898,6 +1903,7 @@ end;
 
 procedure TNEDCustomDocument.Reload;
 begin
+  FDocumentAnalyzer.AnalyzeDocument(Self);
   NotifyObservers(TNEDTextRange.LineColumn(0, 0, FLines.Count - 1, 0), dcReload, opNone, 0, FLength);
 end;
 
@@ -2051,6 +2057,7 @@ end;
 procedure TNEDCustomDocument.Insert(const Line, Column: Integer; const Text: String);
 var
   LineProperties: TNEDLineProperties;
+  TextLength: Integer;
   Piece: PNEDPiece;
   AddOffset: Integer;
   Parts: TStringList;
@@ -2149,22 +2156,25 @@ begin
       //AffectedStartLine := StartLine;
       AffectedEndLine := Line + 1;
     end;
+    TextLength := 0;
 
     MarkModified;
     RebuildCaches;
     RebuildLinesContext(AffectedStartLine, AffectedEndLine);
 
-    NotifyObservers(TNEDTextRange.LineColumn(AffectedStartLine, Column, AffectedEndLine, 0), dcInsert, opInsert, 0, Length(Text));
+    NotifyObservers(TNEDTextRange.LineColumn(AffectedStartLine, Column, AffectedEndLine, 0), dcInsert, opInsert, 0, TextLength);
 
     Exit;
   end;
 
   // fast path: no line breaks
   if Pos(#10, Text) = 0 then begin // @FIX: this #10 probably should be determined by our LineBreak type
+    TextLength := Length(Text);
+
     Piece := CreatePiece;
     Piece.Buffer := pbInputBuffer;
     Piece.Offset := AddOffset;
-    Piece.Length := Length(Text);
+    Piece.Length := TextLength;
     Piece.Origin := Nil;
 
     LineProperties.InsertPiece(Column, Piece);
@@ -2173,12 +2183,13 @@ begin
     RebuildCaches;
     RebuildLinesContext(AffectedStartLine, AffectedEndLine);
 
-    NotifyObservers(TNEDTextRange.LineColumn(Line, Column), dcInsert, opInsert, 0, Length(Text));
+    NotifyObservers(TNEDTextRange.LineColumn(Line, Column), dcInsert, opInsert, 0, TextLength);
 
     Exit;
   end;
 
   // multi-line insert
+  TextLength := Length(Text);
   Parts := TStringList.Create;
   try
     Parts.Text := StringReplace(Text, #13, '', [rfReplaceAll]); // @FIX: it assumes that Text contains #13#10 as line breaks
@@ -2224,7 +2235,7 @@ begin
   RebuildCaches;
   RebuildLinesContext(AffectedStartLine, AffectedEndLine);
 
-  NotifyObservers(TNEDTextRange.LineColumn(AffectedStartLine, Column, AffectedEndLine, 0), dcInsert, opInsert, 0, Length(Text));
+  NotifyObservers(TNEDTextRange.LineColumn(AffectedStartLine, Column, AffectedEndLine, 0), dcInsert, opInsert, 0, TextLength);
 end;
 
 procedure TNEDCustomDocument.Delete(const Position, Count: Integer; const Backspace: Boolean);

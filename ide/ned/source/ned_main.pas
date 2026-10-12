@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-07
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -38,6 +38,7 @@ uses
   UCL.ProgressBar,
   UCL.HyperLink,
   UCL.TitleBar,
+  UCL.PopupMenu,
   SynEditHighlighter,
   SynHighlighterGeneral,
   SynEdit,
@@ -50,7 +51,7 @@ uses
   ned_projects,
   ned_source_editor,
   ned_splitview_manager,
-  ned_workspace_manager, UCL.PopupMenu;
+  ned_workspace_manager;
 
 const
   WM_AFTERSHOW = $BF00; // max $BFFF
@@ -58,7 +59,10 @@ const
 type
   TNEDToolboxTypeEnum = (
     ttWorkspace,
-    ttSearch
+    ttSearch,
+    ttInspector,
+    ttToolbox,
+    ttHistory
   );
 
   TNEDMainForm = class(TUForm)
@@ -213,12 +217,17 @@ type
     procedure NitroPascalwebsite1Click(Sender: TObject);
     procedure AboutNED1Click(Sender: TObject);
     procedure mnuWorkSpacePopup(Sender: TObject);
+    procedure btnFileZoomOutClick(Sender: TObject);
+    procedure btnFileZoomInClick(Sender: TObject);
+    procedure sliFileZoomChange(Sender: TObject);
+    procedure sliFileZoomDblClick(Sender: TObject);
   private
     FModalForm: TForm;
     FProfile: TNEDProfile;
     FWorkspaceManager: TNEDWorkspaceManager;
     FLastOpenedPath: String;
     FActiveToolbox: TNEDToolboxTypeEnum;
+    FActiveEditorZoomUpdate: Boolean;
     //
     //
     procedure WMAfterShow(var Msg: TMessage); message WM_AFTERSHOW;
@@ -247,6 +256,9 @@ type
     procedure CreateWorkSpaceAndOpenFile(const FileName: String; const SplitType: TNEDSplitViewTypeEnum); overload;
     procedure CreateWorkSpaceAndOpenFile(const Project: TNEDProject; const SplitType: TNEDSplitViewTypeEnum); overload;
     procedure SelectWorkspaceProjectEntry(const EditorInfo: TNEDEditorInfo); // (const Editor: TNEDEditorView);
+    //
+    property WorkspaceManager: TNEDWorkspaceManager read FWorkspaceManager;
+    property Profile: TNEDProfile read FProfile;
   end;
 
 var
@@ -302,6 +314,7 @@ begin
   FLastOpenedPath := '';
   boxWorkspace.BringToFront;
   FActiveToolbox := ttWorkspace;
+  FActiveEditorZoomUpdate := False;
   //
   if not NEDConfig.Loaded and NEDConfig.Error then
     txtStatus.Caption := NEDConfig.ErrorMsg;
@@ -489,6 +502,7 @@ begin
       txtFileEditMode.Caption := EditorInfoDetails.FileInsertType;
       txtFileEditPosition.Caption := 'Line: ' + IntToStr(EditorInfoDetails.Line) + ' / ' + IntToStr(EditorInfoDetails.Lines) + ', Column: ' + IntToStr(EditorInfoDetails.Column);
       txtStatus.Caption := EditorInfoDetails.Status;
+      sliFileZoom.Value := EditorInfoDetails.Zoom;
     except
     end;
   end;
@@ -992,6 +1006,50 @@ begin
       CreateProjectPopupMenu(mnuWorkSpace, TNEDProject(Entry.Data))
     else if TObject(Entry.Data) is TNEDProjectFile then
       CreateProjectFilePopupMenu(mnuWorkSpace, TNEDProjectFile(Entry.Data));
+  end;
+end;
+
+procedure TNEDMainForm.btnFileZoomOutClick(Sender: TObject);
+var
+  zoom: Integer;
+begin
+  if FWorkspaceManager.GetActiveEditor <> Nil then begin
+    zoom := FWorkspaceManager.GetActiveEditor.Zoom;
+    Dec(zoom, 5);
+    FWorkspaceManager.GetActiveEditor.Zoom := zoom;
+    FActiveEditorZoomUpdate := True;
+    sliFileZoom.Value := FWorkspaceManager.GetActiveEditor.Zoom;
+    FActiveEditorZoomUpdate := False;
+  end;
+end;
+
+procedure TNEDMainForm.sliFileZoomChange(Sender: TObject);
+begin
+  if FActiveEditorZoomUpdate or (FWorkspaceManager.GetActiveEditor = Nil) then
+    Exit;
+  //
+  FWorkspaceManager.GetActiveEditor.Zoom := sliFileZoom.Value;
+end;
+
+procedure TNEDMainForm.sliFileZoomDblClick(Sender: TObject);
+begin
+  FActiveEditorZoomUpdate := True;
+  sliFileZoom.Value := 100;
+  FWorkspaceManager.GetActiveEditor.Zoom := 100;
+  FActiveEditorZoomUpdate := False;
+end;
+
+procedure TNEDMainForm.btnFileZoomInClick(Sender: TObject);
+var
+  zoom: Integer;
+begin
+  if FWorkspaceManager.GetActiveEditor <> Nil then begin
+    zoom := FWorkspaceManager.GetActiveEditor.Zoom;
+    Inc(zoom, 5);
+    FWorkspaceManager.GetActiveEditor.Zoom := zoom;
+    FActiveEditorZoomUpdate := True;
+    sliFileZoom.Value := FWorkspaceManager.GetActiveEditor.Zoom;
+    FActiveEditorZoomUpdate := False;
   end;
 end;
 

@@ -263,10 +263,11 @@ begin
       View.BringToFront;
     end;
     //
+    Buffer.LoadFromFile(FilePath);
     Editor := View.NewEditor(Buffer, Info);
     //
-  //  Buffer.LoadFromFile('d:\Borland Librarys\NitroPascal\compiler\tests\simple_project\first.npe');
-    Buffer.LoadFromFile(FilePath);
+    //Buffer.LoadFromFile(FilePath);
+    Buffer.Reload; // send notification to the attached editor
     //
     Editor.SetFocus;
     //

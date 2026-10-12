@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-06
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -64,6 +64,7 @@ type
   private
     procedure CMDialogKey(var Msg: TCMDialogKey); message CM_DIALOGKEY; // grab TAB key before delphi can still it and switch it off
     procedure NEDEditorInfoDetails(var Msg: TMessage); message CM_NED_EDITORINFO_DETAILS;
+    procedure NEDEditorAcquireLanguageProfile(Sender: TNEDLanguageProfile; const Extension: UTF8String);
     procedure NEDEditorFocus(Sender: TNEDCustomEditorView; const FocusType: TNEDCustomEditorViewFocusEnum);
     //
     function FindEditorInfoByThumbstone(const Thumbstone: TUSymbolButton): TNEDEditorInfo;
@@ -89,9 +90,14 @@ implementation
 uses
 //  Windows,
 //  Dialogs;
+  Graphics,
+  UCL.Types,
+  ned_config,
   ned_main,
-  ned_source_view;
-//  ned_workspace_manager;
+  ned_source_view,
+  ned_session_context,
+  ned_editor_types,
+  ned_editor_parser;
 
 var
   NEDUniqueEditorNumber: Integer = 0;
@@ -163,6 +169,7 @@ begin
   Result.Name := 'NEDEditorView' + IntToStr(NEDUniqueEditorNumber);
   Result.Parent := Self;
   Result.Align := alClient;
+  Result.LanguageProfile.OnAcquireSettings := NEDEditorAcquireLanguageProfile;
   Result.Document := Buffer;
   Result.PopupMenu := PopupMenu1;
   Result.OnFocus := NEDEditorFocus;
@@ -223,6 +230,7 @@ begin
   if EditorInfo <> Nil then begin
     NEDMainForm.SelectWorkspaceProjectEntry(EditorInfo);
     EditorView := EditorInfo.Editor;
+    NEDMainForm.WorkspaceManager.SetActiveEditor(EditorView);
     EditorView.BringToFront;
     EditorView.ReportEditorInfo;
     EditorView.SetFocus;
@@ -247,6 +255,7 @@ begin
   //
   if EditorInfo <> Nil then begin
     EditorView := EditorInfo.Editor;
+    NEDMainForm.WorkspaceManager.SetActiveEditor(EditorView);
     EditorView.BringToFront;
     EditorView.ReportEditorInfo;
     EditorView.SetFocus;
@@ -271,6 +280,7 @@ begin
   //
   if EditorInfo <> Nil then begin
     EditorView := EditorInfo.Editor;
+    NEDMainForm.WorkspaceManager.SetActiveEditor(EditorView);
     EditorView.BringToFront;
     EditorView.ReportEditorInfo;
     EditorView.SetFocus;
@@ -329,6 +339,114 @@ begin
       end;
     end;
 //    EditorInfoDetails := PNEDEditorInfoDetails(Msg.LParam);
+  end;
+end;
+
+procedure TNEDEditorForm.NEDEditorAcquireLanguageProfile(Sender: TNEDLanguageProfile; const Extension: UTF8String);
+var
+  LangProfile: TNEDLanguageProfile;
+  Theme: TUThemeType;
+  DefaultFont: TFont;
+  Settings: TNEDSettingsStructure;
+  FileType: String;
+  HighlightSettings: TNEDEditorHighlightSettings;
+  i: Integer;
+  DelimiterPair: TNEDEditorDelimiterPair;
+begin
+  if NEDMainForm.Profile = Nil then
+    Exit;
+  //
+  Theme := ttDark;
+  if NEDConfig.ColorSchema = 'system' then begin
+    if GetCommonThemeManager.SystemTheme = utLight then
+      Theme := ttLight;
+  end
+  else begin
+    if NEDConfig.ColorSchema = 'light' then
+      Theme := ttLight;
+  end;
+  //
+  DefaultFont := TFont.Create;
+  try
+    if Theme = ttDark then begin
+      Settings := NEDMainForm.Profile.Session.Settings.DarkSettings;
+
+      DefaultFont.Name := Settings.EditorSettings.FontName;
+      DefaultFont.Size := Settings.EditorSettings.FontSize;
+      DefaultFont.Style := Settings.EditorSettings.FontStyle;
+      DefaultFont.Color := Settings.EditorSettings.FontColor;
+    end
+    else begin
+      Settings := NEDMainForm.Profile.Session.Settings.LightSettings;
+
+      DefaultFont.Name := Settings.EditorSettings.FontName;
+      DefaultFont.Size := Settings.EditorSettings.FontSize;
+      DefaultFont.Style := Settings.EditorSettings.FontStyle;
+      DefaultFont.Color := Settings.EditorSettings.FontColor;
+    end;
+    //
+    LangProfile := TNEDLanguageProfile.Create(DefaultFont);
+    try
+      // resolve file extension to file_type: .npe/.npc --> nitropascal
+      // fixed for now
+      FileType := 'default';
+      if SameText(Extension, '.npe') or SameText(Extension, '.npc') then
+        FileType := 'nitropascal';
+      //
+      if not Settings.HighlighterProfiles.HasFileType(FileType) then begin
+        FileType := 'default'; // fall-back to default, it is hardcoded
+      end;
+
+      HighlightSettings := Settings.HighlighterProfiles.LanguagesByName[FileType];
+      Assert(HighlightSettings <> Nil);
+
+      LangProfile.ID := FileType;
+      LangProfile.Name := HighlightSettings.Name;
+      LangProfile.Description := HighlightSettings.Description;
+      LangProfile.FileExtensions.Assign(HighlightSettings.FileExtensions);
+      //
+      LangProfile.LexerConfig.LineBreak := HighlightSettings.LineBreak;
+      LangProfile.LexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
+      LangProfile.LexerConfig.AllowStringDelimiterNesting := HighlightSettings.AllowStringDelimiterNesting;
+      LangProfile.LexerConfig.NestedStringDelimiterEscapeing := HighlightSettings.NestedStringDelimiterEscapeing;
+      for i := 0 to HighlightSettings.CommentsDelimitersCount - 1 do begin
+        DelimiterPair := HighlightSettings.CommentsDelimiters[i];
+        LangProfile.LexerConfig.AddCommentDelimiter(DelimiterPair);
+      end;
+      LangProfile.LexerConfig.DirectiveDelimiter := HighlightSettings.DirectiveDelimiter;
+      LangProfile.LexerConfig.AllowNestedComments := HighlightSettings.AllowNestedComments;
+      LangProfile.LexerConfig.AllowMultilineStrings := HighlightSettings.AllowMultilineStrings;
+      LangProfile.LexerConfig.AllowMultilineComments := HighlightSettings.AllowMultilineComments;
+      //
+      LangProfile.TexerConfig.Keywords.Assign(HighlightSettings.Keywords);
+      LangProfile.TexerConfig.Operators.Assign(HighlightSettings.Operators);
+      LangProfile.TexerConfig.Punctuation.Assign(HighlightSettings.Punctuation);
+      LangProfile.TexerConfig.BooleanLiterals.Assign(HighlightSettings.BooleanLiterals);
+      LangProfile.TexerConfig.NilLiterals.Assign(HighlightSettings.NilLiterals);
+      LangProfile.TexerConfig.HexPrefix := HighlightSettings.HexPrefix;
+      LangProfile.TexerConfig.HexSuffix := HighlightSettings.HexSuffix;
+      LangProfile.TexerConfig.BinaryPrefix := HighlightSettings.BinaryPrefix;
+      LangProfile.TexerConfig.BinarySuffix := HighlightSettings.BinarySuffix;
+      LangProfile.TexerConfig.OctalPrefix := HighlightSettings.OctalPrefix;
+      LangProfile.TexerConfig.OctalSuffix := HighlightSettings.OctalSuffix;
+      LangProfile.TexerConfig.ExtendedSuffix := HighlightSettings.ExtendedSuffix;
+      LangProfile.TexerConfig.DecimalSeparator := HighlightSettings.DecimalSeparator;
+      LangProfile.TexerConfig.AllowUnderscoreNumbers := HighlightSettings.AllowUnderscoreNumbers;
+      LangProfile.TexerConfig.CaseSensitive := HighlightSettings.CaseSensitive;
+      //
+      for i := 0 to HighlightSettings.Keywords.Count - 1 do begin
+        LangProfile.ParserConfig.AddKeyword(HighlightSettings.Keywords.Strings[i], sfkUnknown);
+      end;
+      LangProfile.ParserConfig.CaseSensitive := HighlightSettings.CaseSensitive;
+      //
+      //LangProfile.HighlightConfig. := HighlightSettings.Name;
+      //
+      Sender.Assign(LangProfile); // set language profile for editor
+    finally
+      LangProfile.Free;
+    end;
+  finally
+    DefaultFont.Free;
   end;
 end;
 

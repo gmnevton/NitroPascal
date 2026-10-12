@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-09
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -292,6 +292,34 @@ type
 //    property State: TNEDParserState read FState;
 //  end;
 
+  TNEDParserKeyword = class
+  public
+    Text: UTF8String;
+    Kind: TNEDStructuralFrameKindEnum;
+    //
+    destructor Destroy; override;
+  end;
+
+  TNEDParserConfig = class
+  private
+    FKeywords: TObjectList<TNEDParserKeyword>;
+    FCaseSensitive: Boolean;
+    //
+    function GetKeyword(const AText: UTF8String): TNEDParserKeyword;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Assign(const ASource: TNEDParserConfig);
+    //
+    procedure Reset;
+    //
+    function AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum): TNEDParserKeyword;
+    function FindKeyword(const AText: UTF8String): TNEDParserKeyword;
+    //
+    property Keywords: TObjectList<TNEDParserKeyword> read FKeywords;
+    property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive;
+  end;
+
 { Parser }
 
   TNEDParser = class
@@ -329,6 +357,370 @@ type
   end;
 
 implementation
+
+{ TNEDStructuralStack }
+
+procedure TNEDStructuralStack.Clear;
+begin
+  SetLength(FFrames, 0);
+end;
+
+procedure TNEDStructuralStack.Push(const AFrame: TNEDStructuralFrame);
+var
+  N: Integer;
+begin
+  N := Length(FFrames);
+  SetLength(FFrames, N + 1);
+  FFrames[N] := AFrame;
+end;
+
+function TNEDStructuralStack.Pop(out AFrame: TNEDStructuralFrame): Boolean;
+var
+  N: Integer;
+begin
+  N := Length(FFrames);
+  if N = 0 then begin
+    FillChar(AFrame, SizeOf(AFrame), 0);
+    Result := False;
+    Exit;
+  end;
+
+  AFrame := FFrames[N - 1];
+  SetLength(FFrames, N - 1);
+  Result := True;
+end;
+
+function TNEDStructuralStack.Peek(out AFrame: TNEDStructuralFrame): Boolean;
+var
+  N: Integer;
+begin
+  N := Length(FFrames);
+  if N = 0 then begin
+    FillChar(AFrame, SizeOf(AFrame), 0);
+    Result := False;
+    Exit;
+  end;
+
+  AFrame := FFrames[N - 1];
+  Result := True;
+end;
+
+function TNEDStructuralStack.Find(const AKind: TNEDStructuralFrameKindEnum; out AFrame: TNEDStructuralFrame): Boolean;
+var
+  I: Integer;
+begin
+  for I := Length(FFrames) - 1 downto 0 do begin
+    if FFrames[I].Kind = AKind then begin
+      AFrame := FFrames[I];
+      Result := True;
+      Exit;
+    end;
+  end;
+
+  FillChar(AFrame, SizeOf(AFrame), 0);
+  Result := False;
+end;
+
+function TNEDStructuralStack.Contains(const AKind: TNEDStructuralFrameKindEnum): Boolean;
+var
+  Dummy: TNEDStructuralFrame;
+begin
+  Result := Find(AKind, Dummy);
+end;
+
+function TNEDStructuralStack.GetCount: Integer;
+begin
+  Result := Length(FFrames);
+end;
+
+function TNEDStructuralStack.GetFrame(AIndex: Integer): TNEDStructuralFrame;
+begin
+  Result := FFrames[AIndex];
+end;
+
+{ TNEDLineAnalysis }
+
+constructor TNEDLineAnalysis.Create;
+begin
+  Tokens := TNEDLineTokens.Create;
+  Clear;
+end;
+
+destructor TNEDLineAnalysis.Destroy;
+begin
+  Clear;
+  Tokens.Free;
+  inherited;
+end;
+
+procedure TNEDLineAnalysis.Clear;
+begin
+  Tokens.Clear;
+  FillChar(Context, SizeOf(TNEDLineContext), 0);
+  SetLength(Elements, 0);
+  SetLength(Declarations, 0);
+  SetLength(References, 0);
+end;
+
+procedure TNEDLineAnalysis.AddElement(const AKind: TNEDCodeElementKindEnum; const AStartOffset, ALength: Integer);
+var
+  N: Integer;
+begin
+  if ALength <= 0 then
+    Exit;
+
+  N := Length(Elements);
+  SetLength(Elements, N + 1);
+  Elements[N].Kind := AKind;
+  Elements[N].SourceRange.StartPos.Line := 0;
+  Elements[N].SourceRange.StartPos.Column := AStartOffset;
+  Elements[N].SourceRange.StartPos.Length := ALength;
+  Elements[N].SourceRange.EndPos := Elements[N].SourceRange.StartPos;
+  Inc(Elements[N].SourceRange.EndPos.Column, ALength);
+end;
+
+procedure TNEDLineAnalysis.AddDeclaration(const ASymbolID: Cardinal; const AStartOffset, ALength: Integer);
+var
+  N: Integer;
+begin
+  N := Length(Declarations);
+  SetLength(Declarations, N + 1);
+  Declarations[N].SymbolID := ASymbolID;
+  Declarations[N].SourceRange.StartPos.Column := AStartOffset;
+  Declarations[N].SourceRange.StartPos.Length := ALength;
+  Declarations[N].SourceRange.EndPos := Declarations[N].SourceRange.StartPos;
+  Inc(Declarations[N].SourceRange.EndPos.Column, ALength);
+end;
+
+procedure TNEDLineAnalysis.AddReference(const ASymbolID: Cardinal; const AStartOffset, ALength: Integer);
+var
+  N: Integer;
+begin
+  N := Length(References);
+  SetLength(References, N + 1);
+  References[N].SymbolID := ASymbolID;
+  References[N].SourceRange.StartPos.Column := AStartOffset;
+  References[N].SourceRange.StartPos.Length := ALength;
+  References[N].SourceRange.EndPos := References[N].SourceRange.StartPos;
+  Inc(References[N].SourceRange.EndPos.Column, ALength);
+end;
+
+{ TNEDParserKeyword }
+
+destructor TNEDParserKeyword.Destroy;
+begin
+
+  inherited;
+end;
+
+{ TNEDParserConfig }
+
+constructor TNEDParserConfig.Create;
+begin
+  inherited Create;
+  FKeywords := TObjectList<TNEDParserKeyword>.Create(True);
+  Reset;
+end;
+
+destructor TNEDParserConfig.Destroy;
+begin
+  FKeywords.Free;
+  inherited Destroy;
+end;
+
+procedure TNEDParserConfig.Assign(const ASource: TNEDParserConfig);
+var
+  I: Integer;
+begin
+  if ASource = Nil then
+    Exit;
+
+  FKeywords.Clear;
+  FCaseSensitive := ASource.CaseSensitive;
+
+  for I := 0 to ASource.Keywords.Count - 1 do begin
+    AddKeyword(ASource.Keywords[I].Text, ASource.Keywords[I].Kind);
+  end;
+end;
+
+function TNEDParserConfig.GetKeyword(const AText: UTF8String): TNEDParserKeyword;
+var
+  I: Integer;
+  S1: UTF8String;
+  S2: UTF8String;
+begin
+  Result := nil;
+
+  for I := 0 to FKeywords.Count - 1 do begin
+    S1 := FKeywords[I].Text;
+    S2 := AText;
+
+    if not FCaseSensitive then begin
+      S1 := UTF8String(AnsiLowerCase(String(S1)));
+      S2 := UTF8String(AnsiLowerCase(String(S2)));
+    end;
+
+    if S1 = S2 then begin
+      Result := FKeywords[I];
+      Exit;
+    end;
+  end;
+end;
+
+procedure TNEDParserConfig.Reset;
+begin
+  FKeywords.Clear;
+  FCaseSensitive := False;
+  //
+  AddKeyword('class', sfkClass);
+  AddKeyword('record', sfkRecord);
+  AddKeyword('procedure', sfkProcedure);
+  AddKeyword('function', sfkFunction);
+  AddKeyword('begin', sfkBeginBlock);
+  AddKeyword('if', sfkIf);
+  AddKeyword('case', sfkCase);
+  AddKeyword('try', sfkTry);
+end;
+
+function TNEDParserConfig.AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum): TNEDParserKeyword;
+begin
+  Result := TNEDParserKeyword.Create;
+
+  Result.Text := AText;
+  Result.Kind := AKind;
+
+  FKeywords.Add(Result);
+end;
+
+function TNEDParserConfig.FindKeyword(const AText: UTF8String): TNEDParserKeyword;
+begin
+  Result := GetKeyword(AText);
+end;
+
+{ TNEDParser }
+
+constructor TNEDParser.Create;
+begin
+  inherited Create;
+  Reset;
+end;
+
+procedure TNEDParser.Reset;
+begin
+  FVersion := 0;
+end;
+
+class function TNEDParser.InitialState: TNEDParserState;
+begin
+  Result.Lexical.Mode := lmNormal;
+  Result.Lexical.StringDelimiter := #0;
+  Result.Lexical.CommentDepth := 0;
+  Result.Lexical.DirectiveDepth := 0;
+  Result.Lexical.CompilerDirective := '';
+
+  Result.Structural.Stack.Clear;
+  Result.Structural.CurrentConstruct := sfkUnknown;
+  Result.Structural.Expectation := peNone;
+  Result.Structural.PendingConstruct := sfkUnknown;
+  Result.Structural.PendingName := '';
+  Result.Structural.PendingStartLine := 0;
+  Result.Structural.PendingStartColumn := 0;
+
+  Result.Semantic.CurrentScopeID := 0;
+  Result.Semantic.CurrentSymbolID := 0;
+  Result.Semantic.CurrentTypeID := 0;
+
+  Result.StateID := 0;
+end;
+
+procedure TNEDParser.ParseRange(const AText: UTF8String; const ATokens: TNEDTextTokenList; const AStartOffset, AEndOffset: Integer; const AInState: TNEDParserState; out AAnalysis: TNEDLineAnalysis);
+var
+  I: Integer;
+  Frame: TNEDStructuralFrame;
+  Token: TNEDTextToken;
+  State: TNEDParserState;
+begin
+  AAnalysis := TNEDLineAnalysis.Create;
+  AAnalysis.Clear;
+  AAnalysis.Context.InState := AInState;
+
+  State := AInState;
+  Include(AAnalysis.Context.Flags, lcfContextDependsOnPreviousLine);
+
+  for I := 0 to ATokens.Count - 1 do begin
+    Token := ATokens[I];
+    if not IsInsideRange(Token, AStartOffset, AEndOffset) then
+      Continue;
+
+    ProcessToken(AText, Token, State, AAnalysis);
+  end;
+
+  State.Structural.CurrentConstruct := sfkUnknown;
+
+  if State.Structural.Stack.Peek(Frame) then
+    State.Structural.CurrentConstruct := Frame.Kind
+  else
+    State.Structural.CurrentConstruct := sfkUnknown;
+
+  State.StateID := CalculateStateID(State);
+
+  AAnalysis.Context.OutState := State;
+
+  Inc(FVersion);
+
+  AAnalysis.Context.Version := FVersion;
+end;
+
+function TNEDParser.StatesEqual(const ALeft, ARight: TNEDParserState): Boolean;
+var
+  I: Integer;
+  LFrame: TNEDStructuralFrame;
+  RFrame: TNEDStructuralFrame;
+begin
+  Result := False;
+
+  if ALeft.StateID <> ARight.StateID then
+    Exit;
+
+  if ALeft.Lexical.Mode <> ARight.Lexical.Mode then
+    Exit;
+
+  if ALeft.Lexical.CommentDepth <> ARight.Lexical.CommentDepth then
+    Exit;
+
+  if ALeft.Lexical.CommentKind <> ARight.Lexical.CommentKind then
+    Exit;
+
+  if ALeft.Lexical.DirectiveDepth <> ARight.Lexical.DirectiveDepth then
+    Exit;
+
+  if ALeft.Structural.CurrentConstruct <> ARight.Structural.CurrentConstruct then
+    Exit;
+
+  if ALeft.Structural.Expectation <> ARight.Structural.Expectation then
+    Exit;
+
+  if ALeft.Structural.PendingConstruct <> ARight.Structural.PendingConstruct then
+    Exit;
+
+  if ALeft.Structural.Stack.Count <> ARight.Structural.Stack.Count then
+    Exit;
+
+  for I := 0 to ALeft.Structural.Stack.Count - 1 do begin
+    LFrame := ALeft.Structural.Stack.Frames[I];
+    RFrame := ARight.Structural.Stack.Frames[I];
+
+    if LFrame.Kind <> RFrame.Kind then
+      Exit;
+    if LFrame.ScopeID <> RFrame.ScopeID then
+      Exit;
+  end;
+
+  if ALeft.Semantic.CurrentScopeID <> ARight.Semantic.CurrentScopeID then
+    Exit;
+
+  Result := True;
+end;
 
 { Helper functions }
 
@@ -936,19 +1328,6 @@ begin
   AState.Structural.Expectation := peExpression;
 end;
 
-procedure TNEDParser.UpdateExpectation(const AText: UTF8String; const AToken: TNEDTextToken; var AState: TNEDParserState);
-begin
-  if AToken.Kind = ttkNumber then begin
-    AState.Structural.Expectation := peNone;
-    Exit;
-  end;
-
-  if AToken.Kind = ttkString then begin
-    AState.Structural.Expectation := peNone;
-    Exit;
-  end;
-end;
-
 procedure TNEDParser.ProcessToken(const AText: UTF8String; const AToken: TNEDTextToken; var AState: TNEDParserState; AAnalysis: TNEDLineAnalysis);
 begin
   case AToken.Kind of
@@ -977,274 +1356,17 @@ begin
   end;
 end;
 
-procedure TNEDParser.ParseRange(const AText: UTF8String; const ATokens: TNEDTextTokenList; const AStartOffset, AEndOffset: Integer; const AInState: TNEDParserState; out AAnalysis: TNEDLineAnalysis);
-var
-  I: Integer;
-  Frame: TNEDStructuralFrame;
-  Token: TNEDTextToken;
-  State: TNEDParserState;
+procedure TNEDParser.UpdateExpectation(const AText: UTF8String; const AToken: TNEDTextToken; var AState: TNEDParserState);
 begin
-  AAnalysis := TNEDLineAnalysis.Create;
-  AAnalysis.Clear;
-  AAnalysis.Context.InState := AInState;
-
-  State := AInState;
-  Include(AAnalysis.Context.Flags, lcfContextDependsOnPreviousLine);
-
-  for I := 0 to ATokens.Count - 1 do begin
-    Token := ATokens[I];
-    if not IsInsideRange(Token, AStartOffset, AEndOffset) then
-      Continue;
-
-    ProcessToken(AText, Token, State, AAnalysis);
-  end;
-
-  State.Structural.CurrentConstruct := sfkUnknown;
-
-  if State.Structural.Stack.Peek(Frame) then
-    State.Structural.CurrentConstruct := Frame.Kind
-  else
-    State.Structural.CurrentConstruct := sfkUnknown;
-
-  State.StateID := CalculateStateID(State);
-
-  AAnalysis.Context.OutState := State;
-
-  Inc(FVersion);
-
-  AAnalysis.Context.Version := FVersion;
-end;
-
-function TNEDParser.StatesEqual(const ALeft, ARight: TNEDParserState): Boolean;
-var
-  I: Integer;
-  LFrame: TNEDStructuralFrame;
-  RFrame: TNEDStructuralFrame;
-begin
-  Result := False;
-
-  if ALeft.StateID <> ARight.StateID then
-    Exit;
-
-  if ALeft.Lexical.Mode <> ARight.Lexical.Mode then
-    Exit;
-
-  if ALeft.Lexical.CommentDepth <> ARight.Lexical.CommentDepth then
-    Exit;
-
-  if ALeft.Lexical.CommentKind <> ARight.Lexical.CommentKind then
-    Exit;
-
-  if ALeft.Lexical.DirectiveDepth <> ARight.Lexical.DirectiveDepth then
-    Exit;
-
-  if ALeft.Structural.CurrentConstruct <> ARight.Structural.CurrentConstruct then
-    Exit;
-
-  if ALeft.Structural.Expectation <> ARight.Structural.Expectation then
-    Exit;
-
-  if ALeft.Structural.PendingConstruct <> ARight.Structural.PendingConstruct then
-    Exit;
-
-  if ALeft.Structural.Stack.Count <> ARight.Structural.Stack.Count then
-    Exit;
-
-  for I := 0 to ALeft.Structural.Stack.Count - 1 do begin
-    LFrame := ALeft.Structural.Stack.Frames[I];
-    RFrame := ARight.Structural.Stack.Frames[I];
-
-    if LFrame.Kind <> RFrame.Kind then
-      Exit;
-    if LFrame.ScopeID <> RFrame.ScopeID then
-      Exit;
-  end;
-
-  if ALeft.Semantic.CurrentScopeID <> ARight.Semantic.CurrentScopeID then
-    Exit;
-
-  Result := True;
-end;
-
-constructor TNEDParser.Create;
-begin
-  inherited Create;
-  Reset;
-end;
-
-procedure TNEDParser.Reset;
-begin
-  FVersion := 0;
-end;
-
-class function TNEDParser.InitialState: TNEDParserState;
-begin
-  Result.Lexical.Mode := lmNormal;
-  Result.Lexical.StringDelimiter := #0;
-  Result.Lexical.CommentDepth := 0;
-  Result.Lexical.DirectiveDepth := 0;
-  Result.Lexical.CompilerDirective := '';
-
-  Result.Structural.Stack.Clear;
-  Result.Structural.CurrentConstruct := sfkUnknown;
-  Result.Structural.Expectation := peNone;
-  Result.Structural.PendingConstruct := sfkUnknown;
-  Result.Structural.PendingName := '';
-  Result.Structural.PendingStartLine := 0;
-  Result.Structural.PendingStartColumn := 0;
-
-  Result.Semantic.CurrentScopeID := 0;
-  Result.Semantic.CurrentSymbolID := 0;
-  Result.Semantic.CurrentTypeID := 0;
-
-  Result.StateID := 0;
-end;
-
-{ TNEDStructuralStack }
-
-procedure TNEDStructuralStack.Clear;
-begin
-  SetLength(FFrames, 0);
-end;
-
-procedure TNEDStructuralStack.Push(const AFrame: TNEDStructuralFrame);
-var
-  N: Integer;
-begin
-  N := Length(FFrames);
-  SetLength(FFrames, N + 1);
-  FFrames[N] := AFrame;
-end;
-
-function TNEDStructuralStack.Pop(out AFrame: TNEDStructuralFrame): Boolean;
-var
-  N: Integer;
-begin
-  N := Length(FFrames);
-  if N = 0 then begin
-    FillChar(AFrame, SizeOf(AFrame), 0);
-    Result := False;
+  if AToken.Kind = ttkNumber then begin
+    AState.Structural.Expectation := peNone;
     Exit;
   end;
 
-  AFrame := FFrames[N - 1];
-  SetLength(FFrames, N - 1);
-  Result := True;
-end;
-
-function TNEDStructuralStack.Peek(out AFrame: TNEDStructuralFrame): Boolean;
-var
-  N: Integer;
-begin
-  N := Length(FFrames);
-  if N = 0 then begin
-    FillChar(AFrame, SizeOf(AFrame), 0);
-    Result := False;
+  if AToken.Kind = ttkString then begin
+    AState.Structural.Expectation := peNone;
     Exit;
   end;
-
-  AFrame := FFrames[N - 1];
-  Result := True;
-end;
-
-function TNEDStructuralStack.Find(const AKind: TNEDStructuralFrameKindEnum; out AFrame: TNEDStructuralFrame): Boolean;
-var
-  I: Integer;
-begin
-  for I := Length(FFrames) - 1 downto 0 do begin
-    if FFrames[I].Kind = AKind then begin
-      AFrame := FFrames[I];
-      Result := True;
-      Exit;
-    end;
-  end;
-
-  FillChar(AFrame, SizeOf(AFrame), 0);
-  Result := False;
-end;
-
-function TNEDStructuralStack.Contains(const AKind: TNEDStructuralFrameKindEnum): Boolean;
-var
-  Dummy: TNEDStructuralFrame;
-begin
-  Result := Find(AKind, Dummy);
-end;
-
-function TNEDStructuralStack.GetCount: Integer;
-begin
-  Result := Length(FFrames);
-end;
-
-function TNEDStructuralStack.GetFrame(AIndex: Integer): TNEDStructuralFrame;
-begin
-  Result := FFrames[AIndex];
-end;
-
-{ TNEDLineAnalysis }
-
-constructor TNEDLineAnalysis.Create;
-begin
-  Tokens := TNEDLineTokens.Create;
-  Clear;
-end;
-
-destructor TNEDLineAnalysis.Destroy;
-begin
-  Clear;
-  Tokens.Free;
-  inherited;
-end;
-
-procedure TNEDLineAnalysis.Clear;
-begin
-  Tokens.Clear;
-  FillChar(Context, SizeOf(TNEDLineContext), 0);
-  SetLength(Elements, 0);
-  SetLength(Declarations, 0);
-  SetLength(References, 0);
-end;
-
-procedure TNEDLineAnalysis.AddElement(const AKind: TNEDCodeElementKindEnum; const AStartOffset, ALength: Integer);
-var
-  N: Integer;
-begin
-  if ALength <= 0 then
-    Exit;
-
-  N := Length(Elements);
-  SetLength(Elements, N + 1);
-  Elements[N].Kind := AKind;
-  Elements[N].SourceRange.StartPos.Line := 0;
-  Elements[N].SourceRange.StartPos.Column := AStartOffset;
-  Elements[N].SourceRange.StartPos.Length := ALength;
-  Elements[N].SourceRange.EndPos := Elements[N].SourceRange.StartPos;
-  Inc(Elements[N].SourceRange.EndPos.Column, ALength);
-end;
-
-procedure TNEDLineAnalysis.AddDeclaration(const ASymbolID: Cardinal; const AStartOffset, ALength: Integer);
-var
-  N: Integer;
-begin
-  N := Length(Declarations);
-  SetLength(Declarations, N + 1);
-  Declarations[N].SymbolID := ASymbolID;
-  Declarations[N].SourceRange.StartPos.Column := AStartOffset;
-  Declarations[N].SourceRange.StartPos.Length := ALength;
-  Declarations[N].SourceRange.EndPos := Declarations[N].SourceRange.StartPos;
-  Inc(Declarations[N].SourceRange.EndPos.Column, ALength);
-end;
-
-procedure TNEDLineAnalysis.AddReference(const ASymbolID: Cardinal; const AStartOffset, ALength: Integer);
-var
-  N: Integer;
-begin
-  N := Length(References);
-  SetLength(References, N + 1);
-  References[N].SymbolID := ASymbolID;
-  References[N].SourceRange.StartPos.Column := AStartOffset;
-  References[N].SourceRange.StartPos.Length := ALength;
-  References[N].SourceRange.EndPos := References[N].SourceRange.StartPos;
-  Inc(References[N].SourceRange.EndPos.Column, ALength);
 end;
 
 end.

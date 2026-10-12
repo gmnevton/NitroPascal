@@ -110,6 +110,295 @@
     "Layout" : {
     },
     "Settings" : {
+      "DarkMode" : {
+        "EditorSettings" : {
+          "BackgroundColor" : "$00330000",
+          "Font" : {
+            "Name" : "Source Code Pro Semibold",
+            "Size" : 12,
+            "Style" : "",
+            "Color": "$00FFFFFF"
+          }
+        },
+        "HighlighterProfiles" : {
+          "Count" : 2,
+          "List" : {
+            "default" : {
+              "Name" : "Default",
+              "Description" : "Default text",
+              "FileExtensions" : [
+              ],
+              "LineBreak" : "CRLF",
+              "StringDelimiter" : "'",
+              "AllowStringDelimiterNesting" : False,
+              "NestedStringDelimiterEscapeing" : False,
+              "CommentsDelimiter" : [
+                {
+                  "Type" : "SingleLine",
+                  "StartDelimiter" : "//",
+                  "EndDelimiter" : "",
+                  "CanNest" : True,
+                  "CanBeNested" : True
+                },
+                {
+                  "Type" : "MultiLine",
+                  "StartDelimiter" : "{",
+                  "EndDelimiter" : "}",
+                  "CanNest" : True,
+                  "CanBeNested" : True
+                }
+              ],
+              "DirectiveDelimiter" : {
+                "Type" : "Mixed",
+                "StartDelimiter" : "{$",
+                "EndDelimiter" : "}",
+                "CanNest" : True,
+                "CanBeNested" : True
+              },
+              "AllowNestedComments" : True,
+              "AllowMultilineStrings" : False,
+              "AllowMultilineComments" : True,
+              "Keywords" : [
+              ],
+              "Operators" : [
+                "*",
+                "/",
+                "-",
+                "+",
+                "=",
+                "<",
+                ">",
+                "..",
+              ],
+              "Punctuation" : [
+                ".",
+                ",",
+                ";",
+                ":",
+                "'",
+                "\""
+              ],
+              "BooleanLiterals" : [
+                "False",
+                "True"
+              ],
+              "NilLiterals" : [
+              ],
+              "HexPrefix" : "0x",
+              "HexSuffix" : "h",
+              "BinaryPrefix" : "0b",
+              "BinarySuffix" : "b",
+              "OctalPrefix" : "0o",
+              "OctalSuffix" : "o",
+              "ExtendedSuffix" : "e",
+              "DecimalSeparator" : ",",
+              "AllowUnderscoreNumbers" : False,
+              "CaseSensitive" : False
+            },
+            "nitropascal" : {
+              "Name" : "NitroPascal",
+              "Description" : "NitroPascal - Modern Pascal for the Next Generation",
+              "FileExtensions" : [
+                ".npe",
+                ".npc"
+              ],
+              "LineBreak" : "CRLF",
+              "StringDelimiter" : "'",
+              "AllowStringDelimiterNesting" : True,
+              "NestedStringDelimiterEscapeing" : True,
+              "CommentsDelimiter" : [
+                {
+                  "Type" : "SingleLine",
+                  "StartDelimiter" : "//",
+                  "EndDelimiter" : "",
+                  "CanNest" : True,
+                  "CanBeNested" : True
+                },
+                {
+                  "Type" : "MultiLine",
+                  "StartDelimiter" : "/.",
+                  "EndDelimiter" : "./",
+                  "CanNest" : True,
+                  "CanBeNested" : True
+                },
+                {
+                  "Type" : "MultiLine",
+                  "StartDelimiter" : "{.",
+                  "EndDelimiter" : ".}",
+                  "CanNest" : True,
+                  "CanBeNested" : True
+                },
+                {
+                  "Type" : "MultiLine",
+                  "StartDelimiter" : "(*",
+                  "EndDelimiter" : "*)",
+                  "CanNest" : True,
+                  "CanBeNested" : True
+                },
+                {
+                  "Type" : "SingleLine",
+                  "StartDelimiter" : "//-",
+                  "EndDelimiter" : "",
+                  "CanNest" : True,
+                  "CanBeNested" : False
+                },
+                {
+                  "Type" : "MultiLine",
+                  "StartDelimiter" : "//+",
+                  "EndDelimiter" : "+//",
+                  "CanNest" : True,
+                  "CanBeNested" : False
+                }
+              ],
+              "DirectiveDelimiter" : {
+                "Type" : "Mixed",
+                "StartDelimiter" : "{$",
+                "EndDelimiter" : "}",
+                "CanNest" : True,
+                "CanBeNested" : True
+              },
+              "AllowNestedComments" : True,
+              "AllowMultilineStrings" : True,
+              "AllowMultilineComments" : True,
+              "Keywords" : [
+                "and",
+                "array",
+                "as",
+                "asm",
+                "begin",
+                "break",
+                "case",
+                "class",
+                "code",
+                "const",
+                "constructor",
+                "default",
+                "defer",
+                "destructor",
+                "dispinterface",
+                "div",
+                "do",
+                "else",
+                "end",
+                "except",
+                "exit",
+                "export",
+                "exports",
+                "finalization",
+                "finally",
+                "for",
+                "goto",
+                "if",
+                "in",
+                "inherited",
+                "init",
+                "initialization",
+                "inline",
+                "interface",
+                "import",
+                "imports",
+                "is",
+                "label",
+                "library",
+                "mod",
+                "nil",
+                "not",
+                "object",
+                "of",
+                "or",
+                "out",
+                "packed",
+                "private",
+                "protected",
+                "project",
+                "property",
+                "public",
+                "raise",
+                "read",
+                "record",
+                "repeat",
+                "resourcestring",
+                "result",
+                "return",
+                "set",
+                "shl",
+                "shr",
+                "string",
+                "then",
+                "threadvar",
+                "to",
+                "try",
+                "type",
+                "until",
+                "uses",
+                "var",
+                "while",
+                "with",
+                "write",
+                "xor"
+              ],
+              "Operators" : [
+                "~",
+                "!",
+                "@",
+                "#",
+                "$",
+                "%",
+                "^",
+                "&",
+                "*",
+                "/",
+                "-",
+                "+",
+                "=",
+                "<",
+                ">",
+                "..",
+                ":=",
+                "<=",
+                ">=",
+                "<>",
+                "!=",
+                "++",
+                "--",
+                "+=",
+                "-=",
+                "*=",
+                "/=",
+                "%="
+              ],
+              "Punctuation" : [
+                ".",
+                ",",
+                ";",
+                ":",
+                "'",
+                "\""
+              ],
+              "BooleanLiterals" : [
+                "False",
+                "True"
+              ],
+              "NilLiterals" : [
+                "nil",
+                "---"
+              ],
+              "HexPrefix" : "0x",
+              "HexSuffix" : "h",
+              "BinaryPrefix" : "0b",
+              "BinarySuffix" : "b",
+              "OctalPrefix" : "0o",
+              "OctalSuffix" : "o",
+              "ExtendedSuffix" : "e",
+              "DecimalSeparator" : ".",
+              "AllowUnderscoreNumbers" : True,
+              "CaseSensitive" : True
+            }
+          }
+        }
+      },
+      "LightMode" : {
+      }
     }
   },
   "LastOpenedProjects" : {

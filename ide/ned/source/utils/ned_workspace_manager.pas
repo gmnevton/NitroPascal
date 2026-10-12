@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-07
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -22,6 +22,7 @@ uses
   ned_session_context,
   ned_projects,
   ned_editor_buffer,
+  ned_editor_view,
   ned_source_view,
   ned_splitview_manager,
   ned_dialog_message;
@@ -44,6 +45,8 @@ type
     FEmpty: Boolean;
     FWorkspaceEntries: TEntryView; // owned by TNEDMainForm.boxWorkSpace object
     FViewForm: TNEDViewForm; // owned by TNEDMainForm.pnlWorkSpace object
+    FActiveEditor: TNEDEditorView; // reference to active editor view
+  private
 //    FEditorSettings: TNEDEditorSettings;
 //    FTerminalSettings: TNEDTerminalSettings;
 //    FCodeFormatting: TNEDCodeFormatting;
@@ -84,6 +87,7 @@ type
     property Empty: Boolean read FEmpty;
     property Entries: TEntryView read FWorkspaceEntries;
     property ViewForm: TNEDViewForm read FViewForm;
+    property ActiveEditor: TNEDEditorView read FActiveEditor write FActiveEditor;
   end;
 
   TNEDWorkspaceManager = class
@@ -112,6 +116,8 @@ type
     function OpenFile(const AFilePath: String): TNEDProject;
     //
     procedure SelectWorkspaceProjectEntry(const Project: TNEDProject; const Buffer: TNEDEditorBuffer);
+    procedure SetActiveEditor(const Editor: TNEDEditorView);
+    function GetActiveEditor: TNEDEditorView;
     //
     property NEDEntries: TEntryView read GetEntries;
     property NEDViewForm: TNEDViewForm read GetViewForm;
@@ -126,6 +132,7 @@ uses
   Windows,
   Forms,
   Dialogs,
+  ned_main,
   ned_home_page,
   ned_editor_context;
 
@@ -137,6 +144,7 @@ begin
   FEmpty := True;
   FWorkspaceEntries := Nil;
   FViewForm := Nil;
+  FActiveEditor := Nil;
 end;
 
 destructor TNEDWorkspace.Destroy;
@@ -419,6 +427,8 @@ begin
       EditorContextReference.WorkspaceEntry := Entry;
       EditorContextReference.Info.Project := TObject(Entry.Data);
       TNEDProject(Entry.Data).AddEditor(EditorContextReference); // adds to owner list
+      FWorkspace.FActiveEditor := EditorContextReference.Info.Editor;
+      NEDMainForm.sliFileZoom.Value := FWorkspace.FActiveEditor.Zoom;
     end;
     Exit;
   end;
@@ -438,6 +448,8 @@ begin
     EditorContextReference.WorkspaceEntry := Entry;
     EditorContextReference.Info.Project := TObject(Entry.Data);
     TNEDProject(Entry.Data).AddEditor(EditorContextReference); // adds to owner list
+    FWorkspace.FActiveEditor := EditorContextReference.Info.Editor;
+    NEDMainForm.sliFileZoom.Value := FWorkspace.FActiveEditor.Zoom;
   end;
 end;
 
@@ -463,6 +475,17 @@ begin
     end;
     FileEntry := FilesEntry.Items.GetNextEntrySibling(FileEntry);
   end;
+end;
+
+procedure TNEDWorkspaceManager.SetActiveEditor(const Editor: TNEDEditorView);
+begin
+  FWorkspace.ActiveEditor := Editor;
+  NEDMainForm.sliFileZoom.Value := Editor.Zoom;
+end;
+
+function TNEDWorkspaceManager.GetActiveEditor: TNEDEditorView;
+begin
+  Result := FWorkspace.ActiveEditor;
 end;
 
 function TNEDWorkspaceManager.OpenProject(const AProjectPath: String): TNEDProject;

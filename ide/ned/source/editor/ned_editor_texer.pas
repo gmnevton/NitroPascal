@@ -4,7 +4,7 @@
 //
 // Author: Grzegorz Molenda
 // Created: 2024-12-27
-// Modified: 2026-09
+// Modified: 2026-10
 // All rights reserved.
 //
 
@@ -21,6 +21,7 @@ uses
 
 type
   TNEDTextTokenKindEnum = (
+    ttkDefault,
     ttkKeyword,
     ttkIdentifier,
     ttkString,
@@ -44,15 +45,19 @@ type
 //    ttsClass
 //  );
 
-  TNEDTextLineBreakStyle = (tlbsNone, tlbsLF, tlbsCRLF);
+  TNEDTextLineBreakStyleEnum = (tlbsNone, tlbsCR, tlbsLF, tlbsCRLF);
 
   TNEDTokenFormat = record
-    Font: TFont;
+    StyleID: Integer;
+    //Font: TFont;
+    FontBackground: TColor;
+    FontForeground: TColor;
+    FontStyle: TFontStyles;
     TextAlignment: TVerticalAlignment; // vtop, vcenter, vbottom
     WordBreak: Boolean; // this character token is a line break
     WordWrap: Boolean; // internal; wrap line in this place while rendering
     LineBreak: String; // oryginal line break
-    LineBreakType: TNEDTextLineBreakStyle;
+    LineBreakType: TNEDTextLineBreakStyleEnum;
     LetterSpacing: Integer;
     WordSpacing: Integer;
     TextIndentation: Integer;
@@ -113,6 +118,56 @@ type
     //
     property Count: Integer read GetCount;
     property Tokens[const AIndex: Integer]: TNEDTextToken read GetToken;
+  end;
+
+  TNEDTexerConfig = class
+  private
+    FKeywords: TStringList;
+    FOperators: TStringList;
+    FPunctuation: TStringList;
+
+    FBooleanLiterals: TStringList;
+    FNilLiterals: TStringList;
+
+    FHexPrefix: UTF8String; // 0xABCD, $ABCD
+    FHexSuffix: UTF8String; // 0ABCDH or 0ABCDh - assembler
+    FBinaryPrefix: UTF8String; // 0b01010101
+    FBinarySuffix: UTF8String; // 01010101b
+    FOctalPrefix: UTF8String; // 0o01234567
+    FOctalSuffix: UTF8String; // 01234567o
+    FExtendedSuffix: UTF8String; // 1.123e4 or 1.123E4
+
+    FDecimalSeparator: UTF8Char;
+    FAllowUnderscoreNumbers: Boolean;
+
+    FCaseSensitive: Boolean;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Assign(const ASource: TNEDTexerConfig);
+    //
+    procedure Reset;
+    procedure ConfigureList(const AList: TStringList; const ACaseSensitive: Boolean);
+    //
+    property Keywords: TStringList read FKeywords;
+    property Operators: TStringList read FOperators;
+    property Punctuation: TStringList read FPunctuation;
+
+    property BooleanLiterals: TStringList read FBooleanLiterals;
+    property NilLiterals: TStringList read FNilLiterals;
+
+    property HexPrefix: UTF8String read FHexPrefix write FHexPrefix;
+    property HexSuffix: UTF8String read FHexSuffix write FHexSuffix;
+    property BinaryPrefix: UTF8String read FBinaryPrefix write FBinaryPrefix;
+    property BinarySuffix: UTF8String read FBinarySuffix write FBinarySuffix;
+    property OctalPrefix: UTF8String read FOctalPrefix write FOctalPrefix;
+    property OctalSuffix: UTF8String read FOctalSuffix write FOctalSuffix;
+    property ExtendedSuffix: UTF8String read FExtendedSuffix write FExtendedSuffix;
+
+    property DecimalSeparator: UTF8Char read FDecimalSeparator write FDecimalSeparator;
+    property AllowUnderscoreNumbers: Boolean read FAllowUnderscoreNumbers write FAllowUnderscoreNumbers;
+
+    property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive;
   end;
 
 { Texer }
@@ -292,6 +347,99 @@ end;
 function TNEDLineTokens.GetToken(const AIndex: Integer): TNEDTextToken;
 begin
   Result := FTokens.Items[AIndex];
+end;
+
+{ TNEDTexerConfig }
+
+constructor TNEDTexerConfig.Create;
+begin
+  inherited Create;
+
+  FKeywords := TStringList.Create;
+  FOperators := TStringList.Create;
+  FPunctuation := TStringList.Create;
+  FBooleanLiterals := TStringList.Create;
+  FNilLiterals := TStringList.Create;
+
+  ConfigureList(FKeywords, False);
+  ConfigureList(FOperators, True);
+  ConfigureList(FPunctuation, True);
+  ConfigureList(FBooleanLiterals, False);
+  ConfigureList(FNilLiterals, False);
+
+  Reset;
+end;
+
+destructor TNEDTexerConfig.Destroy;
+begin
+  FNilLiterals.Free;
+  FBooleanLiterals.Free;
+  FPunctuation.Free;
+  FOperators.Free;
+  FKeywords.Free;
+
+  inherited Destroy;
+end;
+
+procedure TNEDTexerConfig.Assign(const ASource: TNEDTexerConfig);
+begin
+  if ASource = nil then
+    Exit;
+
+  FKeywords.Assign(ASource.Keywords);
+  FOperators.Assign(ASource.Operators);
+  FPunctuation.Assign(ASource.Punctuation);
+
+  FBooleanLiterals.Assign(ASource.BooleanLiterals);
+  FNilLiterals.Assign(ASource.NilLiterals);
+
+  FHexPrefix := ASource.HexPrefix;
+  FHexSuffix := ASource.HexSuffix;
+  FBinaryPrefix := ASource.BinaryPrefix;
+  FBinarySuffix := ASource.BinarySuffix;
+  FOctalPrefix := ASource.OctalPrefix;
+  FOctalSuffix := ASource.OctalSuffix;
+  FExtendedSuffix := ASource.FExtendedSuffix;
+
+  FDecimalSeparator := ASource.DecimalSeparator;
+  FAllowUnderscoreNumbers := ASource.AllowUnderscoreNumbers;
+
+  FCaseSensitive := ASource.CaseSensitive;
+end;
+
+procedure TNEDTexerConfig.Reset;
+begin
+  FKeywords.Clear;
+  FOperators.Clear;
+  FPunctuation.Clear;
+  FBooleanLiterals.Clear;
+  FNilLiterals.Clear;
+
+  FHexPrefix := '0x';
+  FHexSuffix := 'h';
+  FBinaryPrefix := '0b';
+  FBinarySuffix := 'b';
+  FOctalPrefix := '0o';
+  FOctalSuffix := 'o';
+  FExtendedSuffix := 'e';
+
+  FDecimalSeparator := '.';
+  FAllowUnderscoreNumbers := False;
+
+  FCaseSensitive := False;
+
+  // @TODO: NitroPascal / Pascal-like defaults can be added here
+end;
+
+procedure TNEDTexerConfig.ConfigureList(const AList: TStringList; const ACaseSensitive: Boolean);
+begin
+  AList.Sorted := True;
+  AList.Duplicates := dupIgnore;
+
+  if ACaseSensitive then
+    AList.CaseSensitive := True
+  else
+    AList.CaseSensitive := False;
 end;
 
 { TNEDTexer }

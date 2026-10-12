@@ -447,7 +447,7 @@ object NEDMainForm: TNEDMainForm
       Left = 65
       Top = 4
       Width = 44
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -461,7 +461,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator3: TUSeparator
       Left = 175
@@ -477,7 +476,7 @@ object NEDMainForm: TNEDMainForm
       Left = 195
       Top = 4
       Width = 34
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -491,7 +490,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator4: TUSeparator
       Left = 229
@@ -505,7 +503,7 @@ object NEDMainForm: TNEDMainForm
       Left = 249
       Top = 4
       Width = 28
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -519,7 +517,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator5: TUSeparator
       Left = 277
@@ -534,7 +531,7 @@ object NEDMainForm: TNEDMainForm
       Left = 297
       Top = 4
       Width = 32
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -548,7 +545,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator6: TUSeparator
       Left = 329
@@ -562,7 +558,7 @@ object NEDMainForm: TNEDMainForm
       Left = 349
       Top = 4
       Width = 118
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -576,7 +572,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object sepStatus: TUSeparator
       Left = 467
@@ -592,7 +587,7 @@ object NEDMainForm: TNEDMainForm
       Left = 487
       Top = 4
       Width = 15
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -607,7 +602,6 @@ object NEDMainForm: TNEDMainForm
       ParentFont = False
       Layout = tlCenter
       Visible = False
-      ExplicitHeight = 17
     end
     object btnFileZoomOut: TUQuickButton
       Left = 598
@@ -619,6 +613,7 @@ object NEDMainForm: TNEDMainForm
       Font.Name = 'Segoe MDL2 Assets'
       Font.Style = []
       ParentFont = False
+      OnClick = btnFileZoomOutClick
       BackColors.Enabled = False
       BackColors.Color = clBlack
       BackColors.LightColor = 13619151
@@ -643,6 +638,7 @@ object NEDMainForm: TNEDMainForm
       Font.Name = 'Segoe MDL2 Assets'
       Font.Style = []
       ParentFont = False
+      OnClick = btnFileZoomInClick
       BackColors.Enabled = False
       BackColors.Color = clBlack
       BackColors.LightColor = 13619151
@@ -657,7 +653,7 @@ object NEDMainForm: TNEDMainForm
       Left = 129
       Top = 4
       Width = 46
-      Height = 24
+      Height = 17
       Margins.Left = 0
       Margins.Top = 4
       Margins.Right = 0
@@ -671,7 +667,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator7: TUSeparator
       Left = 109
@@ -686,7 +681,7 @@ object NEDMainForm: TNEDMainForm
       Left = 8
       Top = 4
       Width = 37
-      Height = 24
+      Height = 17
       Margins.Left = 8
       Margins.Top = 4
       Margins.Right = 0
@@ -700,7 +695,6 @@ object NEDMainForm: TNEDMainForm
       Font.Style = []
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object USeparator8: TUSeparator
       Left = 45
@@ -751,6 +745,8 @@ object NEDMainForm: TNEDMainForm
       Align = alRight
       TabOrder = 0
       TabStop = True
+      StyleElements = []
+      OnDblClick = sliFileZoomDblClick
       BackColor.Enabled = False
       BackColor.LightColor = 10066329
       BackColor.LightHover = 6710886
@@ -773,9 +769,10 @@ object NEDMainForm: TNEDMainForm
       CurColor.DarkPress = 15921906
       CurColor.DarkDisabled = 14120960
       CurColor.DarkFocused = 15921906
-      Min = 50
-      Max = 250
+      Min = 25
+      Max = 500
       Value = 100
+      OnChange = sliFileZoomChange
     end
   end
   object pnlWorkSpace: TUPanel
