@@ -1,8 +1,8 @@
-{ JSON.VerySimple v1.6.0 - a lightweight, one-unit, cross-platform JSON reader/writer
+{ JSON.VerySimple v1.7.0 - a lightweight, one-unit, cross-platform JSON reader/writer
   for Delphi 2010-XE10.3 by Grzegorz Molenda
   https://github.com/gmnevton/JSON.VerySimple
 
-  (c) Copyrights 2016-2024 Grzegorz Molenda aka NevTon <gmnevton@gmail.com>
+  (c) Copyrights 2016-2026 Grzegorz Molenda aka NevTon <gmnevton@gmail.com>
   This unit is free and can be used for any needs. The introduction of
   any changes and the use of those changed library is permitted without
   limitations. Only requirement:
@@ -2942,16 +2942,16 @@ begin
             Break;
           end
           else begin
-            if (TempIndex > 0) and ((Self.FBufferedData[TempIndex - 1] = '\') and (Self.FBufferedData[TempIndex - 0] = '"')) then begin
-              Found := False;
-            end
-            else if (TempIndex > 0) and (Self.FBufferedData[TempIndex - 1] = '\') then begin
+            if (TempIndex > 0) and (Self.FBufferedData[TempIndex - 1] = '\') then begin
               if (TempIndex > 1) and (Self.FBufferedData[TempIndex - 2] = '\') then begin
                 Found := True;
                 Break;
               end
               else
                 Found := False;
+            end
+            else if (TempIndex > 0) and ((Self.FBufferedData[TempIndex - 1] = '\') and (Self.FBufferedData[TempIndex - 0] = '"')) then begin
+              Found := False;
             end
             else
               Inc(TempIndex);

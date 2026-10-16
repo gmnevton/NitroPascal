@@ -17,7 +17,8 @@ uses
   Classes,
   Graphics,
   Generics.Collections,
-  ned_editor_lexer;
+  ned_editor_lexer,
+  ned_editor_types;
 
 type
   TNEDTextTokenKindEnum = (
@@ -78,24 +79,44 @@ type
 
 { Keyword collection }
 
-  TNEDTextKeywordSet = class
+  TNEDTextSetArray = Array of String;
+  TNEDTextSetCharSet = Array of Char;
+
+  TNEDTextSet = class
   private
-    FKeywords: TStringList;
+    FTextSet: TStringList;
+    //
+    FTextSetArrayCache: TNEDTextSetArray;
+    FTextSetCharSetCache: TNEDTextSetCharSet;
+    FTextSetStringCache: UTF8String;
+    //
+    FTextSetArrayCacheValid: Boolean;
+    FTextSetCharSetCacheValid: Boolean;
+    FTextSetStringCacheValid: Boolean;
     //
     function GetCount: Integer;
-    function GetKeyword(AIndex: Integer): String;
+    function GetTexts(AIndex: Integer): String;
+    function GetCaseSensitive: Boolean;
+    procedure SetCaseSensitive(const Value: Boolean);
   public
-    constructor Create;
+    constructor Create(const ACaseSensitive: Boolean = False);
     destructor Destroy; override;
     //
     procedure Clear;
-    procedure Add(const AKeyword: String);
-    procedure AddKeywords(const AKeywords: Array of String);
+    procedure ClearCache;
+    procedure Assign(const ATextSet: TNEDTextSet); overload; inline;
+    procedure Assign(const AStringList: TStringList); overload; inline;
+    procedure Add(const AText: String);
+    procedure AddText(const ATextSet: TNEDTextSetArray);
     //
-    function Contains(const AKeyword: String): Boolean;
+    function Contains(const AText: String): Boolean;
+    function ToArray: TNEDTextSetArray;
+    function ToCharSet: TNEDTextSetCharSet;
+    function ToString: UTF8String;
     //
     property Count: Integer read GetCount;
-    property Keywords[AIndex: Integer]: String read GetKeyword;
+    property Texts[AIndex: Integer]: String read GetTexts;
+    property CaseSensitive: Boolean read GetCaseSensitive write SetCaseSensitive;
   end;
 
 { Line tokens }
@@ -122,12 +143,27 @@ type
 
   TNEDTexerConfig = class
   private
-    FKeywords: TStringList;
-    FOperators: TStringList;
-    FPunctuation: TStringList;
+    FWhitespaceCharSet: UTF8String; // ' ', #9, #10, #13
+    //
+    FIdentifierCharSet: UTF8String; // a..z, A..Z, 0..9, _
+    FIdentifierUnderscoreStart: Boolean; // _ident
+    FIdentifierNumberStart: Boolean; // 0ident
+    FIdentifierCanContainDash: Boolean; // some-type
+    //
+    FNumberCharSet: UTF8String; // 0..9, '.', '_', x/X, b/B, o/O, e/E, +, -
+    FNumberUnderscoreStart: Boolean; // _0123
+    FNumberNumberStart: Boolean; // 00C0FE
+    FNumberCanContainDash: Boolean; // 00-00
+    //
+    FCommentsDelimiters: Array of TNEDEditorDelimiterPair;
+    FStringDelimiter: UTF8Char; // " or '
 
-    FBooleanLiterals: TStringList;
-    FNilLiterals: TStringList;
+    FKeywords: TNEDTextSet;
+    FOperators: TNEDTextSet;
+    FPunctuation: TNEDTextSet;
+
+    FBooleanLiterals: TNEDTextSet;
+    FNilLiterals: TNEDTextSet;
 
     FHexPrefix: UTF8String; // 0xABCD, $ABCD
     FHexSuffix: UTF8String; // 0ABCDH or 0ABCDh - assembler
@@ -141,20 +177,38 @@ type
     FAllowUnderscoreNumbers: Boolean;
 
     FCaseSensitive: Boolean;
+  private
+    function GetCommentsDelimitersCount: Integer;
+    function GetCommentsDelimiters(const Index: Integer): TNEDEditorDelimiterPair;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Assign(const ASource: TNEDTexerConfig);
     //
     procedure Reset;
-    procedure ConfigureList(const AList: TStringList; const ACaseSensitive: Boolean);
     //
-    property Keywords: TStringList read FKeywords;
-    property Operators: TStringList read FOperators;
-    property Punctuation: TStringList read FPunctuation;
+    property WhitespaceCharSet: UTF8String read FWhitespaceCharSet write FWhitespaceCharSet;
+    //
+    property IdentifierCharSet: UTF8String read FIdentifierCharSet write FIdentifierCharSet;
+    property IdentifierUnderscoreStart: Boolean read FIdentifierUnderscoreStart write FIdentifierUnderscoreStart;
+    property IdentifierNumberStart: Boolean read FIdentifierNumberStart write FIdentifierNumberStart;
+    property IdentifierCanContainDash: Boolean read FIdentifierCanContainDash write FIdentifierCanContainDash;
+    //
+    property NumberCharSet: UTF8String read FNumberCharSet write FNumberCharSet;
+    property NumberUnderscoreStart: Boolean read FNumberUnderscoreStart write FNumberUnderscoreStart;
+    property NumberNumberStart: Boolean read FNumberNumberStart write FNumberNumberStart;
+    property NumberCanContainDash: Boolean read FNumberCanContainDash write FNumberCanContainDash;
+    //
+    property CommentsDelimitersCount: Integer read GetCommentsDelimitersCount;
+    property CommentsDelimiters[const Index: Integer]: TNEDEditorDelimiterPair read GetCommentsDelimiters;
+    property StringDelimiter: UTF8Char read FStringDelimiter write FStringDelimiter;
+    //
+    property Keywords: TNEDTextSet read FKeywords;
+    property Operators: TNEDTextSet read FOperators;
+    property Punctuation: TNEDTextSet read FPunctuation;
 
-    property BooleanLiterals: TStringList read FBooleanLiterals;
-    property NilLiterals: TStringList read FNilLiterals;
+    property BooleanLiterals: TNEDTextSet read FBooleanLiterals;
+    property NilLiterals: TNEDTextSet read FNilLiterals;
 
     property HexPrefix: UTF8String read FHexPrefix write FHexPrefix;
     property HexSuffix: UTF8String read FHexSuffix write FHexSuffix;
@@ -175,7 +229,7 @@ type
   TNEDTexer = class
   private
     FLexer: TNEDLexer;
-    FKeywords: TNEDTextKeywordSet;
+    FConfig: TNEDTexerConfig;
     //
     FLine: Integer;
     FText: UTF8String;
@@ -183,16 +237,18 @@ type
     //
     FCurrentOffset: Integer;
     //
+    function IsWhitespace(AChar: UTF8Char): Boolean;
+    //
+    function IsCommentDelimiterStart(AChar: UTF8Char): Boolean;
+    //
     function IsIdentifierStart(AChar: UTF8Char): Boolean;
     function IsIdentifierChar(AChar: UTF8Char): Boolean;
     //
     function IsNumberStart(AChar: UTF8Char): Boolean;
     function IsNumberChar(AChar: UTF8Char): Boolean;
     //
-    function IsWhitespace(AChar: UTF8Char): Boolean;
-    //
     function IsOperatorChar(AChar: UTF8Char): Boolean;
-    //
+    function IsPunctuationChar(AChar: UTF8Char): Boolean;
     function IsKeyword(const AText: string): Boolean;
     //
     function GetText(const AOffset, ALength: Integer): String;
@@ -219,7 +275,7 @@ type
     property Text: UTF8String read FText;
     //
     property Lexer: TNEDLexer read FLexer;
-    property Keywords: TNEDTextKeywordSet read FKeywords;
+    property Config: TNEDTexerConfig read FConfig;
     //
     property Tokens: TNEDTextTokenList read FTokens;
   end;
@@ -233,58 +289,149 @@ implementation
 //  Self.Format := Value;
 //end;
 
-{ TNEDTextKeywordSet }
+{ TNEDTextSet }
 
-constructor TNEDTextKeywordSet.Create;
+constructor TNEDTextSet.Create(const ACaseSensitive: Boolean = False);
 begin
   inherited Create;
-  FKeywords := TStringList.Create;
+  FTextSet := TStringList.Create;
 
-  FKeywords.CaseSensitive := False;
-  FKeywords.Sorted := True;
-  FKeywords.Duplicates := dupIgnore;
+  FTextSet.Sorted := True;
+  FTextSet.Duplicates := dupIgnore;
+  FTextSet.CaseSensitive := ACaseSensitive;
+
+  ClearCache;
 end;
 
-destructor TNEDTextKeywordSet.Destroy;
+destructor TNEDTextSet.Destroy;
 begin
-  FKeywords.Free;
+  ClearCache;
+  FTextSet.Free;
   inherited Destroy;
 end;
 
-procedure TNEDTextKeywordSet.Clear;
+function TNEDTextSet.GetCount: Integer;
 begin
-  FKeywords.Clear;
+  Result := FTextSet.Count;
 end;
 
-procedure TNEDTextKeywordSet.Add(const AKeyword: string);
+function TNEDTextSet.GetTexts(AIndex: Integer): string;
 begin
-  if AKeyword = '' then
+  Result := FTextSet[AIndex];
+end;
+
+function TNEDTextSet.GetCaseSensitive: Boolean;
+begin
+  Result := FTextSet.CaseSensitive;
+end;
+
+procedure TNEDTextSet.SetCaseSensitive(const Value: Boolean);
+begin
+  if FTextSet.CaseSensitive <> Value then
+    FTextSet.CaseSensitive := Value;
+end;
+
+procedure TNEDTextSet.Clear;
+begin
+  FTextSet.Clear;
+end;
+
+procedure TNEDTextSet.ClearCache;
+begin
+  SetLength(FTextSetArrayCache, 0);
+  SetLength(FTextSetCharSetCache, 0);
+  FTextSetStringCache := '';
+  //
+  FTextSetArrayCacheValid := False;
+  FTextSetCharSetCacheValid := False;
+  FTextSetStringCacheValid := False;
+end;
+
+procedure TNEDTextSet.Assign(const ATextSet: TNEDTextSet);
+begin
+  FTextSet.Assign(ATextSet.FTextSet);
+  FTextSet.CaseSensitive := ATextSet.CaseSensitive;
+end;
+
+procedure TNEDTextSet.Assign(const AStringList: TStringList);
+begin
+  FTextSet.Assign(AStringList);
+  FTextSet.CaseSensitive := AStringList.CaseSensitive;
+end;
+
+procedure TNEDTextSet.Add(const AText: String);
+begin
+  if AText = '' then
     Exit;
 
-  FKeywords.Add(AKeyword);
+  FTextSet.Add(AText);
+  ClearCache;
 end;
 
-procedure TNEDTextKeywordSet.AddKeywords(const AKeywords: array of string);
+procedure TNEDTextSet.AddText(const ATextSet: TNEDTextSetArray);
 var
   I: Integer;
 begin
-  for I := Low(AKeywords) to High(AKeywords) do
-    Add(AKeywords[I]);
+  for I := Low(ATextSet) to High(ATextSet) do
+    Add(ATextSet[I]);
+  ClearCache;
 end;
 
-function TNEDTextKeywordSet.Contains(const AKeyword: string): Boolean;
+function TNEDTextSet.Contains(const AText: String): Boolean;
 begin
-  Result := FKeywords.IndexOf(AKeyword) >= 0;
+  Result := FTextSet.IndexOf(AText) >= 0;
 end;
 
-function TNEDTextKeywordSet.GetCount: Integer;
+function TNEDTextSet.ToArray: TNEDTextSetArray;
+var
+  I: Integer;
 begin
-  Result := FKeywords.Count;
+  if FTextSetArrayCacheValid then begin
+    Exit(FTextSetArrayCache);
+  end;
+
+  SetLength(Result, FTextSet.Count);
+  for I := 0 to FTextSet.Count - 1 do
+    Result[I] := FTextSet.Strings[I];
+
+  FTextSetArrayCache := Result;
+  FTextSetArrayCacheValid := True;
 end;
 
-function TNEDTextKeywordSet.GetKeyword(AIndex: Integer): string;
+function TNEDTextSet.ToCharSet: TNEDTextSetCharSet;
+var
+  I: Integer;
+  temp: String;
 begin
-  Result := FKeywords[AIndex];
+  if FTextSetCharSetCacheValid then begin
+    Exit(FTextSetCharSetCache);
+  end;
+
+  SetLength(Result, FTextSet.Count);
+  for I := 0 to FTextSet.Count - 1 do begin
+    temp := FTextSet.Strings[I];
+    if Length(temp) > 0 then
+      Result[I] := temp[1];
+  end;
+
+  FTextSetCharSetCache := Result;
+  FTextSetCharSetCacheValid := True;
+end;
+
+function TNEDTextSet.ToString: UTF8String;
+var
+  I: Integer;
+begin
+  if FTextSetStringCacheValid then begin
+    Exit(FTextSetStringCache);
+  end;
+
+  Result := '';
+  for I := 0 to FTextSet.Count - 1 do
+    Result := Result + FTextSet.Strings[I];
+
+  FTextSetStringCache := Result;
+  FTextSetStringCacheValid := True;
 end;
 
 { TNEDLineTokens }
@@ -354,18 +501,11 @@ end;
 constructor TNEDTexerConfig.Create;
 begin
   inherited Create;
-
-  FKeywords := TStringList.Create;
-  FOperators := TStringList.Create;
-  FPunctuation := TStringList.Create;
-  FBooleanLiterals := TStringList.Create;
-  FNilLiterals := TStringList.Create;
-
-  ConfigureList(FKeywords, False);
-  ConfigureList(FOperators, True);
-  ConfigureList(FPunctuation, True);
-  ConfigureList(FBooleanLiterals, False);
-  ConfigureList(FNilLiterals, False);
+  FKeywords := TNEDTextSet.Create;
+  FOperators := TNEDTextSet.Create(True);
+  FPunctuation := TNEDTextSet.Create(True);
+  FBooleanLiterals := TNEDTextSet.Create;
+  FNilLiterals := TNEDTextSet.Create;
 
   Reset;
 end;
@@ -382,9 +522,34 @@ begin
 end;
 
 procedure TNEDTexerConfig.Assign(const ASource: TNEDTexerConfig);
+var
+  i, len: Integer;
 begin
   if ASource = nil then
     Exit;
+
+  FWhitespaceCharSet := ASource.WhitespaceCharSet;
+  //
+  FIdentifierCharSet := ASource.IdentifierCharSet;
+  FIdentifierUnderscoreStart := ASource.IdentifierUnderscoreStart;
+  FIdentifierNumberStart := ASource.IdentifierNumberStart;
+  FIdentifierCanContainDash := ASource.IdentifierCanContainDash;
+  //
+  FNumberCharSet := ASource.NumberCharSet;
+  FNumberUnderscoreStart := ASource.NumberUnderscoreStart;
+  FNumberNumberStart := ASource.NumberNumberStart;
+  FNumberCanContainDash := ASource.NumberCanContainDash;
+  //
+  len := ASource.CommentsDelimitersCount;
+  SetLength(FCommentsDelimiters, len);
+  for i := 0 to len - 1 do begin
+    FCommentsDelimiters[i].&Type := ASource.CommentsDelimiters[i].&Type;
+    FCommentsDelimiters[i].StartDelimiter := ASource.CommentsDelimiters[i].StartDelimiter;
+    FCommentsDelimiters[i].EndDelimiter := ASource.CommentsDelimiters[i].EndDelimiter;
+    FCommentsDelimiters[i].CanNest := ASource.CommentsDelimiters[i].CanNest;
+    FCommentsDelimiters[i].CanBeNested := ASource.CommentsDelimiters[i].CanBeNested;
+  end;
+  FStringDelimiter := ASource.StringDelimiter;
 
   FKeywords.Assign(ASource.Keywords);
   FOperators.Assign(ASource.Operators);
@@ -407,8 +572,34 @@ begin
   FCaseSensitive := ASource.CaseSensitive;
 end;
 
+function TNEDTexerConfig.GetCommentsDelimitersCount: Integer;
+begin
+  Result := Length(FCommentsDelimiters);
+end;
+
+function TNEDTexerConfig.GetCommentsDelimiters(const Index: Integer): TNEDEditorDelimiterPair;
+begin
+  FillChar(Result, SizeOf(TNEDEditorDelimiterPair), 0);
+  if (Index < 0) or (Index > High(FCommentsDelimiters)) then
+    Exit;
+  //
+  Result := FCommentsDelimiters[Index];
+end;
+
 procedure TNEDTexerConfig.Reset;
 begin
+  FWhitespaceCharSet := ' '#9#10#13;
+
+  FIdentifierCharSet := 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_'; // a..z, A..Z, 0..9, _
+  FIdentifierUnderscoreStart := True; // _ident
+  FIdentifierNumberStart := False; // 0ident
+  FIdentifierCanContainDash := False; // some-type
+
+  FNumberCharSet := '0123456789._xboe+-'; // 0..9, '.', '_', x/X, b/B, o/O, e/E, +, -
+  FNumberUnderscoreStart := False; // _0123
+  FNumberNumberStart := True; // 00C0FE
+  FNumberCanContainDash := False; // 00-00
+
   FKeywords.Clear;
   FOperators.Clear;
   FPunctuation.Clear;
@@ -431,24 +622,13 @@ begin
   // @TODO: NitroPascal / Pascal-like defaults can be added here
 end;
 
-procedure TNEDTexerConfig.ConfigureList(const AList: TStringList; const ACaseSensitive: Boolean);
-begin
-  AList.Sorted := True;
-  AList.Duplicates := dupIgnore;
-
-  if ACaseSensitive then
-    AList.CaseSensitive := True
-  else
-    AList.CaseSensitive := False;
-end;
-
 { TNEDTexer }
 
 constructor TNEDTexer.Create(const ALexer: TNEDLexer);
 begin
   inherited Create;
   FLexer := ALexer;
-  FKeywords := TNEDTextKeywordSet.Create;
+  FConfig := TNEDTexerConfig.Create;
   FTokens := TNEDTextTokenList.Create;
 
   FLine := 0;
@@ -459,7 +639,7 @@ end;
 destructor TNEDTexer.Destroy;
 begin
   FTokens.Free;
-  FKeywords.Free;
+  FConfig.Free;
   inherited Destroy;
 end;
 
@@ -483,49 +663,83 @@ begin
 //  FLexer.SetText(ALine + 1, AText);
 end;
 
+function TNEDTexer.IsWhitespace(AChar: UTF8Char): Boolean;
+begin
+  Result := Pos(AChar, FConfig.FWhitespaceCharSet) > 0;
+end;
+
+function TNEDTexer.IsCommentDelimiterStart(AChar: UTF8Char): Boolean;
+var
+  start_len, i, idx: Integer;
+  CommentDelimiters: TNEDEditorDelimiterPair;
+begin
+  Result := False;
+  if AChar = #0 then
+    Exit;
+  //
+  for i := 0 to FConfig.CommentsDelimitersCount - 1 do begin
+    CommentDelimiters := FConfig.CommentsDelimiters[i];
+    start_len := Length(CommentDelimiters.StartDelimiter);
+    if (CommentDelimiters.&Type > ectNotInComment) and (start_len >= 1) then begin
+      idx := 1;
+      while (AChar <> #0) and (idx <= start_len) do begin
+        if AChar = CommentDelimiters.StartDelimiter[idx] then begin
+          Inc(idx);
+          AChar := FLexer.PeekChar(idx - 1);
+        end
+        else
+          Break;
+      end;
+      if idx > start_len then begin
+        Result := True;
+        Break;
+      end;
+    end;
+  end;
+end;
+
 function TNEDTexer.IsIdentifierStart(AChar: UTF8Char): Boolean;
 begin
-  Result := ((AChar >= 'A') and (AChar <= 'Z')) or ((AChar >= 'a') and (AChar <= 'z')) or (AChar = '_');
+  if AChar = '_' then
+    Exit(FConfig.FIdentifierUnderscoreStart);
+
+  if ((AChar >= '0') and (AChar <= '9')) then
+    Exit(FConfig.FIdentifierNumberStart);
+
+  Result := Pos(AChar, FConfig.FIdentifierCharSet) > 0; // ((AChar >= 'A') and (AChar <= 'Z')) or ((AChar >= 'a') and (AChar <= 'z')) or (AChar = '_');
 end;
 
 function TNEDTexer.IsIdentifierChar(AChar: UTF8Char): Boolean;
 begin
-  Result := IsIdentifierStart(AChar) or ((AChar >= '0') and (AChar <= '9'));
+  Result := Pos(AChar, FConfig.FIdentifierCharSet) > 0;
 end;
 
 function TNEDTexer.IsNumberStart(AChar: UTF8Char): Boolean;
 begin
+  if AChar = '_' then
+    Exit(FConfig.FNumberUnderscoreStart);
+
   Result := (AChar >= '0') and (AChar <= '9');
 end;
 
 function TNEDTexer.IsNumberChar(AChar: UTF8Char): Boolean;
 begin
-  Result := ((AChar >= '0') and (AChar <= '9')) or
-            (AChar = '.') or
-            (AChar = '_') or
-            (AChar = 'x') or
-            (AChar = 'X') or
-            (AChar = 'b') or
-            (AChar = 'B') or
-            (AChar = 'e') or
-            (AChar = 'E') or
-            (AChar = '+') or
-            (AChar = '-');
-end;
-
-function TNEDTexer.IsWhitespace(AChar: UTF8Char): Boolean;
-begin
-  Result := (AChar = ' ') or (AChar = #9) or (AChar = #10) or (AChar = #13);
+  Result := Pos(AChar, FConfig.FNumberCharSet) > 0;
 end;
 
 function TNEDTexer.IsOperatorChar(AChar: UTF8Char): Boolean;
 begin
-  Result := Pos(AChar, '+-*/=<>:;,.()[]{}^@&|~%!?') > 0;
+  Result := Pos(AChar, FConfig.Operators.ToString) > 0;
+end;
+
+function TNEDTexer.IsPunctuationChar(AChar: UTF8Char): Boolean;
+begin
+  Result := Pos(AChar, FConfig.Punctuation.ToString) > 0;
 end;
 
 function TNEDTexer.IsKeyword(const AText: string): Boolean;
 begin
-  Result := FKeywords.Contains(AText);
+  Result := FConfig.Keywords.Contains(AText);
 end;
 
 function TNEDTexer.GetText(const AOffset, ALength: Integer): string;
@@ -555,91 +769,72 @@ end;
 procedure TNEDTexer.TexIdentifier;
 var
   StartPosition: Integer;
-  CurrentPosition: Integer;
   C: UTF8Char;
   S: string;
   TokenKind: TNEDTextTokenKindEnum;
 begin
   StartPosition := FLexer.Position;
-  CurrentPosition := StartPosition;
 
-  while CurrentPosition <= Length(FText) do begin
-    C := FText[CurrentPosition];
+  while not FLexer.IsEOF do begin
+    C := FLexer.PeekChar(0);
     if not IsIdentifierChar(C) then
       Break;
-
-    Inc(CurrentPosition);
+    if not FLexer.NextChar(C) then
+      Break;
   end;
 
-  S := GetText(StartPosition, CurrentPosition - StartPosition);
+  S := GetText(StartPosition, FLexer.Position - StartPosition);
   if IsKeyword(S) then
     TokenKind := ttkKeyword
   else
     TokenKind := ttkIdentifier;
 
-  AddToken(TokenKind, StartPosition, CurrentPosition - StartPosition);
-
-  while FLexer.Position < CurrentPosition do
-    FLexer.NextChar(C);
+  if FLexer.Position > StartPosition then
+    AddToken(TokenKind, StartPosition, FLexer.Position - StartPosition);
 end;
 
 procedure TNEDTexer.TexNumber;
 var
   StartPosition: Integer;
-  CurrentPosition: Integer;
   C: UTF8Char;
 begin
   StartPosition := FLexer.Position;
-  CurrentPosition := StartPosition;
 
-  while CurrentPosition <= Length(FText) do begin
-    C := FText[CurrentPosition];
+  while not FLexer.IsEOF do begin
+    C := FLexer.PeekChar(0);
     if not IsNumberChar(C) then
       Break;
-
-    Inc(CurrentPosition);
+    if not FLexer.NextChar(C) then
+      Break;
   end;
 
-  AddToken(ttkNumber, StartPosition, CurrentPosition - StartPosition);
-
-  while FLexer.Position < CurrentPosition do
-    FLexer.NextChar(C);
+  if FLexer.Position > StartPosition then
+    AddToken(ttkNumber, StartPosition, FLexer.Position - StartPosition);
 end;
 
 procedure TNEDTexer.TexString;
 var
   StartPosition: Integer;
   C: UTF8Char;
-  Finished: Boolean;
 begin
   StartPosition := FLexer.Position;
-  Finished := False;
 
   while not FLexer.IsEOF do begin
-    if not FLexer.NextChar(C) then
-      Break;
-
+    C := FLexer.PeekChar(0);
     if FLexer.State.Mode = lmNormal then begin
-      // The character which closed the string has already been consumed by the lexer.
-      if C = '''' then begin
-        Finished := True;
-        Break;
-      end;
-
-      if C = '"' then begin
-        Finished := True;
+      // the character which closed the string has already been consumed by the lexer
+      if C = FConfig.StringDelimiter then begin
         Break;
       end;
     end;
+    if not FLexer.NextChar(C) then
+      Break;
   end;
 
   if FLexer.Position > StartPosition then
     AddToken(ttkString, StartPosition, FLexer.Position - StartPosition);
 
-  // Finished is intentionally not used to force an error.
-  //
-  // An unterminated string is perfectly normal while the
-  // user is editing source code.
+  // an unterminated string is perfectly normal while the user is editing source code
 end;
 
 procedure TNEDTexer.TexComment;
@@ -650,11 +845,11 @@ begin
   StartPosition := FLexer.Position;
 
   while not FLexer.IsEOF do begin
-    if not FLexer.NextChar(C) then
-      Break;
-
-    // Once the lexer returns to normal mode, the comment has ended.
+    C := FLexer.PeekChar(0);
+    // once the lexer returns to normal mode, the comment has ended
     if FLexer.State.Mode = lmNormal then
+      Break;
+    if not FLexer.NextChar(C) then
       Break;
   end;
 
@@ -665,49 +860,50 @@ end;
 procedure TNEDTexer.TexOperator;
 var
   StartPosition: Integer;
-  CurrentPosition: Integer;
   C: UTF8Char;
 begin
   StartPosition := FLexer.Position;
-  CurrentPosition := StartPosition;
 
-  while CurrentPosition <= Length(FText) do begin
-    C := FText[CurrentPosition];
+  while not FLexer.IsEOF do begin
+    C := FLexer.PeekChar(0);
     if not IsOperatorChar(C) then
       Break;
 
+    // @TODO: parametrize this
     // Comments and directives must be allowed to terminate an operator sequence.
-    if (C = '/') and (CurrentPosition < Length(FText)) and (FText[CurrentPosition + 1] = '/') then
+    if (C = '/') and (FLexer.Position < Length(FText)) and (FLexer.PeekChar = '/') then
       Break;
 
-    if (C = '/') and (CurrentPosition < Length(FText)) and (FText[CurrentPosition + 1] = '*') then
+    if (C = '/') and (FLexer.Position < Length(FText)) and (FLexer.PeekChar = '*') then
       Break;
 
-    Inc(CurrentPosition);
+    if not FLexer.NextChar(C) then
+      Break;
   end;
 
-  if CurrentPosition = StartPosition then begin
+  if FLexer.Position = StartPosition then begin
     FLexer.NextChar(C);
     AddToken(ttkOperator, StartPosition, 1);
     Exit;
   end;
 
-  AddToken(ttkOperator, StartPosition, CurrentPosition - StartPosition);
-
-  while FLexer.Position < CurrentPosition do
-    FLexer.NextChar(C);
+  AddToken(ttkOperator, StartPosition, FLexer.Position - StartPosition);
 end;
 
 procedure TNEDTexer.TexWhitespace;
 var
   C: UTF8Char;
 begin
-  while not FLexer.IsEOF do begin
-    C := FText[FLexer.Position];
+  if not FLexer.NextChar(C) then
+    Exit;
+  C := FLexer.PeekChar(0);
+  if not IsWhitespace(C) then
+    Exit;
+
+  while FLexer.NextChar(C) do begin
+    C := FLexer.PeekChar(0);
     if not IsWhitespace(C) then
       Break;
-
-    FLexer.NextChar(C);
   end;
 end;
 
@@ -732,7 +928,7 @@ begin
   FLexer.SetText(FLine + 1, FText);
   while not FLexer.IsEOF do begin
     StartPosition := FLexer.Position;
-    // Lexical state has priority over character classification.
+    // lexical state has priority over character classification
     case FLexer.State.Mode of
       lmString: begin
         TexString;
@@ -743,40 +939,37 @@ begin
       end;
 
       lmDirective: begin
-        // For now compiler directives are represented as comments at the token level.
-        // Later this can become its own token kind if required.
+        // for now compiler directives are represented as comments at the token level,
+        // later this can become its own token kind if required
         TexComment;
       end;
 
       lmNormal: begin
-        C := FText[FLexer.Position];
+        C := FLexer.PeekChar(0); // FText[FLexer.Position];
+
         if IsWhitespace(C) then
           TexWhitespace
         else if IsIdentifierStart(C) then
           TexIdentifier
         else if IsNumberStart(C) then
           TexNumber
-        else if IsOperatorChar(C) then begin
-          // Special handling for constructs which cause the lexer to enter another lexical state.
-          if ((C = '''') or (C = '"')) then
+        else if IsOperatorChar(C) then
+          TexOperator
+        else if IsPunctuationChar(C) then begin
+          // special handling for constructs which cause the lexer to enter another lexical state
+          if C = FConfig.StringDelimiter then
             TexString
-          else if (C = '/') and (FLexer.PeekChar = '/') then
-            TexComment
-          else if (C = '/') and (FLexer.PeekChar = '*') then
-            TexComment
-          else if (C = '{') and (FLexer.PeekChar = '$') then
-            TexComment
-          else if C = '{' then
+          else if IsCommentDelimiterStart(C) then // this checks all possible comments types
             TexComment
           else
-            TexOperator;
+            TexUnknown;
         end
         else
           TexUnknown;
       end;
     end;
 
-    // Safety against a malformed lexer/texer combination which does not advance the input.
+    // safety against a malformed lexer/texer combination which does not advance the input
     if FLexer.Position = StartPosition then
       FLexer.NextChar(C);
   end;

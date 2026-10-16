@@ -129,6 +129,19 @@
               "FileExtensions" : [
               ],
               "LineBreak" : "CRLF",
+              "WhitespaceCharSet" : " \u0009\u000A\u000D",
+              "IdentifierRuleSet" : {
+                "CharSet" : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_",
+                "UnderscoreStart" : True,
+                "NumberStart" : False,
+                "CanContainDash" : False
+              },
+              "NumberRuleSet" : {
+                "CharSet" : "0123456789._xboe+-",
+                "UnderscoreStart" : False,
+                "NumberStart" : True,
+                "CanContainDash" : False
+              },
               "StringDelimiter" : "'",
               "AllowStringDelimiterNesting" : False,
               "NestedStringDelimiterEscapeing" : False,
@@ -161,14 +174,31 @@
               "Keywords" : [
               ],
               "Operators" : [
+                "+",
+                "-",
                 "*",
                 "/",
-                "-",
-                "+",
                 "=",
                 "<",
                 ">",
-                "..",
+                "(",
+                ")",
+                "[",
+                "]",
+                "{",
+                "}",
+                "!",
+                "@",
+                "#",
+                "$",
+                "%",
+                "^",
+                "&",
+                "?",
+                "|",
+                "`",
+                "~",
+                "\\"
               ],
               "Punctuation" : [
                 ".",
@@ -203,6 +233,19 @@
                 ".npc"
               ],
               "LineBreak" : "CRLF",
+              "WhitespaceCharSet" : " \u0009\u000A\u000D",
+              "IdentifierRuleSet" : {
+                "CharSet" : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_",
+                "UnderscoreStart" : True,
+                "NumberStart" : False,
+                "CanContainDash" : False
+              },
+              "NumberRuleSet" : {
+                "CharSet" : "0123456789._xboe+-",
+                "UnderscoreStart" : False,
+                "NumberStart" : True,
+                "CanContainDash" : False
+              },
               "StringDelimiter" : "'",
               "AllowStringDelimiterNesting" : True,
               "NestedStringDelimiterEscapeing" : True,

@@ -418,6 +418,22 @@ begin
       LangProfile.LexerConfig.AllowMultilineStrings := HighlightSettings.AllowMultilineStrings;
       LangProfile.LexerConfig.AllowMultilineComments := HighlightSettings.AllowMultilineComments;
       //
+      LangProfile.TexerConfig.WhitespaceCharSet := HighlightSettings.WhitespaceCharSet;
+      //
+      LangProfile.TexerConfig.IdentifierCharSet := HighlightSettings.IdentifierRuleSet.CharSet;
+      LangProfile.TexerConfig.IdentifierUnderscoreStart := HighlightSettings.IdentifierRuleSet.UnderscoreStart;
+      LangProfile.TexerConfig.IdentifierNumberStart := HighlightSettings.IdentifierRuleSet.NumberStart;
+      LangProfile.TexerConfig.IdentifierCanContainDash := HighlightSettings.IdentifierRuleSet.CanContainDash;
+      //
+      LangProfile.TexerConfig.NumberCharSet := HighlightSettings.NumberRuleSet.CharSet;
+      LangProfile.TexerConfig.NumberUnderscoreStart := HighlightSettings.NumberRuleSet.UnderscoreStart;
+      LangProfile.TexerConfig.NumberNumberStart := HighlightSettings.NumberRuleSet.NumberStart;
+      LangProfile.TexerConfig.NumberCanContainDash := HighlightSettings.NumberRuleSet.CanContainDash;
+      //
+      LangProfile.TexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
+      //LangProfile.TexerConfig.AllowStringDelimiterNesting
+      //LangProfile.TexerConfig.NestedStringDelimiterEscapeing
+      //
       LangProfile.TexerConfig.Keywords.Assign(HighlightSettings.Keywords);
       LangProfile.TexerConfig.Operators.Assign(HighlightSettings.Operators);
       LangProfile.TexerConfig.Punctuation.Assign(HighlightSettings.Punctuation);

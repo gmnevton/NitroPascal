@@ -35,6 +35,13 @@ type
     class function StringToEditorCommentType(Value: String): TNEDEditorCommentTypeEnum; static;
   end;
 
+  TNEDCharSetRule = record
+    CharSet: UTF8String; // a..z, A..Z, 0..9, _
+    UnderscoreStart: Boolean; // _ident
+    NumberStart: Boolean; // 0ident
+    CanContainDash: Boolean; // some-type
+  end;
+
 implementation
 
 { TNEDEditorDelimiterPair }

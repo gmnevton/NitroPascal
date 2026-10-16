@@ -3650,8 +3650,7 @@ begin
   if (FHighlighter <> Nil) and (FHighlighter.FEditorControl <> Nil) then begin
     DocumentAnalyzer := FHighlighter.FEditorControl.Document.DocumentAnalyzer;
     DocumentAnalyzer.Lexer.Config.Assign(FLexerConfig);
-    DocumentAnalyzer.Texer.Keywords.Clear;
-    DocumentAnalyzer.Texer.Keywords.AddKeywords(FTexerConfig.Keywords.ToStringArray);
+    DocumentAnalyzer.Texer.Config.Assign(FTexerConfig);
     //DocumentAnalyzer.Parser.Config.Assign(FLexerConfig);
 
     FHighlighter.FEditorControl.Invalidate;

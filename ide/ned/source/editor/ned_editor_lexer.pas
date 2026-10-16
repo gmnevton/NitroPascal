@@ -196,6 +196,8 @@ begin
 
   FLineBreak := ASource.FLineBreak;
   FStringDelimiter := ASource.StringDelimiter;
+  FAllowStringDelimiterNesting := ASource.AllowStringDelimiterNesting;
+  FNestedStringDelimiterEscapeing := ASource.NestedStringDelimiterEscapeing;
 
   SetLength(FCommentsDelimiter, 0);
   for i := 0 to High(ASource.FCommentsDelimiter) do

@@ -69,12 +69,16 @@ type
     FFileExtensions: TStringList;
     //
     FLineBreak: UTF8String; // CRLF or LF or CR
+    FWhitespaceCharSet: UTF8String; // ' ', #9, #10, #13
+    FIdentifierRuleSet: TNEDCharSetRule;
+    FNumberRuleSet: TNEDCharSetRule;
     FStringDelimiter: UTF8Char; // " or '
     FAllowStringDelimiterNesting: Boolean;
     FNestedStringDelimiterEscapeing: Boolean;
     //
     FCommentsDelimiter: Array of TNEDEditorDelimiterPair; // see the compiler\concepts\comment\comment.npc file for detail explanation
     FDirectiveDelimiter: TNEDEditorDelimiterPair; // '{$' - directive begin; '}' directive end
+    //FCompilerVariable: TNEDEditorDelimiterPair; // %project-name%
     //
     FAllowNestedComments: Boolean;
     FAllowMultilineStrings: Boolean;
@@ -116,6 +120,9 @@ type
     property FileExtensions: TStringList read FFileExtensions;
     //
     property LineBreak: UTF8String read FLineBreak; // CRLF or LF or CR
+    property WhitespaceCharSet: UTF8String read FWhitespaceCharSet; // ' ', #9, #10, #13
+    property IdentifierRuleSet: TNEDCharSetRule read FIdentifierRuleSet;
+    property NumberRuleSet: TNEDCharSetRule read FNumberRuleSet;
     property StringDelimiter: UTF8Char read FStringDelimiter; // " or '
     property AllowStringDelimiterNesting: Boolean read FAllowStringDelimiterNesting;
     property NestedStringDelimiterEscapeing: Boolean read FNestedStringDelimiterEscapeing;
@@ -351,26 +358,9 @@ constructor TNEDEditorHighlightSettings.Create;
 begin
   inherited Create;
   //
-  FName := '';
-  FDescription := '';
   FFileExtensions := TStringList.Create;
   //
-  FLineBreak := ''; // CRLF or LF or CR
-  FStringDelimiter := #0; // " or '
-  FAllowStringDelimiterNesting := False;
-  FNestedStringDelimiterEscapeing := False;
-  //
   SetLength(FCommentsDelimiter, 0);
-  FDirectiveDelimiter.&Type := ectNotInComment; // '{$' - directive begin; '}' directive end
-  FDirectiveDelimiter.StartDelimiter := '';
-  FDirectiveDelimiter.EndDelimiter := '';
-  FDirectiveDelimiter.CanNest := False;
-  FDirectiveDelimiter.CanBeNested := False;
-  //
-  FAllowNestedComments := False;
-  FAllowMultilineStrings := False;
-  FAllowMultilineComments := False;
-  //
   //
   FKeywords := TStringList.Create;
   FOperators := TStringList.Create;
@@ -379,18 +369,7 @@ begin
   FBooleanLiterals := TStringList.Create;
   FNilLiterals := TStringList.Create;
   //
-  FHexPrefix := ''; // 0xABCD, $ABCD
-  FHexSuffix := ''; // 0ABCDH or 0ABCDh - assembler
-  FBinaryPrefix := ''; // 0b01010101
-  FBinarySuffix := ''; // 01010101b
-  FOctalPrefix := ''; // 0o01234567
-  FOctalSuffix := ''; // 01234567o
-  FExtendedSuffix := ''; // 1.123e4 or 1.123E4
-  //
-  FDecimalSeparator := #0; // 12345.6789
-  FAllowUnderscoreNumbers := False; // eg.: 123_456_789
-  //
-  FCaseSensitive := False;
+  Reset;
 end;
 
 destructor TNEDEditorHighlightSettings.Destroy;
@@ -402,6 +381,7 @@ begin
   FFileExtensions.Free;
   //
   FLineBreak := '';
+  FWhitespaceCharSet := '';
   FStringDelimiter := #0;
   //
   for i := 0 to High(FCommentsDelimiter) do begin
@@ -439,6 +419,7 @@ end;
 
 function TNEDEditorHighlightSettings.GetCommentsDelimiters(const Index: Integer): TNEDEditorDelimiterPair;
 begin
+  FillChar(Result, SizeOf(TNEDEditorDelimiterPair), 0);
   if (Index < 0) or (Index > High(FCommentsDelimiter)) then
     Exit;
   //
@@ -454,6 +435,11 @@ begin
   FFileExtensions.Clear;
   //
   FLineBreak := ''; // CRLF or LF or CR
+  FWhitespaceCharSet := ' '#9#10#13;
+  FIdentifierRuleSet.CharSet := 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_';
+  FIdentifierRuleSet.UnderscoreStart := True;
+  FIdentifierRuleSet.NumberStart := False;
+  FIdentifierRuleSet.CanContainDash := False;
   FStringDelimiter := #0; // " or '
   FAllowStringDelimiterNesting := False;
   FNestedStringDelimiterEscapeing := False;
@@ -481,15 +467,15 @@ begin
   FBooleanLiterals.Clear;
   FNilLiterals.Clear;
   //
-  FHexPrefix := ''; // 0xABCD, $ABCD
-  FHexSuffix := ''; // 0ABCDH or 0ABCDh - assembler
-  FBinaryPrefix := ''; // 0b01010101
-  FBinarySuffix := ''; // 01010101b
-  FOctalPrefix := ''; // 0o01234567
-  FOctalSuffix := ''; // 01234567o
-  FExtendedSuffix := ''; // 1.123e4 or 1.123E4
+  FHexPrefix := '0x'; // 0xABCD, $ABCD
+  FHexSuffix := 'h'; // 0ABCDH or 0ABCDh - assembler
+  FBinaryPrefix := '0b'; // 0b01010101
+  FBinarySuffix := 'b'; // 01010101b
+  FOctalPrefix := '0o'; // 0o01234567
+  FOctalSuffix := 'o'; // 01234567o
+  FExtendedSuffix := 'e'; // 1.123e4 or 1.123E4
   //
-  FDecimalSeparator := #0; // 12345.6789
+  FDecimalSeparator := '.'; // 12345.6789
   FAllowUnderscoreNumbers := False; // eg.: 123_456_789
   //
   FCaseSensitive := False;
@@ -517,6 +503,21 @@ begin
   end;
   //
   FLineBreak := ARoot.Document.NodeAsString(ARoot, 'LineBreak', 'CRLF'); // CRLF or LF or CR
+  FWhitespaceCharSet := ARoot.Document.NodeAsString(ARoot, 'WhitespaceCharSet', ' '#9#10#13);
+  Root := ARoot.FindNode('IdentifierRuleSet', [jtObject]);
+  if Root <> Nil then begin
+    FIdentifierRuleSet.CharSet := ARoot.Document.NodeAsString(Root, 'CharSet', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_');
+    FIdentifierRuleSet.UnderscoreStart := ARoot.Document.NodeAsBoolean(Root, 'UnderscoreStart', True);
+    FIdentifierRuleSet.NumberStart := ARoot.Document.NodeAsBoolean(Root, 'NumberStart', False);
+    FIdentifierRuleSet.CanContainDash := ARoot.Document.NodeAsBoolean(Root, 'CanContainDash', False);
+  end;
+  Root := ARoot.FindNode('NumberRuleSet', [jtObject]);
+  if Root <> Nil then begin
+    FNumberRuleSet.CharSet := ARoot.Document.NodeAsString(Root, 'CharSet', '0123456789._xboe+-');
+    FNumberRuleSet.UnderscoreStart := ARoot.Document.NodeAsBoolean(Root, 'UnderscoreStart', False);
+    FNumberRuleSet.NumberStart := ARoot.Document.NodeAsBoolean(Root, 'NumberStart', True);
+    FNumberRuleSet.CanContainDash := ARoot.Document.NodeAsBoolean(Root, 'CanContainDash', False);
+  end;
   FStringDelimiter := UTF8Char(ARoot.Document.NodeAsChar(ARoot, 'StringDelimiter', #39)); // #34 - " or #39 - '
   FAllowStringDelimiterNesting := ARoot.Document.NodeAsBoolean(ARoot, 'AllowStringDelimiterNesting', False);
   FNestedStringDelimiterEscapeing := ARoot.Document.NodeAsBoolean(ARoot, 'NestedStringDelimiterEscapeing', False);
