@@ -128,7 +128,7 @@
               "Description" : "Default text",
               "FileExtensions" : [
               ],
-              "LineBreak" : "CRLF",
+              "LineBreak" : "\u000D\u000A",
               "WhitespaceCharSet" : " \u0009\u000A\u000D",
               "IdentifierRuleSet" : {
                 "CharSet" : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_",
@@ -168,6 +168,15 @@
                 "CanNest" : True,
                 "CanBeNested" : True
               },
+              "DirectiveCanContainDash" : False,
+              "CompilerVariableDelimiter" : {
+                "Type" : "Mixed",
+                "StartDelimiter" : "%",
+                "EndDelimiter" : "%",
+                "CanNest" : False,
+                "CanBeNested" : True
+              },
+              "CompilerVariableCanContainDash" : True,
               "AllowNestedComments" : True,
               "AllowMultilineStrings" : False,
               "AllowMultilineComments" : True,
@@ -232,7 +241,7 @@
                 ".npe",
                 ".npc"
               ],
-              "LineBreak" : "CRLF",
+              "LineBreak" : "\u000D\u000A",
               "WhitespaceCharSet" : " \u0009\u000A\u000D",
               "IdentifierRuleSet" : {
                 "CharSet" : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_",
@@ -300,6 +309,15 @@
                 "CanNest" : True,
                 "CanBeNested" : True
               },
+              "DirectiveCanContainDash" : True,
+              "CompilerVariableDelimiter" : {
+                "Type" : "Mixed",
+                "StartDelimiter" : "%",
+                "EndDelimiter" : "%",
+                "CanNest" : False,
+                "CanBeNested" : True
+              },
+              "CompilerVariableCanContainDash" : True,
               "AllowNestedComments" : True,
               "AllowMultilineStrings" : True,
               "AllowMultilineComments" : True,

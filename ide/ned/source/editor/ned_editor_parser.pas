@@ -311,6 +311,7 @@ type
     destructor Destroy; override;
     procedure Assign(const ASource: TNEDParserConfig);
     //
+    procedure Clear;
     procedure Reset;
     //
     function AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum): TNEDParserKeyword;
@@ -567,6 +568,12 @@ begin
   end;
 end;
 
+procedure TNEDParserConfig.Clear;
+begin
+  FKeywords.Clear;
+  FCaseSensitive := False;
+end;
+
 procedure TNEDParserConfig.Reset;
 begin
   FKeywords.Clear;
@@ -615,8 +622,14 @@ begin
   Result.Lexical.Mode := lmNormal;
   Result.Lexical.StringDelimiter := #0;
   Result.Lexical.CommentDepth := 0;
+  Result.Lexical.CommentKind := lckNone;
+  Result.Lexical.CommentEndDelimiter := '';
+  Result.Lexical.CommentCanNest := False;
+  Result.Lexical.CommentCanBeNested := False;
+  Result.Lexical.DirectiveEndDelimiter := '';
   Result.Lexical.DirectiveDepth := 0;
-  Result.Lexical.CompilerDirective := '';
+  Result.Lexical.CompilerVariableEndDelimiter := '';
+  Result.Lexical.CompilerVariableDepth := 0;
 
   Result.Structural.Stack.Clear;
   Result.Structural.CurrentConstruct := sfkUnknown;

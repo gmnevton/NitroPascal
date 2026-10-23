@@ -78,7 +78,9 @@ type
     //
     FCommentsDelimiter: Array of TNEDEditorDelimiterPair; // see the compiler\concepts\comment\comment.npc file for detail explanation
     FDirectiveDelimiter: TNEDEditorDelimiterPair; // '{$' - directive begin; '}' directive end
-    //FCompilerVariable: TNEDEditorDelimiterPair; // %project-name%
+    FDirectiveCanContainDash: Boolean; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
+    FCompilerVariableDelimiter: TNEDEditorDelimiterPair; // %project-name%
+    FCompilerVariableCanContainDash: Boolean; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
     //
     FAllowNestedComments: Boolean;
     FAllowMultilineStrings: Boolean;
@@ -131,6 +133,9 @@ type
     property CommentsDelimitersCount: Integer read GetCommentsDelimitersCount;
     property CommentsDelimiters[const Index: Integer]: TNEDEditorDelimiterPair read GetCommentsDelimiters;
     property DirectiveDelimiter: TNEDEditorDelimiterPair read FDirectiveDelimiter; // '{$' - directive begin; '}' directive end
+    property DirectiveCanContainDash: Boolean read FDirectiveCanContainDash; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
+    property CompilerVariableDelimiter: TNEDEditorDelimiterPair read FCompilerVariableDelimiter; // %project-name%
+    property CompilerVariableCanContainDash: Boolean read FCompilerVariableCanContainDash; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
     //
     property AllowNestedComments: Boolean read FAllowNestedComments;
     property AllowMultilineStrings: Boolean read FAllowMultilineStrings;
@@ -391,7 +396,8 @@ begin
   SetLength(FCommentsDelimiter, 0);
   FDirectiveDelimiter.StartDelimiter := '';
   FDirectiveDelimiter.EndDelimiter := '';
-  //
+  FCompilerVariableDelimiter.StartDelimiter := '';
+  FCompilerVariableDelimiter.EndDelimiter := '';
   //
   FKeywords.Free;
   FOperators.Free;
@@ -434,13 +440,13 @@ begin
   FDescription := '';
   FFileExtensions.Clear;
   //
-  FLineBreak := ''; // CRLF or LF or CR
+  FLineBreak := #13#10; // CRLF or LF or CR
   FWhitespaceCharSet := ' '#9#10#13;
   FIdentifierRuleSet.CharSet := 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_';
   FIdentifierRuleSet.UnderscoreStart := True;
   FIdentifierRuleSet.NumberStart := False;
   FIdentifierRuleSet.CanContainDash := False;
-  FStringDelimiter := #0; // " or '
+  FStringDelimiter := ''''; // " or '
   FAllowStringDelimiterNesting := False;
   FNestedStringDelimiterEscapeing := False;
   //
@@ -449,11 +455,20 @@ begin
     FCommentsDelimiter[i].EndDelimiter := '';
   end;
   SetLength(FCommentsDelimiter, 0);
+  //
   FDirectiveDelimiter.&Type := ectNotInComment; // '{$' - directive begin; '}' directive end
-  FDirectiveDelimiter.StartDelimiter := '';
-  FDirectiveDelimiter.EndDelimiter := '';
-  FDirectiveDelimiter.CanNest := False;
-  FDirectiveDelimiter.CanBeNested := False;
+  FDirectiveDelimiter.StartDelimiter := '{$';
+  FDirectiveDelimiter.EndDelimiter := '}';
+  FDirectiveDelimiter.CanNest := True;
+  FDirectiveDelimiter.CanBeNested := True;
+  FDirectiveCanContainDash := True; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
+  //
+  FCompilerVariableDelimiter.&Type := ectNotInComment; // %project-name%
+  FCompilerVariableDelimiter.StartDelimiter := '%';
+  FCompilerVariableDelimiter.EndDelimiter := '%';
+  FCompilerVariableDelimiter.CanNest := False;
+  FCompilerVariableDelimiter.CanBeNested := True;
+  FCompilerVariableCanContainDash := True; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
   //
   FAllowNestedComments := False;
   FAllowMultilineStrings := False;
@@ -538,6 +553,7 @@ begin
       Root := Root.NextSibling;
     end;
   end;
+  //
   Root := ARoot.FindNode('DirectiveDelimiter', [jtObject]);
   if Root <> Nil then begin
     FDirectiveDelimiter.&Type := TNEDEditorDelimiterPair.StringToEditorCommentType(ARoot.Document.NodeAsString(Root, 'Type', ''));
@@ -546,6 +562,17 @@ begin
     FDirectiveDelimiter.CanNest := ARoot.Document.NodeAsBoolean(Root, 'CanNest', False);
     FDirectiveDelimiter.CanBeNested := ARoot.Document.NodeAsBoolean(Root, 'CanBeNested', False);
   end;
+  FDirectiveCanContainDash := ARoot.Document.NodeAsBoolean(ARoot, 'DirectiveCanContainDash', False);
+  //
+  Root := ARoot.FindNode('CompilerVariableDelimiter', [jtObject]);
+  if Root <> Nil then begin
+    FCompilerVariableDelimiter.&Type := TNEDEditorDelimiterPair.StringToEditorCommentType(ARoot.Document.NodeAsString(Root, 'Type', ''));
+    FCompilerVariableDelimiter.StartDelimiter := ARoot.Document.NodeAsString(Root, 'StartDelimiter', '');
+    FCompilerVariableDelimiter.EndDelimiter := ARoot.Document.NodeAsString(Root, 'EndDelimiter', '');
+    FCompilerVariableDelimiter.CanNest := ARoot.Document.NodeAsBoolean(Root, 'CanNest', False);
+    FCompilerVariableDelimiter.CanBeNested := ARoot.Document.NodeAsBoolean(Root, 'CanBeNested', False);
+  end;
+  FDirectiveCanContainDash := ARoot.Document.NodeAsBoolean(ARoot, 'CompilerVariableCanContainDash', False);
   //
   FAllowNestedComments := ARoot.Document.NodeAsBoolean(ARoot, 'AllowNestedComments', False);
   FAllowMultilineStrings := ARoot.Document.NodeAsBoolean(ARoot, 'AllowMultilineStrings', False);

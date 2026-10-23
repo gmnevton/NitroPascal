@@ -560,13 +560,13 @@ type
     hsDefault,
     //
     // lexical styles
-    hsComment,
     hsKeyword,
     hsIdentifier,
     hsCharacter,
     hsString,
     hsNumber,
     hsPunctuation,
+    hsComment,
     hsOperator,
     //
     // semantic styles
@@ -585,6 +585,8 @@ type
     hsLabel,
     hsAttribute,
     hsDirective,
+    hsDirectiveKeyword,
+    hsCompilerVariable,
     hsAnnotation,
     // operators
     hsAssignment,
@@ -720,6 +722,7 @@ type
     destructor Destroy; override;
     procedure Assign(const ASource: TNEDLanguageProfile);
     //
+    procedure Clear;
     procedure Reset;
     function SupportsExtension(const AExtension: UTF8String): Boolean;
     procedure AcquireProfileByExtension(const APath: UTF8String);
@@ -3424,16 +3427,32 @@ begin
   Rule.FontForeground := clFuchsia; // clPurple;
 
   Rule := AddRule(hsPunctuation, ADefaultFont);
-  Rule.FontForeground := clWebOrangeRed;
+  Rule.FontForeground := clYellow;
+
+  Rule := AddRule(hsDirective, ADefaultFont);
+  Rule.FontForeground := clWhite;
+
+  Rule := AddRule(hsDirectiveKeyword, ADefaultFont);
+  Rule.FontForeground := clWebSandyBrown;
+
+  Rule := AddRule(hsCompilerVariable, ADefaultFont);
+  Rule.FontForeground := clWebLightPink;
 
   Rule := AddRule(hsOperator, ADefaultFont);
-  Rule.FontForeground := clYellow;
+  Rule.FontForeground := clWebOrange;
+
+  Rule := AddRule(hsAnnotation, ADefaultFont);
+  Rule.FontForeground := clWhite;
 
   //
   // semantic styles
   Rule := AddRule(hsNamespace, ADefaultFont);
   Rule.FontForeground := clWhite;
-  //
+
+  Rule := AddRule(hsType, ADefaultFont);
+  Rule.FontForeground := clWebOrange; // clTeal;
+  Rule.FontStyle := [fsBold];
+
   Rule := AddRule(hsConstant, ADefaultFont);
   Rule.FontForeground := clWhite;
 
@@ -3447,10 +3466,6 @@ begin
 
   Rule := AddRule(hsReference, ADefaultFont);
   Rule.FontForeground := clTeal;
-
-  Rule := AddRule(hsType, ADefaultFont);
-  Rule.FontForeground := clWebOrange; // clTeal;
-  Rule.FontStyle := [fsBold];
 
   Rule := AddRule(hsFunction, ADefaultFont);
   Rule.FontForeground := clBlue; // clOlive;
@@ -3471,12 +3486,6 @@ begin
   Rule.FontForeground := clWhite;
 
   Rule := AddRule(hsAttribute, ADefaultFont);
-  Rule.FontForeground := clWhite;
-
-  Rule := AddRule(hsDirective, ADefaultFont);
-  Rule.FontForeground := clWhite;
-
-  Rule := AddRule(hsAnnotation, ADefaultFont);
   Rule.FontForeground := clWhite;
 
   // operators
@@ -3657,6 +3666,21 @@ begin
   end;
 end;
 
+procedure TNEDLanguageProfile.Clear;
+begin
+  FID := '';
+  FName := '';
+  FDescription := '';
+
+  FFileExtensions.Clear;
+
+  FLexerConfig.Clear;
+  FTexerConfig.Clear;
+  FParserConfig.Clear;
+
+  FHighlightConfig.SetDefaultRules(FDefaultFont);
+end;
+
 procedure TNEDLanguageProfile.Reset;
 begin
   FID := '';
@@ -3764,12 +3788,18 @@ end;
 function TNEDHighlighter.GetBaseStyle(const AToken: TNEDTextToken): TNEDHighlightStyleEnum;
 begin
   case AToken.Kind of
-    ttkKeyword   : Result := hsKeyword;
-    ttkIdentifier: Result := hsIdentifier;
-    ttkString    : Result := hsString;
-    ttkNumber    : Result := hsNumber;
-    ttkComment   : Result := hsComment;
-    ttkOperator  : Result := hsOperator;
+    //ttkUnknown,
+    //ttkWhitespace : Result := hsDefault;
+    ttkKeyword    : Result := hsKeyword;
+    ttkIdentifier : Result := hsIdentifier;
+    ttkString     : Result := hsString;
+    ttkNumber     : Result := hsNumber;
+    ttkPunctuation: Result := hsPunctuation;
+    ttkComment    : Result := hsComment;
+    ttkDirective  : Result := hsDirective;
+    ttkDirectiveKeyword: Result := hsDirectiveKeyword;
+    ttkCompilerVariable: Result := hsCompilerVariable;
+    ttkOperator   : Result := hsOperator;
     //hsDeclaration,
     //hsReference,
     //hsType,
@@ -5948,14 +5978,111 @@ begin
   Result := TNEDCaretPosition.Create(Column + 1, Line - HiddenCount + 1);
 end;
 
+procedure DumpPieces(const Document: TNEDEditorBuffer);
+
+  function DigitCount(N: UInt64): Integer;
+  begin
+    if N = 0 then
+      Exit(1);
+    Result := Trunc(Log10(N)) + 1;
+  end;
+
+var
+  pieces_list: TStringList;
+  properties: TNEDLineProperties;
+  line, line_props: String;
+  i, j: Integer;
+begin
+  pieces_list := TStringList.Create;
+  try
+    pieces_list.Add('--- lines ---');
+    pieces_list.Add('');
+    for i := 0 to Document.LinesCount - 1 do begin
+      line := Document.GetLineText(i);
+      pieces_list.Add(Format('Line#%*d: %s', [DigitCount(Document.LastLine), i, line]));
+    end;
+    //
+    pieces_list.Add('');
+    pieces_list.Add('--- pieces ---');
+    pieces_list.Add('');
+    //
+    for i := 0 to Document.LinesCount - 1 do begin
+      properties :=  Document.LineProperties[i];
+      line_props := 'Line#' + IntToStr(i) + ': ';
+      line_props := line_props + '[';
+      if properties.Modified then
+        line_props := line_props + 'Modified; ';
+      if properties.Deleted then
+        line_props := line_props + 'Deleted; ';
+      if properties.Hidden then
+        line_props := line_props + 'Hidden; ';
+      line_props := line_props + 'Len: ' + IntToStr(properties.Length) + '; ';
+      for j := 0 to properties.Pieces.Count - 1 do begin
+        line_props := line_props + 'Piece#' + IntToStr(j) + ': (';
+        if properties.Pieces.Piece[j].Buffer = pbOriginal then
+          line_props := line_props + 'Buffer: Orgin; '
+        else
+          line_props := line_props + 'Buffer: Input; ';
+        line_props := line_props + 'Offset: ' + IntToStr(properties.Pieces.Piece[j].Offset) + '; ';
+        line_props := line_props + 'Length: ' + IntToStr(properties.Pieces.Piece[j].Length);
+        if properties.Pieces.Piece[j].Origin <> Nil then begin
+          line_props := line_props + '; ';
+          line_props := line_props + 'Origin.L: ' + IntToStr(properties.Pieces.Piece[j].Origin.Line) + '; ';
+          line_props := line_props + 'Origin.C: ' + IntToStr(properties.Pieces.Piece[j].Origin.Column);
+        end;
+        line_props := line_props + '), ';
+      end;
+      line_props := line_props + ']';
+      pieces_list.Add(line_props);
+      line_props := '';
+    end;
+    //
+    pieces_list.Add('');
+    pieces_list.Add('--- tokens ---');
+    pieces_list.Add('');
+    //
+    for i := 0 to Document.LinesCount - 1 do begin
+      properties :=  Document.LineProperties[i];
+      line_props := 'Line#' + IntToStr(i) + ': ';
+      line_props := line_props + '[';
+      line_props := line_props + 'Tokens: ' + IntToStr(properties.Analysis.Tokens.Count) + '; ';
+      for j := 0 to properties.Analysis.Tokens.Count - 1 do begin
+        line_props := line_props + 'Token#' + IntToStr(j) + ': (';
+        case properties.Analysis.Tokens.Tokens[j].Kind of
+          ttkUnknown    : line_props := line_props + 'Kind: UNKNOWN; ';
+          ttkDefault    : line_props := line_props + 'Kind: Default; ';
+          ttkWhitespace : line_props := line_props + 'Kind: Whitespace; ';
+          ttkKeyword    : line_props := line_props + 'Kind: Keyword; ';
+          ttkIdentifier : line_props := line_props + 'Kind: Identifier; ';
+          ttkString     : line_props := line_props + 'Kind: String; ';
+          ttkNumber     : line_props := line_props + 'Kind: Number; ';
+          ttkComment    : line_props := line_props + 'Kind: Comment; ';
+          ttkDirective  : line_props := line_props + 'Kind: Directive; ';
+          ttkOperator   : line_props := line_props + 'Kind: Operator; ';
+          ttkPunctuation: line_props := line_props + 'Kind: Punctuation; ';
+        end;
+        line_props := line_props + 'Offset: ' + IntToStr(properties.Analysis.Tokens.Tokens[j].Offset) + '; ';
+        line_props := line_props + 'Length: ' + IntToStr(properties.Analysis.Tokens.Tokens[j].Length);
+        //properties.Analysis.Tokens.Tokens[j].Format.
+        line_props := line_props + '), ';
+      end;
+      line_props := line_props + ']';
+      pieces_list.Add(line_props);
+      line_props := '';
+    end;
+    //
+    pieces_list.SaveToFile('pieces.txt');
+  finally
+    pieces_list.Free;
+  end;
+end;
+
 procedure TNEDCustomEditorView.DocumentChanged(const Change: TNEDDocumentChangeInfo);
 var
   LCaretPos: TNEDCaretPosition;
-  pieces_list: TStringList;
-  i, j: Integer;
+  line: String;
   properties: TNEDLineProperties;
-  line, line_props: String;
-  LineText: String;
+  i: Integer;
 begin
   // @TODO - ??? do something ???
   FVisibleLinesCount := Document.VisibleLinesCount;
@@ -6027,53 +6154,8 @@ begin
   UpdateScrollBars;
   ShowModernScrollBars;
   Invalidate;
-{
-  pieces_list := TStringList.Create;
-  try
-    for i := 0 to Document.LinesCount - 1 do begin
-      line := Document.GetLineText(i);
-      pieces_list.Add(line);
-    end;
-    //
-    pieces_list.Add('');
-    pieces_list.Add('---');
-    pieces_list.Add('');
-    //
-    for i := 0 to Document.LinesCount - 1 do begin
-      properties :=  Document.LineProperties[i];
-      line_props := 'Line#' + IntToStr(i) + ': ';
-      line_props := line_props + '[';
-      if properties.Modified then
-        line_props := line_props + 'Modified; ';
-      if properties.Deleted then
-        line_props := line_props + 'Deleted; ';
-      if properties.Hidden then
-        line_props := line_props + 'Hidden; ';
-      line_props := line_props + 'Len: ' + IntToStr(properties.Length) + '; ';
-      for j := 0 to properties.Pieces.Count - 1 do begin
-        line_props := line_props + 'Piece#' + IntToStr(j) + ': (';
-        if properties.Pieces.Piece[j].Buffer = pbOriginal then
-          line_props := line_props + 'Buffer: Orgin; '
-        else
-          line_props := line_props + 'Buffer: Input; ';
-        line_props := line_props + 'Offset: ' + IntToStr(properties.Pieces.Piece[j].Offset) + '; ';
-        line_props := line_props + 'Length: ' + IntToStr(properties.Pieces.Piece[j].Length);
-        if properties.Pieces.Piece[j].Origin <> Nil then begin
-          line_props := line_props + '; ';
-          line_props := line_props + 'Origin.L: ' + IntToStr(properties.Pieces.Piece[j].Origin.Line) + '; ';
-          line_props := line_props + 'Origin.C: ' + IntToStr(properties.Pieces.Piece[j].Origin.Column);
-        end;
-        line_props := line_props + '), ';
-      end;
-      line_props := line_props + ']';
-      pieces_list.Add(line_props);
-      line_props := '';
-    end;
-    pieces_list.SaveToFile('pieces.txt');
-  finally
-    pieces_list.Free;
-  end;
-}
+
+//  DumpPieces(Document);
 
   ReportEditorInfo;
 end;

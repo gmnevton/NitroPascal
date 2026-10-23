@@ -387,6 +387,7 @@ begin
     //
     LangProfile := TNEDLanguageProfile.Create(DefaultFont);
     try
+      LangProfile.Clear;
       // resolve file extension to file_type: .npe/.npc --> nitropascal
       // fixed for now
       FileType := 'default';
@@ -414,6 +415,10 @@ begin
         LangProfile.LexerConfig.AddCommentDelimiter(DelimiterPair);
       end;
       LangProfile.LexerConfig.DirectiveDelimiter := HighlightSettings.DirectiveDelimiter;
+      LangProfile.LexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
+      LangProfile.LexerConfig.CompilerVariableDelimiter := HighlightSettings.CompilerVariableDelimiter;
+      LangProfile.LexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
+      //
       LangProfile.LexerConfig.AllowNestedComments := HighlightSettings.AllowNestedComments;
       LangProfile.LexerConfig.AllowMultilineStrings := HighlightSettings.AllowMultilineStrings;
       LangProfile.LexerConfig.AllowMultilineComments := HighlightSettings.AllowMultilineComments;
@@ -430,7 +435,13 @@ begin
       LangProfile.TexerConfig.NumberNumberStart := HighlightSettings.NumberRuleSet.NumberStart;
       LangProfile.TexerConfig.NumberCanContainDash := HighlightSettings.NumberRuleSet.CanContainDash;
       //
+      for i := 0 to HighlightSettings.CommentsDelimitersCount - 1 do begin
+        DelimiterPair := HighlightSettings.CommentsDelimiters[i];
+        LangProfile.TexerConfig.AddCommentDelimiter(DelimiterPair);
+      end;
       LangProfile.TexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
+      LangProfile.TexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
+      LangProfile.TexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
       //LangProfile.TexerConfig.AllowStringDelimiterNesting
       //LangProfile.TexerConfig.NestedStringDelimiterEscapeing
       //

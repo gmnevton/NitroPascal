@@ -1161,6 +1161,7 @@ begin
   else
     State := TNEDParser.InitialState;
   //
+  FTexer.Init;
   for I := ALineFrom to ALineTo do begin
     AnalyzeLine(ADocument, I, State);
     State := ADocument.LineProperties[I].Analysis.Context.OutState;
@@ -1894,7 +1895,7 @@ begin
 
     RebuildLineNumbers;
     RebuildCaches;
-    FDocumentAnalyzer.AnalyzeDocument(Self);
+    //FDocumentAnalyzer.AnalyzeDocument(Self);
   finally
     EndUpdate;
     NotifyObservers(TNEDTextRange.LineColumn(0, 0, FLines.Count - 1, 0), dcLoad, opNone, 0, FLength);
