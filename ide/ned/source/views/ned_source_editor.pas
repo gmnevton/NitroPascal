@@ -440,16 +440,20 @@ begin
         LangProfile.TexerConfig.AddCommentDelimiter(DelimiterPair);
       end;
       LangProfile.TexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
-      LangProfile.TexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
-      LangProfile.TexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
-      //LangProfile.TexerConfig.AllowStringDelimiterNesting
-      //LangProfile.TexerConfig.NestedStringDelimiterEscapeing
       //
       LangProfile.TexerConfig.Keywords.Assign(HighlightSettings.Keywords);
       LangProfile.TexerConfig.Operators.Assign(HighlightSettings.Operators);
       LangProfile.TexerConfig.Punctuation.Assign(HighlightSettings.Punctuation);
       LangProfile.TexerConfig.BooleanLiterals.Assign(HighlightSettings.BooleanLiterals);
       LangProfile.TexerConfig.NilLiterals.Assign(HighlightSettings.NilLiterals);
+      //
+      LangProfile.TexerConfig.DirectiveKeywords.Assign(HighlightSettings.DirectiveKeywords);
+      LangProfile.TexerConfig.CompilerVariableKeywords.Assign(HighlightSettings.CompilerVariableKeywords);
+      LangProfile.TexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
+      LangProfile.TexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
+      //LangProfile.TexerConfig.AllowStringDelimiterNesting
+      //LangProfile.TexerConfig.NestedStringDelimiterEscapeing
+      //
       LangProfile.TexerConfig.HexPrefix := HighlightSettings.HexPrefix;
       LangProfile.TexerConfig.HexSuffix := HighlightSettings.HexSuffix;
       LangProfile.TexerConfig.BinaryPrefix := HighlightSettings.BinaryPrefix;

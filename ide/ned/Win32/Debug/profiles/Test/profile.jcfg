@@ -223,6 +223,10 @@
               ],
               "NilLiterals" : [
               ],
+              "DirectiveKeywords" : [
+              ],
+              "CompilerVariableKeywords" : [
+              ],
               "HexPrefix" : "0x",
               "HexSuffix" : "h",
               "BinaryPrefix" : "0b",
@@ -443,6 +447,14 @@
               "NilLiterals" : [
                 "nil",
                 "---"
+              ],
+              "DirectiveKeywords" : [
+                "program-type",
+                "search-path",
+                "defines"
+              ],
+              "CompilerVariableKeywords" : [
+                "project-name"
               ],
               "HexPrefix" : "0x",
               "HexSuffix" : "h",

@@ -142,8 +142,8 @@ type
     //
     function GetEndOfText: Boolean;
     function GetCurrentChar: UTF8Char;
-
     procedure AdvanceChar(const AOffset: Integer);
+    function CheckBufferForCharacters(const ACharacters: UTF8String): Boolean;
 
     procedure StartLexeme;
 
@@ -195,6 +195,7 @@ type
     function CurrentState: TNEDLexicalState;
 
     function IsEOF: Boolean;
+    function IsCommentStart: Boolean;
     function IsDirectiveStart: Boolean; overload;
     function IsDirectiveEnd: Boolean; overload;
     function IsCompilerVariableStart: Boolean; overload;
@@ -365,169 +366,9 @@ begin
   inherited Destroy;
 end;
 
-procedure TNEDLexer.Clear;
-begin
-  FText := '';
-  FTextLength := 0;
-  FLine := 0;
-  FTokenStartLine := 0;
-
-  FillChar(FState, SizeOf(FState), 0);
-
-  FState.Mode := lmNormal;
-  FState.StringDelimiter := #0;
-  FState.CommentKind := lckNone;
-  FState.CommentEndDelimiter := '';
-  FState.CommentCanNest := False;
-  FState.CommentCanBeNested := False;
-  FState.CommentDepth := 0;
-  //FState.CompilerDirective := '';
-  FState.DirectiveEndDelimiter := '';
-  FState.DirectiveDepth := 0;
-  //FState.CompilerVariableDirective := '';
-  FState.CompilerVariableEndDelimiter := '';
-  FState.CompilerVariableDepth := 0;
-
-  Reset;
-end;
-
-procedure TNEDLexer.Reset;
-begin
-  FPosition := 1;
-
-  FLine := 1;
-  FColumn := 1;
-
-  FTokenStart := 1;
-  FTokenStartLine := 1;
-  FTokenStartColumn := 1;
-end;
-
-procedure TNEDLexer.SetText(const ALine: Integer; const AText: UTF8String);
-begin
-  FText := AText;
-  FTextLength := Length(FText);
-  Reset;
-  FLine := ALine;
-  FTokenStartLine := ALine;
-end;
-
 function TNEDLexer.GetEndOfText: Boolean;
 begin
   Result := FPosition > FTextLength;
-end;
-
-function TNEDLexer.IsEOF: Boolean;
-begin
-  Result := GetEndOfText;
-end;
-
-function TNEDLexer.IsDirectiveStart: Boolean;
-var
-  I: Integer;
-  Delimiter: UTF8String;
-  DelimiterLen: Integer;
-begin
-  Result := False;
-
-  if FConfig = Nil then
-    Exit;
-
-  Delimiter := FConfig.DirectiveDelimiter.StartDelimiter;
-
-  if Delimiter = '' then
-    Exit;
-
-  DelimiterLen := Length(Delimiter);
-  if FPosition + DelimiterLen > FTextLength then
-    Exit;
-
-  for I := 1 to DelimiterLen do
-    if FText[FPosition + I - 1] <> UTF8Char(Delimiter[I]) then
-      Exit;
-
-  Result := True;
-end;
-
-function TNEDLexer.IsDirectiveEnd: Boolean;
-var
-  I: Integer;
-  Delimiter: UTF8String;
-  DelimiterLen: Integer;
-begin
-  Result := False;
-
-  if FConfig = Nil then
-    Exit;
-
-  Delimiter := FConfig.DirectiveDelimiter.EndDelimiter;
-
-  if Delimiter = '' then
-    Exit;
-
-  DelimiterLen := Length(Delimiter);
-  if FPosition + DelimiterLen - 1 > FTextLength then
-    Exit;
-
-  for I := 1 to DelimiterLen do
-    if FText[FPosition + I - 1] <> UTF8Char(Delimiter[I]) then
-      Exit;
-
-  Result := True;
-end;
-
-function TNEDLexer.IsCompilerVariableStart: Boolean;
-var
-  I: Integer;
-  Delimiter: UTF8String;
-  DelimiterLen: Integer;
-begin
-  Result := False;
-
-  if FConfig = Nil then
-    Exit;
-
-  Delimiter := FConfig.CompilerVariableDelimiter.StartDelimiter;
-
-  if Delimiter = '' then
-    Exit;
-
-  DelimiterLen := Length(Delimiter);
-  if FPosition + DelimiterLen > FTextLength then
-    Exit;
-
-  for I := 1 to DelimiterLen do
-    if FText[FPosition + I - 1] <> UTF8Char(Delimiter[I]) then
-      Exit;
-
-  Result := True;
-end;
-
-function TNEDLexer.IsCompilerVariableEnd: Boolean;
-var
-  I: Integer;
-  Delimiter: UTF8String;
-  DelimiterLen: Integer;
-begin
-  Result := False;
-
-  if FConfig = Nil then
-    Exit;
-
-  Delimiter := FConfig.CompilerVariableDelimiter.EndDelimiter;
-
-  if Delimiter = '' then
-    Exit;
-
-  DelimiterLen := Length(Delimiter);
-  if FPosition + DelimiterLen - 1 > FTextLength then
-    Exit;
-
-  for I := 1 to DelimiterLen do
-    if FText[FPosition + I - 1] <> UTF8Char(Delimiter[I]) then
-      Exit;
-
-  Result := True;
 end;
 
 function TNEDLexer.GetCurrentChar: UTF8Char;
@@ -538,262 +379,61 @@ begin
     Result := FText[FPosition];
 end;
 
-function TNEDLexer.IsEndOfLine: Boolean;
-begin
-  Result := GetEndOfText;
-end;
-
-function TNEDLexer.IsLineBreak(out AdvanceOffset: Integer): Boolean;
-begin
-  Result := False; // satisfy compiler
-  AdvanceOffset := 1;
-  if Length(FConfig.FLineBreak) > 1 then begin
-    if GetCurrentChar = FConfig.FLineBreak[1] then begin // check if it is exactly as our expected line break
-      if PeekChar = FConfig.FLineBreak[2] then begin
-        AdvanceOffset := 2;
-        Result := True;
-        Exit;
-      end;
-    end
-    else begin // check for lonely CR or LF
-      if (GetCurrentChar = FConfig.FLineBreak[1]) or (GetCurrentChar = FConfig.FLineBreak[2]) then
-        Exit(True);
-    end;
-  end
-  else
-    Result := GetCurrentChar = FConfig.FLineBreak; // CR or LF only
-end;
-
-function TNEDLexer.IsStringDelimiter: Boolean;
-begin
-  Result := GetCurrentChar = FConfig.FStringDelimiter;
-end;
-
-function TNEDLexer.IsInComment: Boolean;
-begin
-  Result := FState.CommentKind > lckNone;
-end;
-
-function TNEDLexer.IsLineCommentStart(out CommentInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
+procedure TNEDLexer.AdvanceChar(const AOffset: Integer);
 var
-  CommentOneChar: UTF8Char;
-  CommentTwoChars: UTF8String;
-  CommentThreeChars: UTF8String;
+  I: Integer;
+//  C: UTF8Char;
+begin
+  I := 0;
+  while I < AOffset do begin
+    if GetEndOfText then
+      Exit;
+
+    Inc(FPosition);
+    Inc(FColumn);
+    Inc(I);
+  end;
+
+// this is for full file lexing, in our editor this is not usefull,
+// because lexer takes only one line of text at a time, and there is no line-break at the end or in the middle
+//
+//    C := FText[FPosition];
+//    Inc(FPosition);
+//
+//    if C = #13 then begin
+//      if (FPosition <= Length(FText)) and (FText[FPosition] = #10) then
+//        Inc(FPosition);
+//
+//      Inc(FLine);
+//      FColumn := 1;
+//    end
+//    else if C = #10 then begin
+//      Inc(FLine);
+//      FColumn := 1;
+//    end
+//    else
+//      Inc(FColumn);
+//  end;
+end;
+
+function TNEDLexer.CheckBufferForCharacters(const ACharacters: UTF8String): Boolean;
+var
+  CharactersLen: Integer;
   i: Integer;
 begin
   Result := False;
-  CommentInfo.&Type := ectNotInComment;
-  CommentInfo.StartDelimiter := '';
-  CommentInfo.EndDelimiter := '';
-  CommentInfo.CanNest := False;
-  CommentInfo.CanBeNested := False;
-  AdvanceOffset := 0;
-  //
-  CommentOneChar := GetCurrentChar;
-  CommentTwoChars := GetCurrentChar + PeekChar;
-  CommentThreeChars := GetCurrentChar + PeekChar + PeekChar(2);
-  for i := 0 to Length(FConfig.FCommentsDelimiters) - 1 do begin
-    if (FConfig.FCommentsDelimiters[i].&Type = ectSingleLine) or (FConfig.FCommentsDelimiters[i].&Type = ectMixed) then begin
-      // to avoid false positives, first check 3 chars comments, than 2 chars, than 1 char
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentThreeChars;
-      if Result then begin
-        CommentInfo := FConfig.FCommentsDelimiters[i];
-        AdvanceOffset := 3;
-        Break;
-      end;
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentTwoChars;
-      if Result then begin
-        CommentInfo := FConfig.FCommentsDelimiters[i];
-        AdvanceOffset := 2;
-        Break;
-      end;
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentOneChar;
-      if Result then begin
-        CommentInfo := FConfig.FCommentsDelimiters[i];
-        AdvanceOffset := 1;
-        Break;
-      end;
-    end;
-  end;
-  CommentOneChar := #0;
-  CommentTwoChars := '';
-  CommentThreeChars := '';
-end;
+  if ACharacters = '' then
+    Exit;
 
-function TNEDLexer.IsMultiLineCommentStart(out CommentInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
-var
-  CommentOneChar: UTF8Char;
-  CommentTwoChars: UTF8String;
-  CommentThreeChars: UTF8String;
-  i: Integer;
-begin
-  Result := False;
-  CommentInfo.&Type := ectNotInComment;
-  CommentInfo.StartDelimiter := '';
-  CommentInfo.EndDelimiter := '';
-  CommentInfo.CanNest := False;
-  CommentInfo.CanBeNested := False;
-  AdvanceOffset := 0;
-  //
-  CommentOneChar := GetCurrentChar;
-  CommentTwoChars := GetCurrentChar + PeekChar;
-  CommentThreeChars := GetCurrentChar + PeekChar + PeekChar(2);
-  for i := 0 to Length(FConfig.FCommentsDelimiters) - 1 do begin
-    if (FConfig.FCommentsDelimiters[i].&Type = ectMultiLine) or (FConfig.FCommentsDelimiters[i].&Type = ectMixed) then begin
-      // to avoid false positives, first check 3 chars comments, than 2 chars, than 1 char
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentThreeChars;
-      if Result then begin
-        CommentInfo := FConfig.FCommentsDelimiters[i];
-        AdvanceOffset := 3;
-        Break;
-      end;
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentTwoChars;
-      if Result then begin
-        CommentInfo := FConfig.FCommentsDelimiters[i];
-        AdvanceOffset := 2;
-        Break;
-      end;
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentOneChar;
-      if Result then begin
-        CommentInfo := FConfig.FCommentsDelimiters[i];
-        AdvanceOffset := 1;
-        Break;
-      end;
-    end;
-  end;
-  CommentOneChar := #0;
-  CommentTwoChars := '';
-  CommentThreeChars := '';
-end;
+  CharactersLen := Length(ACharacters);
+  if FPosition + CharactersLen - 1 > FTextLength then
+    Exit;
 
-function TNEDLexer.IsMultiLineCommentEnd(const AEndDelimiter: UTF8String; out AdvanceOffset: Integer): Boolean;
-var
-  Chars: UTF8String;
-  i, len: Integer;
-begin
-  Result := False;
-  AdvanceOffset := 0;
-  //
-  Chars := '';
-  len := Length(AEndDelimiter);
-  for i := 0 to len - 1 do begin
-    Chars := Chars + PeekChar(i);
-  end;
-  Result := AEndDelimiter = Chars;
-  if Result then
-    AdvanceOffset := len;
-  Chars := '';
-end;
+  for i := 1 to CharactersLen do
+    if FText[FPosition + i - 1] <> UTF8Char(ACharacters[i]) then
+      Exit;
 
-function TNEDLexer.IsNestedComment(out AdvanceOffset: Integer): Boolean;
-var
-  CommentOneChar: UTF8Char;
-  CommentTwoChars: UTF8String;
-  CommentThreeChars: UTF8String;
-  i: Integer;
-begin
-  Result := False;
-  AdvanceOffset := 0;
-  //
-  CommentOneChar := GetCurrentChar;
-  CommentTwoChars := GetCurrentChar + PeekChar;
-  CommentThreeChars := GetCurrentChar + PeekChar + PeekChar(2);
-  for i := 0 to Length(FConfig.FCommentsDelimiters) - 1 do begin
-    if FConfig.FCommentsDelimiters[i].CanBeNested then begin
-      // to avoid false positives, first check 3 chars comments, than 2 chars, than 1 char
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentThreeChars;
-      if Result then begin
-        AdvanceOffset := 3;
-        Break;
-      end;
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentTwoChars;
-      if Result then begin
-        AdvanceOffset := 2;
-        Break;
-      end;
-      Result := FConfig.FCommentsDelimiters[i].StartDelimiter = CommentOneChar;
-      if Result then begin
-        AdvanceOffset := 1;
-        Break;
-      end;
-    end;
-  end;
-  CommentOneChar := #0;
-  CommentTwoChars := '';
-  CommentThreeChars := '';
-end;
-
-function TNEDLexer.IsDirectiveStart(out DirectiveInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
-var
-  DirectiveChars: UTF8String;
-  i, len: Integer;
-begin
-  Result := False;
-  DirectiveInfo.&Type := ectNotInComment;
-  DirectiveInfo.StartDelimiter := '';
-  DirectiveInfo.EndDelimiter := '';
-  DirectiveInfo.CanNest := False;
-  DirectiveInfo.CanBeNested := False;
-  AdvanceOffset := 0;
-  //
-  len := Length(FConfig.DirectiveDelimiter.StartDelimiter);
-  DirectiveChars := '';
-  for i := 0 to len - 1 do begin
-    DirectiveChars := DirectiveChars + PeekChar(i);
-  end;
-
-  Result := FConfig.DirectiveDelimiter.StartDelimiter = DirectiveChars;
-  if Result then begin
-    DirectiveInfo := FConfig.DirectiveDelimiter;
-    AdvanceOffset := len;
-  end;
-  DirectiveChars := '';
-end;
-
-function TNEDLexer.IsCompilerVariableStart(out DirectiveInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
-var
-  DirectiveChars: UTF8String;
-  i, len: Integer;
-begin
-  Result := False;
-  DirectiveInfo.&Type := ectNotInComment;
-  DirectiveInfo.StartDelimiter := '';
-  DirectiveInfo.EndDelimiter := '';
-  DirectiveInfo.CanNest := False;
-  DirectiveInfo.CanBeNested := False;
-  AdvanceOffset := 0;
-  //
-  len := Length(FConfig.CompilerVariableDelimiter.StartDelimiter);
-  DirectiveChars := '';
-  for i := 0 to len - 1 do begin
-    DirectiveChars := DirectiveChars + PeekChar(i);
-  end;
-
-  Result := FConfig.CompilerVariableDelimiter.StartDelimiter = DirectiveChars;
-  if Result then begin
-    DirectiveInfo := FConfig.CompilerVariableDelimiter;
-    AdvanceOffset := len;
-  end;
-  DirectiveChars := '';
-end;
-
-function TNEDLexer.IsDirectiveEnd(const AEndDelimiter: UTF8String; out AdvanceOffset: Integer): Boolean;
-var
-  Chars: UTF8String;
-  i, len: Integer;
-begin
-  Result := False;
-  AdvanceOffset := 0;
-  //
-  Chars := '';
-  len := Length(AEndDelimiter);
-  for i := 0 to len - 1 do begin
-    Chars := Chars + PeekChar(i);
-  end;
-  Result := AEndDelimiter = Chars;
-  if Result then
-    AdvanceOffset := len;
-  Chars := '';
+  Result := True;
 end;
 
 procedure TNEDLexer.StartLexeme;
@@ -812,16 +452,6 @@ begin
   Inc(FState.ModeDepth);
 
   FState.Mode := AMode;
-end;
-
-procedure TNEDLexer.LeaveMode;
-begin
-  if FState.ModeDepth > 0 then begin
-    Dec(FState.ModeDepth);
-    FState.Mode := FState.ModeStack[FState.ModeDepth];
-  end
-  else
-    EnterNormalMode;
 end;
 
 procedure TNEDLexer.EnterNormalMode;
@@ -863,43 +493,6 @@ begin
   //FState.CompilerVariableDirective := '';
   FState.CompilerVariableEndDelimiter := ADelimiter;
   FState.CompilerVariableDepth := 1;
-end;
-
-procedure TNEDLexer.AdvanceChar(const AOffset: Integer);
-var
-  I: Integer;
-//  C: UTF8Char;
-begin
-  I := 0;
-  while I < AOffset do begin
-    if GetEndOfText then
-      Exit;
-
-    Inc(FPosition);
-    Inc(FColumn);
-    Inc(I);
-  end;
-
-// this is for full file lexing, in our editor this is not usefull,
-// because lexer takes only one line of text at a time, and there is no line-break at the end or in the middle
-//
-//    C := FText[FPosition];
-//    Inc(FPosition);
-//
-//    if C = #13 then begin
-//      if (FPosition <= Length(FText)) and (FText[FPosition] = #10) then
-//        Inc(FPosition);
-//
-//      Inc(FLine);
-//      FColumn := 1;
-//    end
-//    else if C = #10 then begin
-//      Inc(FLine);
-//      FColumn := 1;
-//    end
-//    else
-//      Inc(FColumn);
-//  end;
 end;
 
 procedure TNEDLexer.ProcessNormalCharacter; // (AChar: UTF8Char);
@@ -1068,6 +661,204 @@ begin
   AdvanceChar(1);
 end;
 
+function TNEDLexer.IsEndOfLine: Boolean;
+begin
+  Result := GetEndOfText;
+end;
+
+function TNEDLexer.IsLineBreak(out AdvanceOffset: Integer): Boolean;
+begin
+  Result := False; // satisfy compiler
+  AdvanceOffset := 1;
+  Result := CheckBufferForCharacters(FConfig.FLineBreak);
+  if Result then
+    AdvanceOffset := Length(FConfig.FLineBreak);
+end;
+
+function TNEDLexer.IsStringDelimiter: Boolean;
+begin
+  Result := GetCurrentChar = FConfig.FStringDelimiter;
+end;
+
+function TNEDLexer.IsInComment: Boolean;
+begin
+  Result := FState.CommentKind > lckNone;
+end;
+
+function TNEDLexer.IsLineCommentStart(out CommentInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  CommentInfo.&Type := ectNotInComment;
+  CommentInfo.StartDelimiter := '';
+  CommentInfo.EndDelimiter := '';
+  CommentInfo.CanNest := False;
+  CommentInfo.CanBeNested := False;
+  AdvanceOffset := 0;
+  //
+  for i := 0 to Length(FConfig.FCommentsDelimiters) - 1 do begin
+    if (FConfig.FCommentsDelimiters[i].&Type = ectSingleLine) or (FConfig.FCommentsDelimiters[i].&Type = ectMixed) then begin
+      Result := CheckBufferForCharacters(FConfig.FCommentsDelimiters[i].StartDelimiter);
+      if Result then begin
+        CommentInfo := FConfig.FCommentsDelimiters[i];
+        AdvanceOffset := Length(FConfig.FCommentsDelimiters[i].StartDelimiter);
+        Break;
+      end;
+    end;
+  end;
+end;
+
+function TNEDLexer.IsMultiLineCommentStart(out CommentInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  CommentInfo.&Type := ectNotInComment;
+  CommentInfo.StartDelimiter := '';
+  CommentInfo.EndDelimiter := '';
+  CommentInfo.CanNest := False;
+  CommentInfo.CanBeNested := False;
+  AdvanceOffset := 0;
+  //
+  for i := 0 to Length(FConfig.FCommentsDelimiters) - 1 do begin
+    if (FConfig.FCommentsDelimiters[i].&Type = ectMultiLine) or (FConfig.FCommentsDelimiters[i].&Type = ectMixed) then begin
+      Result := CheckBufferForCharacters(FConfig.FCommentsDelimiters[i].StartDelimiter);
+      if Result then begin
+        CommentInfo := FConfig.FCommentsDelimiters[i];
+        AdvanceOffset := Length(FConfig.FCommentsDelimiters[i].StartDelimiter);
+        Break;
+      end;
+    end;
+  end;
+end;
+
+function TNEDLexer.IsMultiLineCommentEnd(const AEndDelimiter: UTF8String; out AdvanceOffset: Integer): Boolean;
+begin
+  Result := False;
+  AdvanceOffset := 0;
+  //
+  Result := CheckBufferForCharacters(AEndDelimiter);
+  if Result then
+    AdvanceOffset := Length(AEndDelimiter);
+end;
+
+function TNEDLexer.IsNestedComment(out AdvanceOffset: Integer): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  AdvanceOffset := 0;
+  //
+  for i := 0 to Length(FConfig.FCommentsDelimiters) - 1 do begin
+    if FConfig.FCommentsDelimiters[i].CanBeNested then begin
+      Result := CheckBufferForCharacters(FConfig.FCommentsDelimiters[i].StartDelimiter);
+      if Result then begin
+        AdvanceOffset := Length(FConfig.FCommentsDelimiters[i].StartDelimiter);
+        Break;
+      end;
+    end;
+  end;
+end;
+
+function TNEDLexer.IsDirectiveStart(out DirectiveInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
+begin
+  Result := False;
+  DirectiveInfo.&Type := ectNotInComment;
+  DirectiveInfo.StartDelimiter := '';
+  DirectiveInfo.EndDelimiter := '';
+  DirectiveInfo.CanNest := False;
+  DirectiveInfo.CanBeNested := False;
+  AdvanceOffset := 0;
+  //
+  Result := CheckBufferForCharacters(FConfig.DirectiveDelimiter.StartDelimiter);
+  if Result then begin
+    DirectiveInfo := FConfig.DirectiveDelimiter;
+    AdvanceOffset := Length(FConfig.DirectiveDelimiter.StartDelimiter);;
+  end;
+end;
+
+function TNEDLexer.IsCompilerVariableStart(out DirectiveInfo: TNEDLexicalDelimiterPair; out AdvanceOffset: Integer): Boolean;
+begin
+  Result := False;
+  DirectiveInfo.&Type := ectNotInComment;
+  DirectiveInfo.StartDelimiter := '';
+  DirectiveInfo.EndDelimiter := '';
+  DirectiveInfo.CanNest := False;
+  DirectiveInfo.CanBeNested := False;
+  AdvanceOffset := 0;
+  //
+  Result := CheckBufferForCharacters(FConfig.CompilerVariableDelimiter.StartDelimiter);
+  if Result then begin
+    DirectiveInfo := FConfig.CompilerVariableDelimiter;
+    AdvanceOffset := Length(FConfig.CompilerVariableDelimiter.StartDelimiter);;
+  end;
+end;
+
+function TNEDLexer.IsDirectiveEnd(const AEndDelimiter: UTF8String; out AdvanceOffset: Integer): Boolean;
+begin
+  Result := False;
+  AdvanceOffset := 0;
+  //
+  Result := CheckBufferForCharacters(AEndDelimiter);
+  if Result then
+    AdvanceOffset := Length(AEndDelimiter);
+end;
+
+function TNEDLexer.GetCurrentLocation: TNEDSourceLocation;
+begin
+  Result.Line := FLine;
+  Result.Column := FColumn;
+  Result.Length := 0;
+end;
+
+procedure TNEDLexer.Clear;
+begin
+  FText := '';
+  FTextLength := 0;
+  FLine := 0;
+  FTokenStartLine := 0;
+
+  FillChar(FState, SizeOf(FState), 0);
+
+  FState.Mode := lmNormal;
+  FState.StringDelimiter := #0;
+  FState.CommentKind := lckNone;
+  FState.CommentEndDelimiter := '';
+  FState.CommentCanNest := False;
+  FState.CommentCanBeNested := False;
+  FState.CommentDepth := 0;
+  //FState.CompilerDirective := '';
+  FState.DirectiveEndDelimiter := '';
+  FState.DirectiveDepth := 0;
+  //FState.CompilerVariableDirective := '';
+  FState.CompilerVariableEndDelimiter := '';
+  FState.CompilerVariableDepth := 0;
+
+  Reset;
+end;
+
+procedure TNEDLexer.Reset;
+begin
+  FPosition := 1;
+
+  FLine := 1;
+  FColumn := 1;
+
+  FTokenStart := 1;
+  FTokenStartLine := 1;
+  FTokenStartColumn := 1;
+end;
+
+procedure TNEDLexer.SetText(const ALine: Integer; const AText: UTF8String);
+begin
+  FText := AText;
+  FTextLength := Length(FText);
+  Reset;
+  FLine := ALine;
+  FTokenStartLine := ALine;
+end;
+
 function TNEDLexer.NextChar(out AChar: UTF8Char): Boolean;
 begin
   if IsEOF then begin
@@ -1102,11 +893,14 @@ begin
     Result := FText[P];
 end;
 
-function TNEDLexer.GetCurrentLocation: TNEDSourceLocation;
+procedure TNEDLexer.LeaveMode;
 begin
-  Result.Line := FLine;
-  Result.Column := FColumn;
-  Result.Length := 0;
+  if FState.ModeDepth > 0 then begin
+    Dec(FState.ModeDepth);
+    FState.Mode := FState.ModeStack[FState.ModeDepth];
+  end
+  else
+    EnterNormalMode;
 end;
 
 function TNEDLexer.CurrentLocation: TNEDSourceLocation;
@@ -1128,6 +922,69 @@ end;
 function TNEDLexer.CurrentState: TNEDLexicalState;
 begin
   Result := FState;
+end;
+
+function TNEDLexer.IsEOF: Boolean;
+begin
+  Result := GetEndOfText;
+end;
+
+function TNEDLexer.IsCommentStart: Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+
+  if FConfig = Nil then
+    Exit;
+
+  for i := 0 to Length(FConfig.FCommentsDelimiters) - 1 do begin
+    if FConfig.FCommentsDelimiters[i].&Type > ectNotInComment then begin
+      Result := CheckBufferForCharacters(FConfig.FCommentsDelimiters[i].StartDelimiter);
+      if Result then
+        Break;
+    end;
+  end;
+end;
+
+function TNEDLexer.IsDirectiveStart: Boolean;
+begin
+  Result := False;
+
+  if FConfig = Nil then
+    Exit;
+
+  Result := CheckBufferForCharacters(FConfig.DirectiveDelimiter.StartDelimiter);
+end;
+
+function TNEDLexer.IsDirectiveEnd: Boolean;
+begin
+  Result := False;
+
+  if FConfig = Nil then
+    Exit;
+
+  Result := CheckBufferForCharacters(FConfig.DirectiveDelimiter.EndDelimiter);
+end;
+
+function TNEDLexer.IsCompilerVariableStart: Boolean;
+begin
+  Result := False;
+
+  if FConfig = Nil then
+    Exit;
+
+  Result := CheckBufferForCharacters(FConfig.CompilerVariableDelimiter.StartDelimiter);
+end;
+
+function TNEDLexer.IsCompilerVariableEnd: Boolean;
+begin
+  Result := False;
+
+  if FConfig = Nil then
+    Exit;
+
+  Result := CheckBufferForCharacters(FConfig.CompilerVariableDelimiter.EndDelimiter);
 end;
 
 end.

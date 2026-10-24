@@ -166,8 +166,6 @@ type
     //
     FCommentsDelimiters: Array of TNEDEditorDelimiterPair;
     FStringDelimiter: UTF8Char; // " or '
-    FDirectiveCanContainDash: Boolean; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
-    FCompilerVariableCanContainDash: Boolean; // %project-name%
 
     FKeywords: TNEDTextSet;
     FOperators: TNEDTextSet;
@@ -175,6 +173,11 @@ type
 
     FBooleanLiterals: TNEDTextSet;
     FNilLiterals: TNEDTextSet;
+
+    FDirectiveKeywords: TNEDTextSet;
+    FCompilerVariableKeywords: TNEDTextSet;
+    FDirectiveCanContainDash: Boolean; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
+    FCompilerVariableCanContainDash: Boolean; // %project-name%
 
     FHexPrefix: UTF8String; // 0xABCD, $ABCD
     FHexSuffix: UTF8String; // 0ABCDH or 0ABCDh - assembler
@@ -217,16 +220,19 @@ type
     property CommentsDelimitersCount: Integer read GetCommentsDelimitersCount;
     property CommentsDelimiters[const Index: Integer]: TNEDEditorDelimiterPair read GetCommentsDelimiters;
     property StringDelimiter: UTF8Char read FStringDelimiter write FStringDelimiter;
-    property DirectiveCanContainDash: Boolean read FDirectiveCanContainDash write FDirectiveCanContainDash;
-    property CompilerVariableCanContainDash: Boolean read FCompilerVariableCanContainDash write FCompilerVariableCanContainDash;
     //
     property Keywords: TNEDTextSet read FKeywords;
     property Operators: TNEDTextSet read FOperators;
     property Punctuation: TNEDTextSet read FPunctuation;
-
+    //
     property BooleanLiterals: TNEDTextSet read FBooleanLiterals;
     property NilLiterals: TNEDTextSet read FNilLiterals;
-
+    //
+    property DirectiveKeywords: TNEDTextSet read FDirectiveKeywords;
+    property CompilerVariableKeywords: TNEDTextSet read FCompilerVariableKeywords;
+    property DirectiveCanContainDash: Boolean read FDirectiveCanContainDash write FDirectiveCanContainDash;
+    property CompilerVariableCanContainDash: Boolean read FCompilerVariableCanContainDash write FCompilerVariableCanContainDash;
+    //
     property HexPrefix: UTF8String read FHexPrefix write FHexPrefix;
     property HexSuffix: UTF8String read FHexSuffix write FHexSuffix;
     property BinaryPrefix: UTF8String read FBinaryPrefix write FBinaryPrefix;
@@ -234,10 +240,10 @@ type
     property OctalPrefix: UTF8String read FOctalPrefix write FOctalPrefix;
     property OctalSuffix: UTF8String read FOctalSuffix write FOctalSuffix;
     property ExtendedSuffix: UTF8String read FExtendedSuffix write FExtendedSuffix;
-
+    //
     property DecimalSeparator: UTF8Char read FDecimalSeparator write FDecimalSeparator;
     property AllowUnderscoreNumbers: Boolean read FAllowUnderscoreNumbers write FAllowUnderscoreNumbers;
-
+    //
     property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive;
   end;
 
@@ -596,12 +602,16 @@ begin
   FPunctuation := TNEDTextSet.Create(True);
   FBooleanLiterals := TNEDTextSet.Create;
   FNilLiterals := TNEDTextSet.Create;
+  FDirectiveKeywords := TNEDTextSet.Create;
+  FCompilerVariableKeywords := TNEDTextSet.Create;
 
   Reset;
 end;
 
 destructor TNEDTexerConfig.Destroy;
 begin
+  FCompilerVariableKeywords.Free;
+  FDirectiveKeywords.Free;
   FNilLiterals.Free;
   FBooleanLiterals.Free;
   FPunctuation.Free;
@@ -640,8 +650,6 @@ begin
     FCommentsDelimiters[i].CanBeNested := ASource.CommentsDelimiters[i].CanBeNested;
   end;
   FStringDelimiter := ASource.StringDelimiter;
-  FDirectiveCanContainDash := ASource.DirectiveCanContainDash;
-  FCompilerVariableCanContainDash := ASource.CompilerVariableCanContainDash;
 
   FKeywords.Assign(ASource.Keywords);
   FOperators.Assign(ASource.Operators);
@@ -649,6 +657,11 @@ begin
 
   FBooleanLiterals.Assign(ASource.BooleanLiterals);
   FNilLiterals.Assign(ASource.NilLiterals);
+
+  FDirectiveKeywords.Assign(ASource.DirectiveKeywords);
+  FCompilerVariableKeywords.Assign(ASource.CompilerVariableKeywords);
+  FDirectiveCanContainDash := ASource.DirectiveCanContainDash;
+  FCompilerVariableCanContainDash := ASource.CompilerVariableCanContainDash;
 
   FHexPrefix := ASource.HexPrefix;
   FHexSuffix := ASource.HexSuffix;
@@ -694,8 +707,6 @@ begin
   //
   SetLength(FCommentsDelimiters, 0);
   FStringDelimiter := #0; // " or '
-  FDirectiveCanContainDash := False; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
-  FCompilerVariableCanContainDash := False; // %project-name%
 
   FKeywords.Clear;
   FOperators.Clear;
@@ -703,6 +714,11 @@ begin
 
   FBooleanLiterals.Clear;
   FNilLiterals.Clear;
+
+  FDirectiveKeywords.Clear;
+  FCompilerVariableKeywords.Clear;
+  FDirectiveCanContainDash := False; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
+  FCompilerVariableCanContainDash := False; // %project-name%
 
   FHexPrefix := ''; // 0xABCD, $ABCD
   FHexSuffix := ''; // 0ABCDH or 0ABCDh - assembler
@@ -742,14 +758,16 @@ begin
   AddCommentDelimiter(ectMultiLine,  '//+', '+//', True, False);
 
   FStringDelimiter := #0; // " or '
-  FDirectiveCanContainDash := False; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
-  FCompilerVariableCanContainDash := False; // %project-name%
 
   FKeywords.Clear;
   FOperators.Clear;
   FPunctuation.Clear;
   FBooleanLiterals.Clear;
   FNilLiterals.Clear;
+  FDirectiveKeywords.Clear;
+  FCompilerVariableKeywords.Clear;
+  FDirectiveCanContainDash := False; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
+  FCompilerVariableCanContainDash := False; // %project-name%
 
   FHexPrefix := '0x';
   FHexSuffix := 'h';
@@ -856,37 +874,8 @@ begin
 end;
 
 function TNEDTexer.IsCommentDelimiterStart(AChar: UTF8Char): Boolean;
-var
-  start_len, i, idx: Integer;
-  CommentDelimiters: TNEDEditorDelimiterPair;
-  to_compare: UTF8String;
 begin
-  Result := False;
-  if AChar = #0 then
-    Exit;
-  //
-  to_compare := AChar;
-  for i := 0 to FConfig.CommentsDelimitersCount - 1 do begin
-    CommentDelimiters := FConfig.CommentsDelimiters[i];
-    start_len := Length(CommentDelimiters.StartDelimiter);
-    if (CommentDelimiters.&Type > ectNotInComment) and (start_len >= 1) then begin
-      idx := 1;
-      while (idx <= Length(to_compare)) and (idx <= start_len) do begin
-        if to_compare[idx] = CommentDelimiters.StartDelimiter[idx] then begin
-          Inc(idx);
-          if (Length(to_compare) < idx) and (FLexer.PeekChar(idx - 1) <> #0) then
-            to_compare := to_compare + FLexer.PeekChar(idx - 1);
-        end
-        else
-          Break;
-      end;
-      if idx > start_len then begin
-        Result := True;
-        Break;
-      end;
-    end;
-  end;
-  to_compare := '';
+  Result := FLexer.IsCommentStart;
 end;
 
 function TNEDTexer.IsDirectiveDelimiterStart(AChar: UTF8Char): Boolean;
@@ -945,14 +934,12 @@ end;
 
 function TNEDTexer.IsDirectiveKeyword(const AIdentifier: UTF8String): Boolean;
 begin
-  Result := True;
-//  Result := FConfig.DirectiveKeywords.Contains(AIdentifier);
+  Result := FConfig.DirectiveKeywords.Contains(AIdentifier);
 end;
 
 function TNEDTexer.IsCompilerVariableKeyword(const AIdentifier: UTF8String): Boolean;
 begin
-  Result := True;
-//  Result := FConfig.CompilerVariableKeywords.Contains(AIdentifier);
+  Result := FConfig.CompilerVariableKeywords.Contains(AIdentifier);
 end;
 
 function TNEDTexer.GetText(const AOffset, ALength: Integer): UTF8String;

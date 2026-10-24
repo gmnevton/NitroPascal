@@ -94,6 +94,9 @@ type
     FBooleanLiterals: TStringList;
     FNilLiterals: TStringList;
     //
+    FDirectiveKeywords: TStringList;
+    FCompilerVariableKeywords: TStringList;
+    //
     //
     FHexPrefix: UTF8String; // 0xABCD, $ABCD
     FHexSuffix: UTF8String; // 0ABCDH or 0ABCDh - assembler
@@ -148,6 +151,9 @@ type
     //
     property BooleanLiterals: TStringList read FBooleanLiterals;
     property NilLiterals: TStringList read FNilLiterals;
+    //
+    property DirectiveKeywords: TStringList read FDirectiveKeywords;
+    property CompilerVariableKeywords: TStringList read FCompilerVariableKeywords;
     //
     //
     property HexPrefix: UTF8String read FHexPrefix; // 0xABCD, $ABCD
@@ -374,6 +380,9 @@ begin
   FBooleanLiterals := TStringList.Create;
   FNilLiterals := TStringList.Create;
   //
+  FDirectiveKeywords := TStringList.Create;
+  FCompilerVariableKeywords := TStringList.Create;
+  //
   Reset;
 end;
 
@@ -405,6 +414,9 @@ begin
   //
   FBooleanLiterals.Free;
   FNilLiterals.Free;
+  //
+  FDirectiveKeywords.Free;
+  FCompilerVariableKeywords.Free;
   //
   FHexPrefix := '';
   FHexSuffix := '';
@@ -481,6 +493,9 @@ begin
   //
   FBooleanLiterals.Clear;
   FNilLiterals.Clear;
+  //
+  FDirectiveKeywords.Clear;
+  FCompilerVariableKeywords.Clear;
   //
   FHexPrefix := '0x'; // 0xABCD, $ABCD
   FHexSuffix := 'h'; // 0ABCDH or 0ABCDh - assembler
@@ -621,6 +636,25 @@ begin
     Root := Root.FirstChild;
     while Root <> Nil do begin
       FNilLiterals.Add(Root.NodeValue);
+      //
+      Root := Root.NextSibling;
+    end;
+  end;
+  //
+  Root := ARoot.FindNode('DirectiveKeywords', [jtArray]);
+  if Root <> Nil then begin
+    Root := Root.FirstChild;
+    while Root <> Nil do begin
+      FDirectiveKeywords.Add(Root.NodeValue);
+      //
+      Root := Root.NextSibling;
+    end;
+  end;
+  Root := ARoot.FindNode('CompilerVariableKeywords', [jtArray]);
+  if Root <> Nil then begin
+    Root := Root.FirstChild;
+    while Root <> Nil do begin
+      FCompilerVariableKeywords.Add(Root.NodeValue);
       //
       Root := Root.NextSibling;
     end;
