@@ -89,7 +89,7 @@
         <AppEnableHighDPI>true</AppEnableHighDPI>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <DCC_Define>madExcept;$(DCC_Define)</DCC_Define>
+        <DCC_Define>madExcept;LeakChecking;$(DCC_Define)</DCC_Define>
         <DCC_MapFile>3</DCC_MapFile>
         <Debugger_CWD>d:\Borland Librarys\NitroPascal\compiler\tests\simple_project\</Debugger_CWD>
     </PropertyGroup>

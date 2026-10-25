@@ -19,7 +19,8 @@ uses
   Generics.Collections,
   JSON.VerySimple,
   ned_projects,
-  ned_editor_types;
+  ned_editor_types,
+  ned_editor_parser;
 
 type
   TNEDLayout = class
@@ -60,6 +61,14 @@ type
     property FontSize: Integer read FFontSize;
     property FontStyle: TFontStyles read FFontStyle;
     property FontColor: TColor read FFontColor;
+  end;
+
+  TNEDEditorParserKeyword = class
+  public
+    Kind: TNEDStructuralFrameKindEnum;
+    Role: TNEDParserKeywordRoleEnum;
+  public
+    constructor Create(const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum);
   end;
 
   TNEDEditorHighlightSettings = class
@@ -363,6 +372,15 @@ begin
   end;
 end;
 
+{ TNEDEditorParserKeyword }
+
+constructor TNEDEditorParserKeyword.Create(const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum);
+begin
+  inherited Create;
+  Kind := AKind;
+  Role := ARole;
+end;
+
 { TNEDEditorHighlightSettings }
 
 constructor TNEDEditorHighlightSettings.Create;
@@ -373,7 +391,7 @@ begin
   //
   SetLength(FCommentsDelimiter, 0);
   //
-  FKeywords := TStringList.Create;
+  FKeywords := TStringList.Create(True);
   FOperators := TStringList.Create;
   FPunctuation := TStringList.Create;
   //
@@ -515,6 +533,9 @@ function TNEDEditorHighlightSettings.Read(const ARoot: TJSONNode): Boolean;
 var
   Root, Node: TJSONNode;
   idx: Integer;
+  Keyword: UTF8String;
+  KeywordKind: TNEDStructuralFrameKindEnum;
+  KeywordRole: TNEDParserKeywordRoleEnum;
 begin
   Result := False;
   Reset;
@@ -598,7 +619,13 @@ begin
   if Root <> Nil then begin
     Root := Root.FirstChild;
     while Root <> Nil do begin
-      FKeywords.Add(Root.NodeValue);
+      Keyword := ARoot.Document.NodeAsString(Root, 'Keyword', '');
+      KeywordKind := TNEDParserKeyword.StringToStructuralFrameKind(ARoot.Document.NodeAsString(Root, 'Kind', ''));
+      KeywordRole := TNEDParserKeyword.StringToParserKeywordRole(ARoot.Document.NodeAsString(Root, 'Role', ''));
+      //
+      // @TODO: FKeywords Objects need to be freed, otherwise we are leaking memory
+      FKeywords.AddObject(Keyword, TNEDEditorParserKeyword.Create(KeywordKind, KeywordRole));
+      Keyword := '';
       //
       Root := Root.NextSibling;
     end;

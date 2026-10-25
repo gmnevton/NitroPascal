@@ -25,10 +25,13 @@ type
   TNEDStructuralFrameKindEnum = (
     sfkUnknown,
 
-    sfkProgram,
-    sfkUnit,
+    sfkProject, // sfkProgram,
+    sfkCode,
     sfkNamespace,
 
+    sfkObject,
+    sfkLibrary,
+    sfkAssembly,
     sfkClass,
     sfkStructure,
     sfkRecord,
@@ -60,8 +63,9 @@ type
 
   TNEDParserExpectationEnum = (
     peNone,
-    peIdentifier,
+    peDeclaration,
     peType,
+    peIdentifier,
     peExpression,
     peStatement,
     peParameter,
@@ -69,8 +73,7 @@ type
     peOperator,
     peThen,
     peElse,
-    peEnd,
-    peDeclaration
+    peEnd
   );
 
   TNEDStructuralFrame = record
@@ -115,8 +118,8 @@ type
   TNEDScopeKindEnum = (
     skUnknown,
     skGlobal,
+    skLocal,
     skNamespace,
-    skUnit,
     skClass,
     skStructure,
     skProcedure,
@@ -126,6 +129,8 @@ type
 
   TNEDSymbolKindEnum = (
     symUnknown,
+    symCode,
+    symNamespace,
     symVariable,
     symConstant,
     symType,
@@ -137,9 +142,7 @@ type
     symClass,
     symStructure,
     symEnum,
-    symEnumValue,
-    symNamespace,
-    symUnit
+    symEnumValue
   );
 
   TNEDSymbol = class;
@@ -292,12 +295,30 @@ type
 //    property State: TNEDParserState read FState;
 //  end;
 
+  TNEDParserKeywordRoleEnum = (
+    pkrOther,
+    pkrDeclaration,
+    pkrType,
+    pkrModifier,
+    pkrSection,
+    pkrStatement,
+    pkrOperator,
+    pkrLiteral,
+    pkrStructural
+  );
+
   TNEDParserKeyword = class
   public
     Text: UTF8String;
     Kind: TNEDStructuralFrameKindEnum;
+    Role: TNEDParserKeywordRoleEnum;
     //
     destructor Destroy; override;
+    //
+    class function StructuralFrameKindToString(const Value: TNEDStructuralFrameKindEnum): String;
+    class function StringToStructuralFrameKind(Value: String): TNEDStructuralFrameKindEnum;
+    class function ParserKeywordRoleToString(const Value: TNEDParserKeywordRoleEnum): String;
+    class function StringToParserKeywordRole(Value: String): TNEDParserKeywordRoleEnum;
   end;
 
   TNEDParserConfig = class
@@ -314,7 +335,8 @@ type
     procedure Clear;
     procedure Reset;
     //
-    function AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum): TNEDParserKeyword;
+    function AddKeyword(const AKeyword: TNEDParserKeyword): TNEDParserKeyword; overload;
+    function AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum): TNEDParserKeyword; overload;
     function FindKeyword(const AText: UTF8String): TNEDParserKeyword;
     //
     property Keywords: TObjectList<TNEDParserKeyword> read FKeywords;
@@ -510,8 +532,151 @@ end;
 
 destructor TNEDParserKeyword.Destroy;
 begin
-
+  Text := '';
   inherited;
+end;
+
+class function TNEDParserKeyword.StructuralFrameKindToString(const Value: TNEDStructuralFrameKindEnum): String;
+begin
+  case Value of
+    sfkUnknown   : Result := 'Unknown';
+
+    sfkProject   : Result := 'Project';
+    sfkCode      : Result := 'Code';
+    sfkNamespace : Result := 'Namespace';
+
+    sfkObject    : Result := 'Object';
+    sfkLibrary   : Result := 'Library';
+    sfkAssembly  : Result := 'Assembly';
+    sfkClass     : Result := 'Class';
+    sfkStructure : Result := 'Structure';
+    sfkRecord    : Result := 'Record';
+    sfkUnion     : Result := 'Union';
+    sfkInterface : Result := 'Interface';
+    sfkEnum      : Result := 'Enum';
+
+    sfkProcedure : Result := 'Procedure';
+    sfkFunction  : Result := 'Function';
+
+    sfkBeginBlock: Result := 'BeginBlock';
+
+    sfkIf        : Result := 'If';
+    sfkElse      : Result := 'Else';
+
+    sfkCase      : Result := 'Case';
+    sfkCaseBranch: Result := 'CaseBranch';
+
+    sfkFor       : Result := 'For';
+    sfkWhile     : Result := 'While';
+    sfkRepeat    : Result := 'Repeat';
+
+    sfkWith      : Result := 'With';
+
+    sfkTry       : Result := 'Try';
+    sfkExcept    : Result := 'Except';
+    sfkFinally   : Result := 'Finally';
+  else
+    Result := 'Unknown';
+  end;
+end;
+
+class function TNEDParserKeyword.StringToStructuralFrameKind(Value: String): TNEDStructuralFrameKindEnum;
+begin
+  Value := LowerCase(Value);
+  Result := sfkUnknown;
+  //
+  if Value = 'project' then
+    Result := sfkProject
+  else if Value = 'code' then
+    Result := sfkCode
+  else if Value = 'namespace' then
+    Result := sfkNamespace
+  else if Value = 'object' then
+    Result := sfkObject
+  else if Value = 'library' then
+    Result := sfkLibrary
+  else if Value = 'assembly' then
+    Result := sfkAssembly
+  else if Value = 'class' then
+    Result := sfkClass
+  else if Value = 'structure' then
+    Result := sfkStructure
+  else if Value = 'record' then
+    Result := sfkRecord
+  else if Value = 'union' then
+    Result := sfkUnion
+  else if Value = 'interface' then
+    Result := sfkInterface
+  else if Value = 'enum' then
+    Result := sfkEnum
+  else if Value = 'procedure' then
+    Result := sfkProcedure
+  else if Value = 'function' then
+    Result := sfkFunction
+  else if Value = 'beginblock' then
+    Result := sfkBeginBlock
+  else if Value = 'if' then
+    Result := sfkIf
+  else if Value = 'else' then
+    Result := sfkElse
+  else if Value = 'case' then
+    Result := sfkCase
+  else if Value = 'casebranch' then
+    Result := sfkCaseBranch
+  else if Value = 'for' then
+    Result := sfkFor
+  else if Value = 'while' then
+    Result := sfkWhile
+  else if Value = 'repeat' then
+    Result := sfkRepeat
+  else if Value = 'with' then
+    Result := sfkWith
+  else if Value = 'try' then
+    Result := sfkTry
+  else if Value = 'except' then
+    Result := sfkExcept
+  else if Value = 'finally' then
+    Result := sfkFinally;
+end;
+
+class function TNEDParserKeyword.ParserKeywordRoleToString(const Value: TNEDParserKeywordRoleEnum): String;
+begin
+  case Value of
+    pkrOther      : Result := 'Other';
+    pkrDeclaration: Result := 'Declaration';
+    pkrType       : Result := 'Type';
+    pkrModifier   : Result := 'Modifier';
+    pkrSection    : Result := 'Section';
+    pkrStatement  : Result := 'Statement';
+    pkrOperator   : Result := 'Operator';
+    pkrLiteral    : Result := 'Literal';
+    pkrStructural : Result := 'Structural';
+  else
+    Result := 'Other';
+  end;
+end;
+
+class function TNEDParserKeyword.StringToParserKeywordRole(Value: String): TNEDParserKeywordRoleEnum;
+begin
+  Value := LowerCase(Value);
+  Result := pkrOther;
+  //
+  if Value = 'declaration' then
+    Result := pkrDeclaration
+  else if Value = 'type' then
+    Result := pkrType
+  else if Value = 'modifier' then
+    Result := pkrModifier
+  else if Value = 'section' then
+    Result := pkrSection
+  else if Value = 'statement' then
+    Result := pkrStatement
+  else if Value = 'operator' then
+    Result := pkrOperator
+  else if Value = 'literal' then
+    Result := pkrLiteral
+  else if Value = 'structural' then
+    Result := pkrStructural;
 end;
 
 { TNEDParserConfig }
@@ -540,7 +705,7 @@ begin
   FCaseSensitive := ASource.CaseSensitive;
 
   for I := 0 to ASource.Keywords.Count - 1 do begin
-    AddKeyword(ASource.Keywords[I].Text, ASource.Keywords[I].Kind);
+    AddKeyword(ASource.Keywords[I]);
   end;
 end;
 
@@ -578,23 +743,122 @@ procedure TNEDParserConfig.Reset;
 begin
   FKeywords.Clear;
   FCaseSensitive := False;
-  //
-  AddKeyword('class', sfkClass);
-  AddKeyword('record', sfkRecord);
-  AddKeyword('procedure', sfkProcedure);
-  AddKeyword('function', sfkFunction);
-  AddKeyword('begin', sfkBeginBlock);
-  AddKeyword('if', sfkIf);
-  AddKeyword('case', sfkCase);
-  AddKeyword('try', sfkTry);
+
+  // Operators
+  AddKeyword('and',       sfkUnknown, pkrOperator);
+  AddKeyword('as',        sfkUnknown, pkrOperator);
+  AddKeyword('div',       sfkUnknown, pkrOperator);
+  AddKeyword('in',        sfkUnknown, pkrOperator);
+  AddKeyword('is',        sfkUnknown, pkrOperator);
+  AddKeyword('mod',       sfkUnknown, pkrOperator);
+  AddKeyword('not',       sfkUnknown, pkrOperator);
+  AddKeyword('of',        sfkUnknown, pkrOperator);
+  AddKeyword('or',        sfkUnknown, pkrOperator);
+  AddKeyword('shl',       sfkUnknown, pkrOperator);
+  AddKeyword('shr',       sfkUnknown, pkrOperator);
+  AddKeyword('to',        sfkUnknown, pkrOperator);
+  AddKeyword('xor',       sfkUnknown, pkrOperator);
+
+  // Literals and special predefined values
+  AddKeyword('nil',       sfkUnknown, pkrLiteral);
+  AddKeyword('result',    sfkUnknown, pkrLiteral);
+
+  // Type-related keywords
+  AddKeyword('array',     sfkUnknown, pkrType);
+  AddKeyword('packed',    sfkUnknown, pkrType);
+  AddKeyword('record',    sfkRecord,  pkrStructural);
+  AddKeyword('set',       sfkUnknown, pkrType);
+  AddKeyword('string',    sfkUnknown, pkrType);
+
+  // Declaration keywords
+  AddKeyword('const',         sfkUnknown, pkrDeclaration);
+  AddKeyword('label',         sfkUnknown, pkrDeclaration);
+  AddKeyword('resourcestring',sfkUnknown, pkrDeclaration);
+  AddKeyword('threadvar',     sfkUnknown, pkrDeclaration);
+  AddKeyword('type',          sfkUnknown, pkrDeclaration);
+  AddKeyword('var',           sfkUnknown, pkrDeclaration);
+
+  // Structural declarations
+  AddKeyword('class',         sfkClass,      pkrStructural);
+  AddKeyword('code',          sfkCode,       pkrStructural);
+  AddKeyword('constructor',   sfkProcedure,  pkrStructural);
+  AddKeyword('destructor',    sfkProcedure,  pkrStructural);
+  AddKeyword('dispinterface', sfkInterface,  pkrStructural);
+//  AddKeyword('function',      sfkFunction,   pkrStructural);
+  AddKeyword('interface',     sfkInterface,  pkrStructural);
+  AddKeyword('object',        sfkObject,     pkrStructural);
+//  AddKeyword('procedure',     sfkProcedure,  pkrStructural);
+//  AddKeyword('program',       sfkProgram,    pkrStructural);
+  AddKeyword('library',       sfkLibrary,    pkrStructural);
+  AddKeyword('project',       sfkProject,    pkrStructural);
+
+  // Structural blocks and control flow
+  AddKeyword('begin',      sfkBeginBlock, pkrStructural);
+  AddKeyword('case',       sfkCase,       pkrStructural);
+  AddKeyword('else',       sfkElse,       pkrStructural);
+  AddKeyword('end',        sfkUnknown,    pkrStructural);
+  AddKeyword('except',     sfkExcept,     pkrStructural);
+  AddKeyword('finally',    sfkFinally,    pkrStructural);
+  AddKeyword('for',        sfkFor,        pkrStructural);
+  AddKeyword('if',         sfkIf,         pkrStructural);
+  AddKeyword('repeat',     sfkRepeat,     pkrStructural);
+  AddKeyword('try',        sfkTry,        pkrStructural);
+  AddKeyword('while',      sfkWhile,      pkrStructural);
+  AddKeyword('with',       sfkWith,       pkrStructural);
+
+  // Contextual control-flow keywords
+  AddKeyword('do',         sfkUnknown,    pkrStructural);
+  AddKeyword('then',       sfkUnknown,    pkrStructural);
+  AddKeyword('until',      sfkUnknown,    pkrStructural);
+
+  // Assembly
+  AddKeyword('asm',        sfkAssembly,   pkrStructural);
+
+  // Statements and control transfer
+  AddKeyword('break',      sfkUnknown, pkrStatement);
+  AddKeyword('defer',      sfkUnknown, pkrStatement);
+  AddKeyword('exit',       sfkUnknown, pkrStatement);
+  AddKeyword('goto',       sfkUnknown, pkrStatement);
+  AddKeyword('inherited',  sfkUnknown, pkrStatement);
+  AddKeyword('raise',      sfkUnknown, pkrStatement);
+  AddKeyword('return',     sfkUnknown, pkrStatement);
+
+  // Modifiers and member access
+  AddKeyword('default',    sfkUnknown, pkrModifier);
+  AddKeyword('export',     sfkUnknown, pkrModifier);
+  AddKeyword('exports',    sfkUnknown, pkrModifier);
+  AddKeyword('inline',     sfkUnknown, pkrModifier);
+  AddKeyword('out',        sfkUnknown, pkrModifier);
+  AddKeyword('private',    sfkUnknown, pkrModifier);
+  AddKeyword('protected',  sfkUnknown, pkrModifier);
+  AddKeyword('public',     sfkUnknown, pkrModifier);
+  AddKeyword('read',       sfkUnknown, pkrModifier);
+  AddKeyword('write',      sfkUnknown, pkrModifier);
+
+  // Unit, module, and initialization sections
+  AddKeyword('finalization',  sfkUnknown, pkrSection);
+  AddKeyword('init',          sfkUnknown, pkrSection);
+  AddKeyword('initialization',sfkUnknown, pkrSection);
+  AddKeyword('import',        sfkUnknown, pkrSection);
+  AddKeyword('imports',       sfkUnknown, pkrSection);
+  AddKeyword('uses',          sfkUnknown, pkrSection);
+
+  // Remaining contextual keywords
+  AddKeyword('property', sfkUnknown, pkrSection);
 end;
 
-function TNEDParserConfig.AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum): TNEDParserKeyword;
+function TNEDParserConfig.AddKeyword(const AKeyword: TNEDParserKeyword): TNEDParserKeyword;
+begin
+  Result := AddKeyword(AKeyword.Text, AKeyword.Kind, AKeyword.Role);
+end;
+
+function TNEDParserConfig.AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum): TNEDParserKeyword;
 begin
   Result := TNEDParserKeyword.Create;
 
   Result.Text := AText;
   Result.Kind := AKind;
+  Result.Role := ARole;
 
   FKeywords.Add(Result);
 end;
@@ -794,9 +1058,9 @@ end;
 function TNEDParser.GetFrameScopeKind(const AKind: TNEDStructuralFrameKindEnum): TNEDScopeKindEnum;
 begin
   case AKind of
-    sfkProgram  : Result := skGlobal;
+    sfkProject  : Result := skGlobal;
 
-    sfkUnit     : Result := skUnit;
+    sfkCode     : Result := skLocal;
 
     sfkNamespace: Result := skNamespace;
 
@@ -991,15 +1255,15 @@ begin
   Name := GetTokenText(AText, AToken);
 
   { program }
-  if SameText(string(Name), 'program') then begin
-    PushFrame(AState, sfkProgram, '', Location.Line, Location.Column);
+  if SameText(string(Name), 'project') then begin
+    PushFrame(AState, sfkProject, '', Location.Line, Location.Column);
     Include(AAnalysis.Context.Flags, lcfOpensScope);
     Exit;
   end;
 
   { unit }
-  if SameText(string(Name), 'unit') then begin
-    PushFrame(AState, sfkUnit, '', Location.Line, Location.Column);
+  if SameText(string(Name), 'code') then begin
+    PushFrame(AState, sfkCode, '', Location.Line, Location.Column);
     Include(AAnalysis.Context.Flags, lcfOpensScope);
     Exit;
   end;

@@ -352,6 +352,9 @@ var
   HighlightSettings: TNEDEditorHighlightSettings;
   i: Integer;
   DelimiterPair: TNEDEditorDelimiterPair;
+  Keyword: UTF8String;
+  KeywordKind: TNEDStructuralFrameKindEnum;
+  KeywordRole: TNEDParserKeywordRoleEnum;
 begin
   if NEDMainForm.Profile = Nil then
     Exit;
@@ -466,7 +469,11 @@ begin
       LangProfile.TexerConfig.CaseSensitive := HighlightSettings.CaseSensitive;
       //
       for i := 0 to HighlightSettings.Keywords.Count - 1 do begin
-        LangProfile.ParserConfig.AddKeyword(HighlightSettings.Keywords.Strings[i], sfkUnknown);
+        Keyword := HighlightSettings.Keywords.Strings[i];
+        KeywordKind := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Kind;
+        KeywordRole := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Role;
+        LangProfile.ParserConfig.AddKeyword(Keyword, KeywordKind, KeywordRole);
+        Keyword := '';
       end;
       LangProfile.ParserConfig.CaseSensitive := HighlightSettings.CaseSensitive;
       //

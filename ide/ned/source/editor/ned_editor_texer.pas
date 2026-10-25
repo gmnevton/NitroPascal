@@ -1041,7 +1041,6 @@ begin
     if not FLexer.NextChar(C) then
       Break;
 
-    //C := FLexer.PeekChar(0);
     if FLexer.State.Mode = AExitMode then begin
       // the character which closed the string has already been consumed by the lexer
       if C = FConfig.StringDelimiter then begin
@@ -1267,12 +1266,8 @@ begin
     if not IsOperatorChar(C) then
       Break;
 
-    // @TODO: parametrize this
     // comments and directives must be allowed to terminate an operator sequence
-    if (C = '/') and (FLexer.Position < Length(FText)) and (FLexer.PeekChar = '/') then
-      Break;
-
-    if (C = '/') and (FLexer.Position < Length(FText)) and (FLexer.PeekChar = '*') then
+    if IsCommentDelimiterStart(C) then
       Break;
 
     if not FLexer.NextChar(C) then
@@ -1307,7 +1302,7 @@ begin
   StartPosition := FLexer.Position;
 
   if FLexer.NextChar(C) then
-    AddToken(ttkDefault, StartPosition, FLexer.Position - StartPosition);
+    AddToken(ttkUnknown, StartPosition, FLexer.Position - StartPosition);
 end;
 
 procedure TNEDTexer.Tex;
