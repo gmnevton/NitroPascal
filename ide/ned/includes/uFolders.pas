@@ -1588,6 +1588,10 @@ begin
     SetRectEmpty(Result);
     Exit;
   end;
+//  if not (Collection is TEntryItems) then begin
+//    SetRectEmpty(Result);
+//    Exit;
+//  end;
   // this is getting parent render control info for us, to know what are the parameters to use while calculating entry position
   View := TCustomEntryView((Collection as TEntryItems).Control);
   if View.Perform(CM_ITEMDETAILS, Integer(@ControlDetails), 0) = 0 then begin // technically not possible, but ... to be sure
