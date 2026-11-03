@@ -105,7 +105,7 @@ type
     procedure Reset;
     procedure ClearCommentDelimiters;
     procedure AddCommentDelimiter(const ADelimiter: TNEDLexicalDelimiterPair); overload;
-    procedure AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; const AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean); overload;
+    procedure AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean); overload;
     //
     // properties
     property LineBreak: UTF8String read FLineBreak write FLineBreak;
@@ -232,6 +232,8 @@ begin
   if ASource = Nil then
     Exit;
 
+  Clear;
+
   FLineBreak := ASource.FLineBreak;
   FStringDelimiter := ASource.StringDelimiter;
   FAllowStringDelimiterNesting := ASource.AllowStringDelimiterNesting;
@@ -253,12 +255,18 @@ begin
 end;
 
 procedure TNEDLexerConfig.Clear;
+var
+  i: Integer;
 begin
   FLineBreak := '';
   FStringDelimiter := #0;
   FAllowStringDelimiterNesting := False;
   FNestedStringDelimiterEscapeing := False;
 
+  for i := 0 to High(FCommentsDelimiters) do begin
+    FCommentsDelimiters[i].StartDelimiter := '';
+    FCommentsDelimiters[i].EndDelimiter := '';
+  end;
   SetLength(FCommentsDelimiters, 0);
 
   FDirectiveDelimiter.&Type          := ectNotInComment;
@@ -281,12 +289,18 @@ begin
 end;
 
 procedure TNEDLexerConfig.Reset;
+var
+  i: Integer;
 begin
   FLineBreak := #13#10; // CRLF(#13#10) or LF(#10) or CR(#13)
   FStringDelimiter := ''''; // ' or "
   FAllowStringDelimiterNesting := False;
   FNestedStringDelimiterEscapeing := False;
 
+  for i := 0 to High(FCommentsDelimiters) do begin
+    FCommentsDelimiters[i].StartDelimiter := '';
+    FCommentsDelimiters[i].EndDelimiter := '';
+  end;
   SetLength(FCommentsDelimiters, 0);
   AddCommentDelimiter(ectSingleLine, '//', '',     True, True);
   AddCommentDelimiter(ectMultiLine,  '/.', './',   True, True);
@@ -332,7 +346,7 @@ begin
   AddCommentDelimiter(ADelimiter.&Type, ADelimiter.StartDelimiter, ADelimiter.EndDelimiter, ADelimiter.CanNest, ADelimiter.CanBeNested);
 end;
 
-procedure TNEDLexerConfig.AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; const AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean);
+procedure TNEDLexerConfig.AddCommentDelimiter(const AType: TNEDLexicalCommentTypeEnum; AStartDelimiter, AEndDelimiter: String; const ACanNest, ACanBeNested: Boolean);
 var
   idx: Integer;
 begin

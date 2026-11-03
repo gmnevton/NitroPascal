@@ -3331,6 +3331,7 @@ end;
 
 destructor TNEDHighlightConfig.Destroy;
 begin
+  Clear;
   FRules.Free;
   inherited Destroy;
 end;
@@ -3642,6 +3643,8 @@ begin
   if ASource = Nil then
     Exit;
 
+  Clear;
+
   FID := ASource.ID;
   FName := ASource.Name;
   FDescription := ASource.Description;
@@ -3660,7 +3663,7 @@ begin
     DocumentAnalyzer := FHighlighter.FEditorControl.Document.DocumentAnalyzer;
     DocumentAnalyzer.Lexer.Config.Assign(FLexerConfig);
     DocumentAnalyzer.Texer.Config.Assign(FTexerConfig);
-    //DocumentAnalyzer.Parser.Config.Assign(FLexerConfig);
+    DocumentAnalyzer.Parser.Config.Assign(FParserConfig);
 
     FHighlighter.FEditorControl.Invalidate;
   end;
@@ -3683,11 +3686,13 @@ end;
 
 procedure TNEDLanguageProfile.Reset;
 begin
-  FID := '';
-  FName := '';
-  FDescription := '';
+  FID := 'nitropascal';
+  FName := 'NitroPascal';
+  FDescription := 'NitroPascal - Modern Pascal for the Next Generation';
 
   FFileExtensions.Clear;
+  FFileExtensions.Add('.npe');
+  FFileExtensions.Add('.npc');
 
   FLexerConfig.Reset;
   FTexerConfig.Reset;
@@ -3770,8 +3775,13 @@ end;
 procedure TNEDHighlighter.SetLanguageProfile(const ALanguageProfile: TNEDLanguageProfile);
 begin
   if FLanguageProfile <> ALanguageProfile then begin
+    if FLanguageProfile <> Nil then
+      FLanguageProfile.FHighlighter := Nil;
+
     FLanguageProfile := ALanguageProfile;
-    FLanguageProfile.FHighlighter := Self;
+
+    if FLanguageProfile <> Nil then
+      FLanguageProfile.FHighlighter := Self;
     FEditorControl.Invalidate;
   end;
 end;

@@ -109,6 +109,7 @@ destructor TNEDConfig.Destroy;
 begin
   FErrorMsg := '';
   FColorSchema := '';
+  FProfiles.Clear;
   FProfiles.Free;
   FLastProfile := '';
   FStorage.Free;

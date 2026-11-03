@@ -610,6 +610,7 @@ end;
 
 destructor TNEDTexerConfig.Destroy;
 begin
+  Clear;
   FCompilerVariableKeywords.Free;
   FDirectiveKeywords.Free;
   FNilLiterals.Free;
@@ -628,6 +629,8 @@ begin
   if ASource = nil then
     Exit;
 
+  Clear;
+  //
   FWhitespaceCharSet := ASource.WhitespaceCharSet;
   //
   FIdentifierCharSet := ASource.IdentifierCharSet;
@@ -692,6 +695,8 @@ begin
 end;
 
 procedure TNEDTexerConfig.Clear;
+var
+  i: Integer;
 begin
   FWhitespaceCharSet := ''; // ' ', #9, #10, #13
   //
@@ -705,6 +710,10 @@ begin
   FNumberNumberStart := False; // 00C0FE
   FNumberCanContainDash := False; // 00-00
   //
+  for i := 0 to High(FCommentsDelimiters) do begin
+    FCommentsDelimiters[i].StartDelimiter := '';
+    FCommentsDelimiters[i].EndDelimiter := '';
+  end;
   SetLength(FCommentsDelimiters, 0);
   FStringDelimiter := #0; // " or '
 
@@ -735,6 +744,8 @@ begin
 end;
 
 procedure TNEDTexerConfig.Reset;
+var
+  i: Integer;
 begin
   FWhitespaceCharSet := ' '#9#10#13;
 
@@ -748,6 +759,10 @@ begin
   FNumberNumberStart := True; // 00C0FE
   FNumberCanContainDash := False; // 00-00
 
+  for i := 0 to High(FCommentsDelimiters) do begin
+    FCommentsDelimiters[i].StartDelimiter := '';
+    FCommentsDelimiters[i].EndDelimiter := '';
+  end;
   SetLength(FCommentsDelimiters, 0);
   AddCommentDelimiter(ectSingleLine, '//', '',     True, True);
   AddCommentDelimiter(ectMultiLine,  '/.', './',   True, True);

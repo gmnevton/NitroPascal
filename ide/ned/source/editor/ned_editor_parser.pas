@@ -307,18 +307,45 @@ type
     pkrStructural
   );
 
+  TNEDParserKeywordActionEnum = (
+    pkaNone,
+
+    pkaOpenFrame,
+    pkaPendingDeclaration,
+
+    pkaBeginBlock,
+    pkaEndBlock,
+    pkaElse,
+
+    pkaSetExpectation
+  );
+
   TNEDParserKeyword = class
   public
     Text: UTF8String;
     Kind: TNEDStructuralFrameKindEnum;
     Role: TNEDParserKeywordRoleEnum;
+    Action: TNEDParserKeywordActionEnum;
+    Expectation: TNEDParserExpectationEnum;
+    ContextFlags: TNEDLineContextFlags;
     //
     destructor Destroy; override;
     //
+    //
     class function StructuralFrameKindToString(const Value: TNEDStructuralFrameKindEnum): String;
     class function StringToStructuralFrameKind(Value: String): TNEDStructuralFrameKindEnum;
+    //
     class function ParserKeywordRoleToString(const Value: TNEDParserKeywordRoleEnum): String;
     class function StringToParserKeywordRole(Value: String): TNEDParserKeywordRoleEnum;
+    //
+    class function ParserKeywordActionToString(const Value: TNEDParserKeywordActionEnum): String;
+    class function StringToParserKeywordAction(Value: String): TNEDParserKeywordActionEnum;
+    //
+    class function ParserExpectationToString(const Value: TNEDParserExpectationEnum): String;
+    class function StringToParserExpectation(Value: String): TNEDParserExpectationEnum;
+    //
+    class function LineContextFlagsToString(const Value: TNEDLineContextFlags): String;
+    class function StringToLineContextFlags(Value: String): TNEDLineContextFlags;
   end;
 
   TNEDParserConfig = class
@@ -336,7 +363,9 @@ type
     procedure Reset;
     //
     function AddKeyword(const AKeyword: TNEDParserKeyword): TNEDParserKeyword; overload;
-    function AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum): TNEDParserKeyword; overload;
+    //function AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum): TNEDParserKeyword; overload;
+    function AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum; const AAction: TNEDParserKeywordActionEnum;
+                        const AExpectation: TNEDParserExpectationEnum; const AContextFlags: TNEDLineContextFlags): TNEDParserKeyword; overload;
     function FindKeyword(const AText: UTF8String): TNEDParserKeyword;
     //
     property Keywords: TObjectList<TNEDParserKeyword> read FKeywords;
@@ -347,6 +376,7 @@ type
 
   TNEDParser = class
   private
+    FConfig: TNEDParserConfig;
     FVersion: Cardinal;
 
     function GetTokenText(const AText: UTF8String; const AToken: TNEDTextToken): UTF8String;
@@ -368,6 +398,7 @@ type
     procedure UpdateExpectation(const AText: UTF8String; const AToken: TNEDTextToken; var AState: TNEDParserState);
   public
     constructor Create;
+    destructor Destroy; override;
     //
     procedure Reset;
     //
@@ -376,6 +407,7 @@ type
     procedure ParseRange(const AText: UTF8String; const ATokens: TNEDTextTokenList; const AStartOffset, AEndOffset: Integer; const AInState: TNEDParserState; out AAnalysis: TNEDLineAnalysis);
     function StatesEqual(const ALeft, ARight: TNEDParserState): Boolean;
     //
+    property Config: TNEDParserConfig read FConfig;
     property Version: Cardinal read FVersion;
   end;
 
@@ -679,6 +711,186 @@ begin
     Result := pkrStructural;
 end;
 
+class function TNEDParserKeyword.ParserKeywordActionToString(const Value: TNEDParserKeywordActionEnum): String;
+begin
+  case Value of
+    pkaNone      : Result := 'None';
+    pkaOpenFrame : Result := 'OpenFrame';
+    pkaPendingDeclaration: Result := 'PendingDeclaration';
+    pkaBeginBlock: Result := 'BeginBlock';
+    pkaEndBlock  : Result := 'EndBlock';
+    pkaElse      : Result := 'Else';
+    pkaSetExpectation    : Result := 'SetExpectation';
+  end;
+end;
+
+class function TNEDParserKeyword.StringToParserKeywordAction(Value: String): TNEDParserKeywordActionEnum;
+begin
+  Value := LowerCase(Value);
+  Result := pkaNone;
+  //
+  if Value = 'openframe' then
+    Result := pkaOpenFrame
+  else if Value = 'pendingdeclaration' then
+    Result := pkaPendingDeclaration
+  else if Value = 'beginblock' then
+    Result := pkaBeginBlock
+  else if Value = 'endblock' then
+    Result := pkaEndBlock
+  else if Value = 'else' then
+    Result := pkaElse
+  else if Value = 'setexpectation' then
+    Result := pkaSetExpectation;
+end;
+
+class function TNEDParserKeyword.ParserExpectationToString(const Value: TNEDParserExpectationEnum): String;
+begin
+  case Value of
+    peNone       : Result := 'None';
+    peDeclaration: Result := 'Declaration';
+    peType       : Result := 'Type';
+    peIdentifier : Result := 'Identifier';
+    peExpression : Result := 'Expression';
+    peStatement  : Result := 'Statement';
+    peParameter  : Result := 'Parameter';
+    peMember     : Result := 'Member';
+    peOperator   : Result := 'Operator';
+    peThen       : Result := 'Then';
+    peElse       : Result := 'Else';
+    peEnd        : Result := 'End';
+  end;
+end;
+
+class function TNEDParserKeyword.StringToParserExpectation(Value: String): TNEDParserExpectationEnum;
+begin
+  Value := LowerCase(Value);
+  Result := peNone;
+  //
+  if Value = 'declaration' then
+    Result := peDeclaration
+  else if Value = 'type' then
+    Result := peType
+  else if Value = 'identifier' then
+    Result := peIdentifier
+  else if Value = 'expression' then
+    Result := peExpression
+  else if Value = 'statement' then
+    Result := peStatement
+  else if Value = 'parameter' then
+    Result := peParameter
+  else if Value = 'member' then
+    Result := peMember
+  else if Value = 'operator' then
+    Result := peOperator
+  else if Value = 'then' then
+    Result := peThen
+  else if Value = 'else' then
+    Result := peElse
+  else if Value = 'end' then
+    Result := peEnd;
+end;
+
+class function TNEDParserKeyword.LineContextFlagsToString(const Value: TNEDLineContextFlags): String;
+begin
+  Result := '';
+  //
+  if lcfContainsDeclaration in Value then
+    Result := Result + 'ContainsDeclaration;';
+
+  if lcfContainsReference in Value then
+    Result := Result + 'ContainsReference;';
+
+  if lcfContainsTypeDeclaration in Value then
+    Result := Result + 'ContainsTypeDeclaration;';
+
+  if lcfContainsClassDeclaration in Value then
+    Result := Result + 'ContainsClassDeclaration;';
+
+  if lcfContainsStructureDeclaration in Value then
+    Result := Result + 'ContainsStructureDeclaration;';
+
+  if lcfContainsProcedureDeclaration in Value then
+    Result := Result + 'ContainsProcedureDeclaration;';
+
+  if lcfContainsFunctionDeclaration in Value then
+    Result := Result + 'ContainsFunctionDeclaration;';
+
+  if lcfOpensScope in Value then
+    Result := Result + 'OpensScope;';
+
+  if lcfClosesScope in Value then
+    Result := Result + 'ClosesScope;';
+
+  if lcfContainsExpression in Value then
+    Result := Result + 'ContainsExpression;';
+
+  if lcfContainsStatement in Value then
+    Result := Result + 'ContainsStatement;';
+
+  if lcfContainsError in Value then
+    Result := Result + 'ContainsError;';
+
+  if lcfIncomplete in Value then
+    Result := Result + 'Incomplete;';
+
+  if lcfContextDependsOnPreviousLine in Value then
+    Result := Result + 'ContextDependsOnPreviousLine;';
+
+  if lcfContextStable in Value then
+    Result := Result + 'ContextStable;';
+end;
+
+class function TNEDParserKeyword.StringToLineContextFlags(Value: String): TNEDLineContextFlags;
+begin
+  Value := LowerCase(Value);
+  Result := [];
+  //
+  if Value.Contains('containsdeclaration') then
+    Include(Result, lcfContainsDeclaration);
+
+  if Value.Contains('containsreference') then
+    Include(Result, lcfContainsReference);
+
+  if Value.Contains('containstypedeclaration') then
+    Include(Result, lcfContainsTypeDeclaration);
+
+  if Value.Contains('containsclassdeclaration') then
+    Include(Result, lcfContainsClassDeclaration);
+
+  if Value.Contains('containsstructuredeclaration') then
+    Include(Result, lcfContainsStructureDeclaration);
+
+  if Value.Contains('containsproceduredeclaration') then
+    Include(Result, lcfContainsProcedureDeclaration);
+
+  if Value.Contains('containsfunctiondeclaration') then
+    Include(Result, lcfContainsFunctionDeclaration);
+
+  if Value.Contains('opensscope') then
+    Include(Result, lcfOpensScope);
+
+  if Value.Contains('closesscope') then
+    Include(Result, lcfClosesScope);
+
+  if Value.Contains('containsexpression') then
+    Include(Result, lcfContainsExpression);
+
+  if Value.Contains('containsstatement') then
+    Include(Result, lcfContainsStatement);
+
+  if Value.Contains('containserror') then
+    Include(Result, lcfContainsError);
+
+  if Value.Contains('incomplete') then
+    Include(Result, lcfIncomplete);
+
+  if Value.Contains('contextdependsonpreviousline') then
+    Include(Result, lcfContextDependsOnPreviousLine);
+
+  if Value.Contains('contextstable') then
+    Include(Result, lcfContextStable);
+end;
+
 { TNEDParserConfig }
 
 constructor TNEDParserConfig.Create;
@@ -690,6 +902,7 @@ end;
 
 destructor TNEDParserConfig.Destroy;
 begin
+  Clear;
   FKeywords.Free;
   inherited Destroy;
 end;
@@ -744,121 +957,133 @@ begin
   FKeywords.Clear;
   FCaseSensitive := False;
 
-  // Operators
-  AddKeyword('and',       sfkUnknown, pkrOperator);
-  AddKeyword('as',        sfkUnknown, pkrOperator);
-  AddKeyword('div',       sfkUnknown, pkrOperator);
-  AddKeyword('in',        sfkUnknown, pkrOperator);
-  AddKeyword('is',        sfkUnknown, pkrOperator);
-  AddKeyword('mod',       sfkUnknown, pkrOperator);
-  AddKeyword('not',       sfkUnknown, pkrOperator);
-  AddKeyword('of',        sfkUnknown, pkrOperator);
-  AddKeyword('or',        sfkUnknown, pkrOperator);
-  AddKeyword('shl',       sfkUnknown, pkrOperator);
-  AddKeyword('shr',       sfkUnknown, pkrOperator);
-  AddKeyword('to',        sfkUnknown, pkrOperator);
-  AddKeyword('xor',       sfkUnknown, pkrOperator);
+  // operators
+  AddKeyword('and',       sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('as',        sfkUnknown, pkrOperator, pkaSetExpectation, peType, []);
+  AddKeyword('div',       sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('in',        sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('is',        sfkUnknown, pkrOperator, pkaSetExpectation, peType, []);
+  AddKeyword('mod',       sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('not',       sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('of',        sfkUnknown, pkrOperator, pkaSetExpectation, peType, []);
+  AddKeyword('or',        sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('shl',       sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('shr',       sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('to',        sfkUnknown, pkrOperator, pkaNone, peNone, []);
+  AddKeyword('xor',       sfkUnknown, pkrOperator, pkaNone, peNone, []);
 
-  // Literals and special predefined values
-  AddKeyword('nil',       sfkUnknown, pkrLiteral);
-  AddKeyword('result',    sfkUnknown, pkrLiteral);
+  // literals and special predefined values
+  AddKeyword('nil',       sfkUnknown, pkrLiteral, pkaNone, peNone, []);
+  AddKeyword('result',    sfkUnknown, pkrLiteral, pkaNone, peNone, []);
 
-  // Type-related keywords
-  AddKeyword('array',     sfkUnknown, pkrType);
-  AddKeyword('packed',    sfkUnknown, pkrType);
-  AddKeyword('record',    sfkRecord,  pkrStructural);
-  AddKeyword('set',       sfkUnknown, pkrType);
-  AddKeyword('string',    sfkUnknown, pkrType);
+  // type-related keywords
+  AddKeyword('array',     sfkUnknown, pkrType, pkaNone, peNone, []);
+  AddKeyword('packed',    sfkUnknown, pkrType, pkaNone, peNone, []);
+  AddKeyword('record',    sfkRecord,  pkrStructural, pkaOpenFrame, peNone, [lcfContainsTypeDeclaration, lcfOpensScope]);
+  AddKeyword('set',       sfkUnknown, pkrType, pkaNone, peNone, []);
+  AddKeyword('string',    sfkUnknown, pkrType, pkaNone, peNone, []);
 
-  // Declaration keywords
-  AddKeyword('const',         sfkUnknown, pkrDeclaration);
-  AddKeyword('label',         sfkUnknown, pkrDeclaration);
-  AddKeyword('resourcestring',sfkUnknown, pkrDeclaration);
-  AddKeyword('threadvar',     sfkUnknown, pkrDeclaration);
-  AddKeyword('type',          sfkUnknown, pkrDeclaration);
-  AddKeyword('var',           sfkUnknown, pkrDeclaration);
+  // declaration keywords
+  AddKeyword('const',          sfkUnknown, pkrDeclaration, pkaSetExpectation, peDeclaration, []);
+  AddKeyword('label',          sfkUnknown, pkrDeclaration, pkaSetExpectation, peDeclaration, []);
+  AddKeyword('resourcestring', sfkUnknown, pkrDeclaration, pkaSetExpectation, peDeclaration, []);
+  AddKeyword('threadvar',      sfkUnknown, pkrDeclaration, pkaSetExpectation, peDeclaration, []);
+  AddKeyword('type',           sfkUnknown, pkrDeclaration, pkaSetExpectation, peDeclaration, []);
+  AddKeyword('var',            sfkUnknown, pkrDeclaration, pkaSetExpectation, peDeclaration, []);
 
-  // Structural declarations
-  AddKeyword('class',         sfkClass,      pkrStructural);
-  AddKeyword('code',          sfkCode,       pkrStructural);
-  AddKeyword('constructor',   sfkProcedure,  pkrStructural);
-  AddKeyword('destructor',    sfkProcedure,  pkrStructural);
-  AddKeyword('dispinterface', sfkInterface,  pkrStructural);
+
+  // structural declarations
+  AddKeyword('class',         sfkClass,     pkrStructural,  pkaOpenFrame, peNone, [lcfContainsClassDeclaration, lcfContainsTypeDeclaration, lcfOpensScope]);
+  AddKeyword('code',          sfkCode,      pkrStructural,  pkaOpenFrame, peNone, [lcfOpensScope]);
+  AddKeyword('constructor',   sfkProcedure, pkrDeclaration, pkaPendingDeclaration, peIdentifier, [lcfContainsProcedureDeclaration, lcfContainsDeclaration]);
+  AddKeyword('destructor',    sfkProcedure, pkrDeclaration, pkaPendingDeclaration, peIdentifier, [lcfContainsProcedureDeclaration, lcfContainsDeclaration]);
+  AddKeyword('dispinterface', sfkInterface, pkrStructural,  pkaOpenFrame, peNone, [lcfContainsTypeDeclaration, lcfOpensScope]);
 //  AddKeyword('function',      sfkFunction,   pkrStructural);
-  AddKeyword('interface',     sfkInterface,  pkrStructural);
-  AddKeyword('object',        sfkObject,     pkrStructural);
+  AddKeyword('interface',     sfkInterface, pkrStructural,  pkaOpenFrame, peNone, [lcfContainsTypeDeclaration, lcfOpensScope]);
+  AddKeyword('object',        sfkObject,    pkrStructural,  pkaOpenFrame, peNone, [lcfContainsTypeDeclaration, lcfOpensScope]);
 //  AddKeyword('procedure',     sfkProcedure,  pkrStructural);
 //  AddKeyword('program',       sfkProgram,    pkrStructural);
-  AddKeyword('library',       sfkLibrary,    pkrStructural);
-  AddKeyword('project',       sfkProject,    pkrStructural);
+  AddKeyword('library',       sfkLibrary,   pkrStructural,  pkaOpenFrame, peNone, [lcfOpensScope]);
+  AddKeyword('project',       sfkProject,   pkrStructural,  pkaOpenFrame, peNone, [lcfOpensScope]);
 
-  // Structural blocks and control flow
-  AddKeyword('begin',      sfkBeginBlock, pkrStructural);
-  AddKeyword('case',       sfkCase,       pkrStructural);
-  AddKeyword('else',       sfkElse,       pkrStructural);
-  AddKeyword('end',        sfkUnknown,    pkrStructural);
-  AddKeyword('except',     sfkExcept,     pkrStructural);
-  AddKeyword('finally',    sfkFinally,    pkrStructural);
-  AddKeyword('for',        sfkFor,        pkrStructural);
-  AddKeyword('if',         sfkIf,         pkrStructural);
-  AddKeyword('repeat',     sfkRepeat,     pkrStructural);
-  AddKeyword('try',        sfkTry,        pkrStructural);
-  AddKeyword('while',      sfkWhile,      pkrStructural);
-  AddKeyword('with',       sfkWith,       pkrStructural);
 
-  // Contextual control-flow keywords
-  AddKeyword('do',         sfkUnknown,    pkrStructural);
-  AddKeyword('then',       sfkUnknown,    pkrStructural);
-  AddKeyword('until',      sfkUnknown,    pkrStructural);
+  // structural blocks and control flow
+  AddKeyword('begin',   sfkBeginBlock, pkrStructural, pkaBeginBlock, peStatement,  [lcfOpensScope, lcfContainsStatement]);
+  AddKeyword('case',    sfkCase,       pkrStructural, pkaOpenFrame,  peExpression, [lcfContainsStatement]);
+  AddKeyword('else',    sfkElse,       pkrStructural, pkaElse,       peStatement,  [lcfContainsStatement]);
+  AddKeyword('end',     sfkUnknown,    pkrStructural, pkaEndBlock,   peNone,       [lcfClosesScope]);
+  AddKeyword('except',  sfkExcept,     pkrStructural, pkaOpenFrame,  peNone,       [lcfContainsStatement]);
+  AddKeyword('finally', sfkFinally,    pkrStructural, pkaOpenFrame,  peNone,       [lcfContainsStatement]);
+  AddKeyword('for',     sfkFor,        pkrStructural, pkaOpenFrame,  peIdentifier, [lcfContainsStatement]);
+  AddKeyword('if',      sfkIf,         pkrStructural, pkaOpenFrame,  peExpression, [lcfContainsStatement]);
+  AddKeyword('repeat',  sfkRepeat,     pkrStructural, pkaOpenFrame,  peStatement,  [lcfContainsStatement]);
+  AddKeyword('try',     sfkTry,        pkrStructural, pkaOpenFrame,  peStatement,  [lcfContainsStatement, lcfOpensScope]);
+  AddKeyword('while',   sfkWhile,      pkrStructural, pkaOpenFrame,  peExpression, [lcfContainsStatement]);
+  AddKeyword('with',    sfkWith,       pkrStructural, pkaOpenFrame,  peExpression, [lcfContainsStatement]);
+
+  // contextual control-flow keywords
+  AddKeyword('do',    sfkUnknown, pkrStructural, pkaSetExpectation, peStatement,  []);
+  AddKeyword('then',  sfkUnknown, pkrStructural, pkaSetExpectation, peStatement,  []);
+  AddKeyword('until', sfkUnknown, pkrStructural, pkaSetExpectation, peExpression, []);
 
   // Assembly
-  AddKeyword('asm',        sfkAssembly,   pkrStructural);
+  AddKeyword('asm', sfkAssembly, pkrStructural, pkaOpenFrame, peNone, [lcfOpensScope]);
 
-  // Statements and control transfer
-  AddKeyword('break',      sfkUnknown, pkrStatement);
-  AddKeyword('defer',      sfkUnknown, pkrStatement);
-  AddKeyword('exit',       sfkUnknown, pkrStatement);
-  AddKeyword('goto',       sfkUnknown, pkrStatement);
-  AddKeyword('inherited',  sfkUnknown, pkrStatement);
-  AddKeyword('raise',      sfkUnknown, pkrStatement);
-  AddKeyword('return',     sfkUnknown, pkrStatement);
+  // statements and control transfer
+  AddKeyword('break',     sfkUnknown, pkrStatement, pkaNone, peNone, [lcfContainsStatement]);
+  AddKeyword('defer',     sfkUnknown, pkrStatement, pkaNone, peNone, [lcfContainsStatement]);
+  AddKeyword('exit',      sfkUnknown, pkrStatement, pkaNone, peNone, [lcfContainsStatement]);
+  AddKeyword('goto',      sfkUnknown, pkrStatement, pkaNone, peNone, [lcfContainsStatement]);
+  AddKeyword('inherited', sfkUnknown, pkrStatement, pkaNone, peNone, [lcfContainsStatement]);
+  AddKeyword('raise',     sfkUnknown, pkrStatement, pkaNone, peNone, [lcfContainsStatement]);
+  AddKeyword('return',    sfkUnknown, pkrStatement, pkaSetExpectation, peExpression, [lcfContainsStatement]);
 
-  // Modifiers and member access
-  AddKeyword('default',    sfkUnknown, pkrModifier);
-  AddKeyword('export',     sfkUnknown, pkrModifier);
-  AddKeyword('exports',    sfkUnknown, pkrModifier);
-  AddKeyword('inline',     sfkUnknown, pkrModifier);
-  AddKeyword('out',        sfkUnknown, pkrModifier);
-  AddKeyword('private',    sfkUnknown, pkrModifier);
-  AddKeyword('protected',  sfkUnknown, pkrModifier);
-  AddKeyword('public',     sfkUnknown, pkrModifier);
-  AddKeyword('read',       sfkUnknown, pkrModifier);
-  AddKeyword('write',      sfkUnknown, pkrModifier);
+  // modifiers and member access
+  AddKeyword('default',   sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('export',    sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('exports',   sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('inline',    sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('out',       sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('private',   sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('protected', sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('public',    sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('read',      sfkUnknown, pkrModifier, pkaNone, peNone, []);
+  AddKeyword('write',     sfkUnknown, pkrModifier, pkaNone, peNone, []);
 
-  // Unit, module, and initialization sections
-  AddKeyword('finalization',  sfkUnknown, pkrSection);
-  AddKeyword('init',          sfkUnknown, pkrSection);
-  AddKeyword('initialization',sfkUnknown, pkrSection);
-  AddKeyword('import',        sfkUnknown, pkrSection);
-  AddKeyword('imports',       sfkUnknown, pkrSection);
-  AddKeyword('uses',          sfkUnknown, pkrSection);
+  // module, and initialization sections
+  AddKeyword('finalization',   sfkUnknown, pkrSection, pkaNone, peNone, []);
+  AddKeyword('init',           sfkUnknown, pkrSection, pkaNone, peNone, []);
+  AddKeyword('initialization', sfkUnknown, pkrSection, pkaNone, peNone, []);
+  AddKeyword('import',         sfkUnknown, pkrSection, pkaNone, peNone, []);
+  AddKeyword('imports',        sfkUnknown, pkrSection, pkaNone, peNone, []);
+  AddKeyword('uses',           sfkUnknown, pkrSection, pkaNone, peNone, []);
 
-  // Remaining contextual keywords
-  AddKeyword('property', sfkUnknown, pkrSection);
+  // remaining contextual keywords
+  AddKeyword('property', sfkUnknown, pkrDeclaration, pkaSetExpectation, peDeclaration, []);
 end;
 
 function TNEDParserConfig.AddKeyword(const AKeyword: TNEDParserKeyword): TNEDParserKeyword;
 begin
-  Result := AddKeyword(AKeyword.Text, AKeyword.Kind, AKeyword.Role);
+  //Result := AddKeyword(AKeyword.Text, AKeyword.Kind, AKeyword.Role);
+  Result := AddKeyword(AKeyword.Text, AKeyword.Kind, AKeyword.Role, AKeyword.Action, AKeyword.Expectation, AKeyword.ContextFlags);
 end;
 
-function TNEDParserConfig.AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum): TNEDParserKeyword;
+//function TNEDParserConfig.AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum): TNEDParserKeyword;
+//begin
+//  Result := AddKeyword(AText, AKind, ARole, pkaNone, peNone, []);
+//end;
+
+function TNEDParserConfig.AddKeyword(const AText: UTF8String; const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum;
+  const AAction: TNEDParserKeywordActionEnum; const AExpectation: TNEDParserExpectationEnum; const AContextFlags: TNEDLineContextFlags): TNEDParserKeyword;
 begin
   Result := TNEDParserKeyword.Create;
 
   Result.Text := AText;
   Result.Kind := AKind;
   Result.Role := ARole;
+  Result.Action := AAction;
+  Result.Expectation := AExpectation;
+  Result.ContextFlags := AContextFlags;
 
   FKeywords.Add(Result);
 end;
@@ -873,7 +1098,14 @@ end;
 constructor TNEDParser.Create;
 begin
   inherited Create;
+  FConfig := TNEDParserConfig.Create;
   Reset;
+end;
+
+destructor TNEDParser.Destroy;
+begin
+  FConfig.Free;
+  inherited Destroy;
 end;
 
 procedure TNEDParser.Reset;
@@ -1247,13 +1479,77 @@ end;
 
 procedure TNEDParser.ProcessKeyword(const AText: UTF8String; const AToken: TNEDTextToken; var AState: TNEDParserState; AAnalysis: TNEDLineAnalysis);
 var
-  Location: TNEDSourceLocation;
   Name: UTF8String;
+  Keyword: TNEDParserKeyword;
+  Location: TNEDSourceLocation;
   FrameKind: TNEDStructuralFrameKindEnum;
 begin
-  Location := TokenLocation(AText, AToken);
   Name := GetTokenText(AText, AToken);
 
+  Keyword := FConfig.FindKeyword(Name);
+
+  if Keyword = Nil then
+    Exit;
+
+  Location := TokenLocation(AText, AToken);
+
+  // apply keyword-specific context flags
+  AAnalysis.Context.Flags := AAnalysis.Context.Flags + Keyword.ContextFlags;
+
+  case Keyword.Action of
+    // open a structural frame
+    pkaOpenFrame: begin
+      PushFrame(AState, Keyword.Kind, '', Location.Line, Location.Column);
+      Include(AAnalysis.Context.Flags, lcfOpensScope);
+      if Keyword.Role = pkrType then
+        AAnalysis.AddElement(cekType, AToken.Offset, AToken.Length);
+    end;
+
+    // start a pending procedure/function declaration
+    pkaPendingDeclaration: begin
+      AState.Structural.PendingConstruct := Keyword.Kind;
+      AState.Structural.PendingName := '';
+      AState.Structural.PendingStartLine := Location.Line;
+      AState.Structural.PendingStartColumn := Location.Column;
+      AState.Structural.Expectation := Keyword.Expectation;
+    end;
+
+    // begin block
+    pkaBeginBlock: begin
+      // complete a pending procedure/function declaration
+      if AState.Structural.PendingConstruct in [sfkProcedure, sfkFunction] then begin
+        PushFrame(AState, AState.Structural.PendingConstruct, AState.Structural.PendingName, AState.Structural.PendingStartLine, AState.Structural.PendingStartColumn);
+
+        AState.Structural.PendingConstruct := sfkUnknown;
+        AState.Structural.PendingName := '';
+
+        Include(AAnalysis.Context.Flags, lcfOpensScope);
+      end;
+
+      PushFrame(AState, Keyword.Kind, '', Location.Line, Location.Column);
+      Include(AAnalysis.Context.Flags, lcfOpensScope);
+    end;
+
+    // close structural frame
+    pkaEndBlock: begin
+      PopFrame(AState);
+      Include(AAnalysis.Context.Flags, lcfClosesScope);
+    end;
+
+    // else branch
+    pkaElse: begin
+      if AState.Structural.Stack.Contains(sfkIf) then begin
+        PushFrame(AState, Keyword.Kind, '', Location.Line, Location.Column);
+      end;
+    end;
+
+    // set parser expectation
+    pkaSetExpectation: begin
+      AState.Structural.Expectation := Keyword.Expectation;
+    end;
+  end;
+
+(*
   { program }
   if SameText(string(Name), 'project') then begin
     PushFrame(AState, sfkProject, '', Location.Line, Location.Column);
@@ -1509,6 +1805,7 @@ begin
     AState.Structural.Expectation := peType;
     Exit;
   end;
+*)
 end;
 
 procedure TNEDParser.ProcessIdentifier(const AToken: TNEDTextToken; var AState: TNEDParserState; AAnalysis: TNEDLineAnalysis);

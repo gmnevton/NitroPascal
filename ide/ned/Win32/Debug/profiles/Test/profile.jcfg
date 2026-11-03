@@ -125,7 +125,7 @@
           "List" : {
             "default" : {
               "Name" : "Default",
-              "Description" : "Default text",
+              "Description" : "Default text profile",
               "FileExtensions" : [
               ],
               "LineBreak" : "\u000D\u000A",
@@ -400,7 +400,7 @@
                 {"Keyword" : "while", "Kind" : "While", "Rule" : "Structural"},
                 {"Keyword" : "with", "Kind" : "With", "Rule" : "Structural"},
                 {"Keyword" : "write", "Kind" : "Unknown", "Rule" : "Modifier"},
-                {"Keyword" : "xor, "Kind" : "Unknown", "Rule" : "Operator"}
+                {"Keyword" : "xor", "Kind" : "Unknown", "Rule" : "Operator"}
               ],
               "Operators" : [
                 "~",

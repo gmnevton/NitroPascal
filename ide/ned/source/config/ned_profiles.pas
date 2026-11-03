@@ -111,6 +111,7 @@ begin
   FName := '';
   FCopiedFrom := '';
   FErrorMsg := '';
+  UnloadSessionContext;
   FSession.Free;
   inherited;
 end;
@@ -130,6 +131,8 @@ var
   FProfilesPath: String;
 begin
   try
+    UnloadSessionContext;
+    FSessionLoaded := False;
     FError := False;
     FErrorMsg := '';
     //
@@ -139,6 +142,7 @@ begin
     if DirectoryExists(FProfilesPath) then begin
       FSession.LoadContext(FProfilesPath);
       Result := FSession.Loaded;
+      FSessionLoaded := Result;
       if not Result or FSession.Error then begin
         FError := FSession.Error;
         FErrorMsg := FSession.ErrorMsg;
@@ -161,7 +165,9 @@ end;
 
 function TNEDProfile.UnloadSessionContext: Boolean;
 begin
-
+  if FSessionLoaded then
+    FSession.ContextClear;
+  FSessionLoaded := False;
 end;
 
 { TNEDProfiles }
@@ -174,6 +180,7 @@ end;
 
 destructor TNEDProfiles.Destroy;
 begin
+  Clear;
   FList.Free;
   inherited;
 end;

@@ -1071,6 +1071,7 @@ begin
     end;
     Reader.SkipWhitespace;
   end;
+  Line := '';
 end;
 
 procedure TJSONVerySimple.ParseArray(Reader: TJSONReader; var Parent: TJSONNode);

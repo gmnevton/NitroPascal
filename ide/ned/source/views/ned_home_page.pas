@@ -195,6 +195,9 @@ end;
 
 function TNEDHomeForm.FindProjectFile(const AFilePath: String): TNEDProject;
 begin
+  if FProfile = Nil then
+    Exit(Nil);
+  //
   Result := FProfile.Session.FindRecentFile(AFilePath);
 end;
 

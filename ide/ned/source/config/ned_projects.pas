@@ -340,6 +340,7 @@ begin
   FFullFilePath := '';
   FTimer.Enabled := False;
   FTimer.Free;
+  FFiles.Clear;
   FFiles.Free;
   FEditors.Free;
   inherited;

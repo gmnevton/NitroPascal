@@ -29,6 +29,7 @@ type
     constructor Create;
     destructor Destroy; override;
     //
+    procedure Clear;
     procedure Reset;
   end;
 
@@ -53,6 +54,7 @@ type
     constructor Create;
     destructor Destroy; override;
     //
+    procedure Clear;
     procedure Reset;
     function Read(const ARoot: TJSONNode): Boolean;
     //
@@ -67,8 +69,12 @@ type
   public
     Kind: TNEDStructuralFrameKindEnum;
     Role: TNEDParserKeywordRoleEnum;
+    Action: TNEDParserKeywordActionEnum;
+    Expectation: TNEDParserExpectationEnum;
+    ContextFlags: TNEDLineContextFlags;
   public
-    constructor Create(const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum);
+    constructor Create(const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum; const AAction: TNEDParserKeywordActionEnum;
+                       const AExpectation: TNEDParserExpectationEnum; const AContextFlags: TNEDLineContextFlags);
   end;
 
   TNEDEditorHighlightSettings = class
@@ -85,7 +91,7 @@ type
     FAllowStringDelimiterNesting: Boolean;
     FNestedStringDelimiterEscapeing: Boolean;
     //
-    FCommentsDelimiter: Array of TNEDEditorDelimiterPair; // see the compiler\concepts\comment\comment.npc file for detail explanation
+    FCommentsDelimiters: Array of TNEDEditorDelimiterPair; // see the compiler\concepts\comment\comment.npc file for detail explanation
     FDirectiveDelimiter: TNEDEditorDelimiterPair; // '{$' - directive begin; '}' directive end
     FDirectiveCanContainDash: Boolean; // {$program-type Windows32 GUI} {$search-path '..\\..\\concepts\\'}
     FCompilerVariableDelimiter: TNEDEditorDelimiterPair; // %project-name%
@@ -126,6 +132,7 @@ type
     constructor Create;
     destructor Destroy; override;
     //
+    procedure Clear;
     procedure Reset;
     function Read(const ARoot: TJSONNode): Boolean;
     //
@@ -181,7 +188,7 @@ type
 
   TNEDHighlighterProfiles = class
   private
-    FLanguageSettings: TDictionary<String, TNEDEditorHighlightSettings>;
+    FLanguageSettings: TObjectDictionary<String, TNEDEditorHighlightSettings>;
     //
     function GetLanguagesCount: Integer;
     function GetLanguages(const AIndex: Integer): TNEDEditorHighlightSettings; overload;
@@ -190,6 +197,7 @@ type
     constructor Create;
     destructor Destroy; override;
     //
+    procedure Clear;
     procedure Reset;
     function Read(const ARoot: TJSONNode; out AErrorMsg: String): Boolean;
     function Save: TJSONNode;
@@ -219,6 +227,7 @@ type
     constructor Create;
     destructor Destroy; override;
     //
+    procedure Clear;
     procedure Reset;
     function Read(const ARoot: TJSONNode; out AErrorMsg: String): Boolean;
     function Save: TJSONNode;
@@ -321,6 +330,11 @@ begin
   inherited;
 end;
 
+procedure TNEDLayout.Clear;
+begin
+
+end;
+
 procedure TNEDLayout.Reset;
 begin
 
@@ -337,7 +351,17 @@ end;
 
 destructor TNEDEditorSettings.Destroy;
 begin
+  Clear;
   inherited;
+end;
+
+procedure TNEDEditorSettings.Clear;
+begin
+  FBackgroundColor := $00000000;
+  FFontName := '';
+  FFontSize := 0;
+  FFontStyle := [];
+  FFontColor := clNone;
 end;
 
 procedure TNEDEditorSettings.Reset;
@@ -359,6 +383,8 @@ begin
   if ARoot = Nil then
     Exit;
   //
+  Clear;
+  //
   Root := ARoot.FindNode('EditorSettings', [jtObject]);
   if Root <> Nil then begin
     FBackgroundColor := StringToColor(ARoot.Document.NodeAsString(Root, 'BackgroundColor', '$00000000'));
@@ -374,11 +400,15 @@ end;
 
 { TNEDEditorParserKeyword }
 
-constructor TNEDEditorParserKeyword.Create(const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum);
+constructor TNEDEditorParserKeyword.Create(const AKind: TNEDStructuralFrameKindEnum; const ARole: TNEDParserKeywordRoleEnum;
+  const AAction: TNEDParserKeywordActionEnum; const AExpectation: TNEDParserExpectationEnum; const AContextFlags: TNEDLineContextFlags);
 begin
   inherited Create;
   Kind := AKind;
   Role := ARole;
+  Action := AAction;
+  Expectation := AExpectation;
+  ContextFlags := AContextFlags;
 end;
 
 { TNEDEditorHighlightSettings }
@@ -389,7 +419,7 @@ begin
   //
   FFileExtensions := TStringList.Create;
   //
-  SetLength(FCommentsDelimiter, 0);
+  SetLength(FCommentsDelimiters, 0);
   //
   FKeywords := TStringList.Create(True);
   FOperators := TStringList.Create;
@@ -408,24 +438,15 @@ destructor TNEDEditorHighlightSettings.Destroy;
 var
   i: Integer;
 begin
-  FName := '';
-  FDescription := '';
+  Clear;
+  //
   FFileExtensions.Free;
   //
-  FLineBreak := '';
-  FWhitespaceCharSet := '';
-  FStringDelimiter := #0;
-  //
-  for i := 0 to High(FCommentsDelimiter) do begin
-    FCommentsDelimiter[i].StartDelimiter := '';
-    FCommentsDelimiter[i].EndDelimiter := '';
-  end;
-  SetLength(FCommentsDelimiter, 0);
-  FDirectiveDelimiter.StartDelimiter := '';
-  FDirectiveDelimiter.EndDelimiter := '';
-  FCompilerVariableDelimiter.StartDelimiter := '';
-  FCompilerVariableDelimiter.EndDelimiter := '';
-  //
+//  for i := 0 to FKeywords.Count - 1 do
+//    if FKeywords.Objects[i] <> Nil then begin
+//      FKeywords.Objects[i].Free;
+//      FKeywords.Objects[i] := Nil;
+//    end;
   FKeywords.Free;
   FOperators.Free;
   FPunctuation.Free;
@@ -435,6 +456,59 @@ begin
   //
   FDirectiveKeywords.Free;
   FCompilerVariableKeywords.Free;
+  inherited;
+end;
+
+function TNEDEditorHighlightSettings.GetCommentsDelimitersCount: Integer;
+begin
+  Result := Length(FCommentsDelimiters);
+end;
+
+function TNEDEditorHighlightSettings.GetCommentsDelimiters(const Index: Integer): TNEDEditorDelimiterPair;
+begin
+  FillChar(Result, SizeOf(TNEDEditorDelimiterPair), 0);
+  if (Index < 0) or (Index > High(FCommentsDelimiters)) then
+    Exit;
+  //
+  Result := FCommentsDelimiters[Index];
+end;
+
+procedure TNEDEditorHighlightSettings.Clear;
+var
+  i: Integer;
+begin
+  FName := '';
+  FDescription := '';
+  FFileExtensions.Clear;
+  //
+  FLineBreak := '';
+  FWhitespaceCharSet := '';
+  FStringDelimiter := #0;
+  //
+  for i := 0 to High(FCommentsDelimiters) do begin
+    FCommentsDelimiters[i].StartDelimiter := '';
+    FCommentsDelimiters[i].EndDelimiter := '';
+  end;
+  SetLength(FCommentsDelimiters, 0);
+  FDirectiveDelimiter.StartDelimiter := '';
+  FDirectiveDelimiter.EndDelimiter := '';
+  FCompilerVariableDelimiter.StartDelimiter := '';
+  FCompilerVariableDelimiter.EndDelimiter := '';
+  //
+//  for i := 0 to FKeywords.Count - 1 do
+//    if FKeywords.Objects[i] <> Nil then begin
+//      FKeywords.Objects[i].Free;
+//      FKeywords.Objects[i] := Nil;
+//    end;
+  FKeywords.Clear;
+  FOperators.Clear;
+  FPunctuation.Clear;
+  //
+  FBooleanLiterals.Clear;
+  FNilLiterals.Clear;
+  //
+  FDirectiveKeywords.Clear;
+  FCompilerVariableKeywords.Clear;
   //
   FHexPrefix := '';
   FHexSuffix := '';
@@ -445,21 +519,6 @@ begin
   FExtendedSuffix := '';
   //
   FDecimalSeparator := #0;
-  inherited;
-end;
-
-function TNEDEditorHighlightSettings.GetCommentsDelimitersCount: Integer;
-begin
-  Result := Length(FCommentsDelimiter);
-end;
-
-function TNEDEditorHighlightSettings.GetCommentsDelimiters(const Index: Integer): TNEDEditorDelimiterPair;
-begin
-  FillChar(Result, SizeOf(TNEDEditorDelimiterPair), 0);
-  if (Index < 0) or (Index > High(FCommentsDelimiter)) then
-    Exit;
-  //
-  Result := FCommentsDelimiter[Index];
 end;
 
 procedure TNEDEditorHighlightSettings.Reset;
@@ -480,11 +539,11 @@ begin
   FAllowStringDelimiterNesting := False;
   FNestedStringDelimiterEscapeing := False;
   //
-  for i := 0 to High(FCommentsDelimiter) do begin
-    FCommentsDelimiter[i].StartDelimiter := '';
-    FCommentsDelimiter[i].EndDelimiter := '';
+  for i := 0 to High(FCommentsDelimiters) do begin
+    FCommentsDelimiters[i].StartDelimiter := '';
+    FCommentsDelimiters[i].EndDelimiter := '';
   end;
-  SetLength(FCommentsDelimiter, 0);
+  SetLength(FCommentsDelimiters, 0);
   //
   FDirectiveDelimiter.&Type := ectNotInComment; // '{$' - directive begin; '}' directive end
   FDirectiveDelimiter.StartDelimiter := '{$';
@@ -505,6 +564,11 @@ begin
   FAllowMultilineComments := False;
   //
   //
+//  for i := 0 to FKeywords.Count - 1 do
+//    if FKeywords.Objects[i] <> Nil then begin
+//      FKeywords.Objects[i].Free;
+//      FKeywords.Objects[i] := Nil;
+//    end;
   FKeywords.Clear;
   FOperators.Clear;
   FPunctuation.Clear;
@@ -536,9 +600,12 @@ var
   Keyword: UTF8String;
   KeywordKind: TNEDStructuralFrameKindEnum;
   KeywordRole: TNEDParserKeywordRoleEnum;
+  KeywordAction: TNEDParserKeywordActionEnum;
+  KeywordExpectation: TNEDParserExpectationEnum;
+  KeywordContextFlags: TNEDLineContextFlags;
 begin
   Result := False;
-  Reset;
+  Clear;
   if ARoot = Nil then
     Exit;
   //
@@ -577,14 +644,14 @@ begin
   if Root <> Nil then begin
     Root := Root.FirstChild;
     while Root <> Nil do begin
-      idx := Length(FCommentsDelimiter);
-      SetLength(FCommentsDelimiter, idx + 1);
+      idx := Length(FCommentsDelimiters);
+      SetLength(FCommentsDelimiters, idx + 1);
       //
-      FCommentsDelimiter[idx].&Type := TNEDEditorDelimiterPair.StringToEditorCommentType(ARoot.Document.NodeAsString(Root, 'Type', ''));
-      FCommentsDelimiter[idx].StartDelimiter := ARoot.Document.NodeAsString(Root, 'StartDelimiter', '');
-      FCommentsDelimiter[idx].EndDelimiter := ARoot.Document.NodeAsString(Root, 'EndDelimiter', '');
-      FCommentsDelimiter[idx].CanNest := ARoot.Document.NodeAsBoolean(Root, 'CanNest', False);
-      FCommentsDelimiter[idx].CanBeNested := ARoot.Document.NodeAsBoolean(Root, 'CanBeNested', False);
+      FCommentsDelimiters[idx].&Type := TNEDEditorDelimiterPair.StringToEditorCommentType(ARoot.Document.NodeAsString(Root, 'Type', ''));
+      FCommentsDelimiters[idx].StartDelimiter := ARoot.Document.NodeAsString(Root, 'StartDelimiter', '');
+      FCommentsDelimiters[idx].EndDelimiter := ARoot.Document.NodeAsString(Root, 'EndDelimiter', '');
+      FCommentsDelimiters[idx].CanNest := ARoot.Document.NodeAsBoolean(Root, 'CanNest', False);
+      FCommentsDelimiters[idx].CanBeNested := ARoot.Document.NodeAsBoolean(Root, 'CanBeNested', False);
       //
       Root := Root.NextSibling;
     end;
@@ -622,9 +689,11 @@ begin
       Keyword := ARoot.Document.NodeAsString(Root, 'Keyword', '');
       KeywordKind := TNEDParserKeyword.StringToStructuralFrameKind(ARoot.Document.NodeAsString(Root, 'Kind', ''));
       KeywordRole := TNEDParserKeyword.StringToParserKeywordRole(ARoot.Document.NodeAsString(Root, 'Role', ''));
+      KeywordAction := TNEDParserKeyword.StringToParserKeywordAction(ARoot.Document.NodeAsString(Root, 'Action', ''));
+      KeywordExpectation := TNEDParserKeyword.StringToParserExpectation(ARoot.Document.NodeAsString(Root, 'Expectation', ''));
+      KeywordContextFlags := TNEDParserKeyword.StringToLineContextFlags(ARoot.Document.NodeAsString(Root, 'ContextFlags', ''));
       //
-      // @TODO: FKeywords Objects need to be freed, otherwise we are leaking memory
-      FKeywords.AddObject(Keyword, TNEDEditorParserKeyword.Create(KeywordKind, KeywordRole));
+      FKeywords.AddObject(Keyword, TNEDEditorParserKeyword.Create(KeywordKind, KeywordRole, KeywordAction, KeywordExpectation, KeywordContextFlags));
       Keyword := '';
       //
       Root := Root.NextSibling;
@@ -706,11 +775,12 @@ end;
 constructor TNEDHighlighterProfiles.Create;
 begin
   inherited Create;
-  FLanguageSettings := TDictionary<String, TNEDEditorHighlightSettings>.Create;
+  FLanguageSettings := TObjectDictionary<String, TNEDEditorHighlightSettings>.Create([doOwnsValues]);
 end;
 
 destructor TNEDHighlighterProfiles.Destroy;
 begin
+  Clear;
   FLanguageSettings.Free;
   inherited;
 end;
@@ -736,6 +806,11 @@ begin
     Result := Nil;
 end;
 
+procedure TNEDHighlighterProfiles.Clear;
+begin
+  FLanguageSettings.Clear;
+end;
+
 procedure TNEDHighlighterProfiles.Reset;
 begin
   FLanguageSettings.Clear;
@@ -749,12 +824,13 @@ var
 begin
   Result := False;
   AErrorMsg := '';
-  Reset;
   if ARoot = Nil then begin
     AErrorMsg := 'EditorSettings can not be loaded, config "Settings" entry not found !';
     Exit;
   end;
-
+  //
+  Clear;
+  //
   HighlighterProfiles := ARoot.FindNode('HighlighterProfiles', [jtObject]);
   if HighlighterProfiles <> Nil then begin
     //
@@ -808,12 +884,23 @@ end;
 
 destructor TNEDSettings.Destroy;
 begin
+  Clear;
+  //
   FDarkSettings.EditorSettings.Free;
   FDarkSettings.HighlighterProfiles.Free;
   //
   FLightSettings.EditorSettings.Free;
   FLightSettings.HighlighterProfiles.Free;
   inherited;
+end;
+
+procedure TNEDSettings.Clear;
+begin
+  FDarkSettings.EditorSettings.Clear;
+  FDarkSettings.HighlighterProfiles.Clear;
+  //
+  FLightSettings.EditorSettings.Clear;
+  FLightSettings.HighlighterProfiles.Clear;
 end;
 
 procedure TNEDSettings.Reset;
@@ -877,8 +964,11 @@ end;
 
 destructor TNEDSessionContext.Destroy;
 begin
+  FStorageFileName := '';
   FErrorMsg := '';
+  ContextClear;
   //
+  FSettings.Clear;
   FSettings.Free;
   FLayout.Free;
   FRecents.Free;
@@ -1048,7 +1138,7 @@ procedure TNEDSessionContext.ReadSettings(const ARootNode: TJSONNode);
 var
   LErrorMsg: String;
 begin
-  FSettings.Reset;
+  FSettings.Clear;
   if ARootNode <> Nil then begin
     if not FSettings.Read(ARootNode, LErrorMsg) then begin
       FError := True;
@@ -1080,9 +1170,11 @@ procedure TNEDSessionContext.ContextClear;
 begin
   FFavorites.Clear;
   FRecents.Clear;
-  FLayout.Reset;
-  FSettings.Reset;
+  FLayout.Clear;
+  FSettings.Clear;
   //FProjects.Clear;
+  if FLoaded then
+    FStorage.Clear;
 end;
 
 //Result := FProjects.Count;

@@ -278,8 +278,8 @@ type
     destructor Destroy; override;
     //
     procedure AnalyzeDocument(ADocument: TNEDCustomDocument);
-    procedure AnalyzeLine(ADocument: TNEDCustomDocument; ALine: Integer; const AInState: TNEDParserState); //; out AAnalysis: TNEDLineAnalysis);
     procedure AnalyzeRange(ADocument: TNEDCustomDocument; ALineFrom, ALineTo: Integer);
+    procedure AnalyzeLine(ADocument: TNEDCustomDocument; ALine: Integer; const AInState: TNEDParserState); //; out AAnalysis: TNEDLineAnalysis);
     //
     property Lexer: TNEDLexer read FLexer;
     property Texer: TNEDTexer read FTexer;
@@ -1123,6 +1123,23 @@ begin
   AnalyzeRange(ADocument, 0, ADocument.LinesCount - 1);
 end;
 
+procedure TNEDDocumentAnalyzer.AnalyzeRange(ADocument: TNEDCustomDocument; ALineFrom, ALineTo: Integer);
+var
+  State: TNEDParserState;
+  I: Integer;
+begin
+  if ALineFrom > 0 then
+    State := ADocument.LineProperties[ALineFrom - 1].Analysis.Context.OutState
+  else
+    State := TNEDParser.InitialState;
+  //
+  FTexer.Init;
+  for I := ALineFrom to ALineTo do begin
+    AnalyzeLine(ADocument, I, State);
+    State := ADocument.LineProperties[I].Analysis.Context.OutState;
+  end;
+end;
+
 procedure TNEDDocumentAnalyzer.AnalyzeLine(ADocument: TNEDCustomDocument; ALine: Integer; const AInState: TNEDParserState); //; out AAnalysis: TNEDLineAnalysis);
 var
   Props: TNEDLineProperties;
@@ -1148,23 +1165,6 @@ begin
   finally
     if Analysis <> Nil then
       Analysis.Free;
-  end;
-end;
-
-procedure TNEDDocumentAnalyzer.AnalyzeRange(ADocument: TNEDCustomDocument; ALineFrom, ALineTo: Integer);
-var
-  State: TNEDParserState;
-  I: Integer;
-begin
-  if ALineFrom > 0 then
-    State := ADocument.LineProperties[ALineFrom - 1].Analysis.Context.OutState
-  else
-    State := TNEDParser.InitialState;
-  //
-  FTexer.Init;
-  for I := ALineFrom to ALineTo do begin
-    AnalyzeLine(ADocument, I, State);
-    State := ADocument.LineProperties[I].Analysis.Context.OutState;
   end;
 end;
 

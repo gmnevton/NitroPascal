@@ -332,6 +332,8 @@ begin
 //  NEDDialogProfiles.Free;
   NEDHomeForm.Free;
   FWorkspaceManager.Free;
+  if FProfile <> Nil then
+    FProfile.UnloadSessionContext;
   FProfile := Nil;
 end;
 
@@ -803,6 +805,7 @@ end;
 procedure TNEDMainForm.btnSelectProfileClick(Sender: TObject);
 var
   NEDDialogProfiles: TNEDDialogProfiles;
+  LProfile: TNEDProfile;
 begin
   if not btnSelectProfile.Enabled then
     Exit;
@@ -811,14 +814,17 @@ begin
   try
     if NEDDialogProfiles <> Nil then begin
       if NEDDialogProfiles.Execute then begin // load selected profile
-        FProfile := NEDDialogProfiles.SelectedProfile;
-        txtProfile.Caption := FProfile.Name;
+        LProfile := NEDDialogProfiles.SelectedProfile;
+        txtProfile.Caption := LProfile.Name;
         // @TODO: load context if needed
-        if not FProfile.LoadSessionContext then begin
-          ShowMessage(FProfile.ErrorMsg);
+        if not LProfile.LoadSessionContext then begin
+          ShowMessage(LProfile.ErrorMsg);
           Exit;
         end;
-        NEDHomeForm.SyncProperties(FProfile);
+        if FProfile <> Nil then
+          FProfile.UnloadSessionContext;
+        FProfile := LProfile;
+        NEDHomeForm.SyncProperties(LProfile);
 
         btnWorkspace.Enabled := True;
         btnSearch.Enabled := True;

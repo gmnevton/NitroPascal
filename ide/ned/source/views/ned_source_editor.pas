@@ -355,6 +355,9 @@ var
   Keyword: UTF8String;
   KeywordKind: TNEDStructuralFrameKindEnum;
   KeywordRole: TNEDParserKeywordRoleEnum;
+  KeywordAction: TNEDParserKeywordActionEnum;
+  KeywordExpectation: TNEDParserExpectationEnum;
+  KeywordContextFlags: TNEDLineContextFlags;
 begin
   if NEDMainForm.Profile = Nil then
     Exit;
@@ -402,82 +405,89 @@ begin
       end;
 
       HighlightSettings := Settings.HighlighterProfiles.LanguagesByName[FileType];
-      Assert(HighlightSettings <> Nil);
-
-      LangProfile.ID := FileType;
-      LangProfile.Name := HighlightSettings.Name;
-      LangProfile.Description := HighlightSettings.Description;
-      LangProfile.FileExtensions.Assign(HighlightSettings.FileExtensions);
-      //
-      LangProfile.LexerConfig.LineBreak := HighlightSettings.LineBreak;
-      LangProfile.LexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
-      LangProfile.LexerConfig.AllowStringDelimiterNesting := HighlightSettings.AllowStringDelimiterNesting;
-      LangProfile.LexerConfig.NestedStringDelimiterEscapeing := HighlightSettings.NestedStringDelimiterEscapeing;
-      for i := 0 to HighlightSettings.CommentsDelimitersCount - 1 do begin
-        DelimiterPair := HighlightSettings.CommentsDelimiters[i];
-        LangProfile.LexerConfig.AddCommentDelimiter(DelimiterPair);
-      end;
-      LangProfile.LexerConfig.DirectiveDelimiter := HighlightSettings.DirectiveDelimiter;
-      LangProfile.LexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
-      LangProfile.LexerConfig.CompilerVariableDelimiter := HighlightSettings.CompilerVariableDelimiter;
-      LangProfile.LexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
-      //
-      LangProfile.LexerConfig.AllowNestedComments := HighlightSettings.AllowNestedComments;
-      LangProfile.LexerConfig.AllowMultilineStrings := HighlightSettings.AllowMultilineStrings;
-      LangProfile.LexerConfig.AllowMultilineComments := HighlightSettings.AllowMultilineComments;
-      //
-      LangProfile.TexerConfig.WhitespaceCharSet := HighlightSettings.WhitespaceCharSet;
-      //
-      LangProfile.TexerConfig.IdentifierCharSet := HighlightSettings.IdentifierRuleSet.CharSet;
-      LangProfile.TexerConfig.IdentifierUnderscoreStart := HighlightSettings.IdentifierRuleSet.UnderscoreStart;
-      LangProfile.TexerConfig.IdentifierNumberStart := HighlightSettings.IdentifierRuleSet.NumberStart;
-      LangProfile.TexerConfig.IdentifierCanContainDash := HighlightSettings.IdentifierRuleSet.CanContainDash;
-      //
-      LangProfile.TexerConfig.NumberCharSet := HighlightSettings.NumberRuleSet.CharSet;
-      LangProfile.TexerConfig.NumberUnderscoreStart := HighlightSettings.NumberRuleSet.UnderscoreStart;
-      LangProfile.TexerConfig.NumberNumberStart := HighlightSettings.NumberRuleSet.NumberStart;
-      LangProfile.TexerConfig.NumberCanContainDash := HighlightSettings.NumberRuleSet.CanContainDash;
-      //
-      for i := 0 to HighlightSettings.CommentsDelimitersCount - 1 do begin
-        DelimiterPair := HighlightSettings.CommentsDelimiters[i];
-        LangProfile.TexerConfig.AddCommentDelimiter(DelimiterPair);
-      end;
-      LangProfile.TexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
-      //
-      LangProfile.TexerConfig.Keywords.Assign(HighlightSettings.Keywords);
-      LangProfile.TexerConfig.Operators.Assign(HighlightSettings.Operators);
-      LangProfile.TexerConfig.Punctuation.Assign(HighlightSettings.Punctuation);
-      LangProfile.TexerConfig.BooleanLiterals.Assign(HighlightSettings.BooleanLiterals);
-      LangProfile.TexerConfig.NilLiterals.Assign(HighlightSettings.NilLiterals);
-      //
-      LangProfile.TexerConfig.DirectiveKeywords.Assign(HighlightSettings.DirectiveKeywords);
-      LangProfile.TexerConfig.CompilerVariableKeywords.Assign(HighlightSettings.CompilerVariableKeywords);
-      LangProfile.TexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
-      LangProfile.TexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
-      //LangProfile.TexerConfig.AllowStringDelimiterNesting
-      //LangProfile.TexerConfig.NestedStringDelimiterEscapeing
-      //
-      LangProfile.TexerConfig.HexPrefix := HighlightSettings.HexPrefix;
-      LangProfile.TexerConfig.HexSuffix := HighlightSettings.HexSuffix;
-      LangProfile.TexerConfig.BinaryPrefix := HighlightSettings.BinaryPrefix;
-      LangProfile.TexerConfig.BinarySuffix := HighlightSettings.BinarySuffix;
-      LangProfile.TexerConfig.OctalPrefix := HighlightSettings.OctalPrefix;
-      LangProfile.TexerConfig.OctalSuffix := HighlightSettings.OctalSuffix;
-      LangProfile.TexerConfig.ExtendedSuffix := HighlightSettings.ExtendedSuffix;
-      LangProfile.TexerConfig.DecimalSeparator := HighlightSettings.DecimalSeparator;
-      LangProfile.TexerConfig.AllowUnderscoreNumbers := HighlightSettings.AllowUnderscoreNumbers;
-      LangProfile.TexerConfig.CaseSensitive := HighlightSettings.CaseSensitive;
-      //
-      for i := 0 to HighlightSettings.Keywords.Count - 1 do begin
-        Keyword := HighlightSettings.Keywords.Strings[i];
-        KeywordKind := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Kind;
-        KeywordRole := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Role;
-        LangProfile.ParserConfig.AddKeyword(Keyword, KeywordKind, KeywordRole);
-        Keyword := '';
-      end;
-      LangProfile.ParserConfig.CaseSensitive := HighlightSettings.CaseSensitive;
-      //
-      //LangProfile.HighlightConfig. := HighlightSettings.Name;
+      //Assert(HighlightSettings <> Nil);
+      if HighlightSettings <> Nil then begin
+        LangProfile.ID := FileType;
+        LangProfile.Name := HighlightSettings.Name;
+        LangProfile.Description := HighlightSettings.Description;
+        LangProfile.FileExtensions.Assign(HighlightSettings.FileExtensions);
+        //
+        LangProfile.LexerConfig.LineBreak := HighlightSettings.LineBreak;
+        LangProfile.LexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
+        LangProfile.LexerConfig.AllowStringDelimiterNesting := HighlightSettings.AllowStringDelimiterNesting;
+        LangProfile.LexerConfig.NestedStringDelimiterEscapeing := HighlightSettings.NestedStringDelimiterEscapeing;
+        for i := 0 to HighlightSettings.CommentsDelimitersCount - 1 do begin
+          DelimiterPair := HighlightSettings.CommentsDelimiters[i];
+          LangProfile.LexerConfig.AddCommentDelimiter(DelimiterPair);
+        end;
+        LangProfile.LexerConfig.DirectiveDelimiter := HighlightSettings.DirectiveDelimiter;
+        LangProfile.LexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
+        LangProfile.LexerConfig.CompilerVariableDelimiter := HighlightSettings.CompilerVariableDelimiter;
+        LangProfile.LexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
+        //
+        LangProfile.LexerConfig.AllowNestedComments := HighlightSettings.AllowNestedComments;
+        LangProfile.LexerConfig.AllowMultilineStrings := HighlightSettings.AllowMultilineStrings;
+        LangProfile.LexerConfig.AllowMultilineComments := HighlightSettings.AllowMultilineComments;
+        //
+        LangProfile.TexerConfig.WhitespaceCharSet := HighlightSettings.WhitespaceCharSet;
+        //
+        LangProfile.TexerConfig.IdentifierCharSet := HighlightSettings.IdentifierRuleSet.CharSet;
+        LangProfile.TexerConfig.IdentifierUnderscoreStart := HighlightSettings.IdentifierRuleSet.UnderscoreStart;
+        LangProfile.TexerConfig.IdentifierNumberStart := HighlightSettings.IdentifierRuleSet.NumberStart;
+        LangProfile.TexerConfig.IdentifierCanContainDash := HighlightSettings.IdentifierRuleSet.CanContainDash;
+        //
+        LangProfile.TexerConfig.NumberCharSet := HighlightSettings.NumberRuleSet.CharSet;
+        LangProfile.TexerConfig.NumberUnderscoreStart := HighlightSettings.NumberRuleSet.UnderscoreStart;
+        LangProfile.TexerConfig.NumberNumberStart := HighlightSettings.NumberRuleSet.NumberStart;
+        LangProfile.TexerConfig.NumberCanContainDash := HighlightSettings.NumberRuleSet.CanContainDash;
+        //
+        for i := 0 to HighlightSettings.CommentsDelimitersCount - 1 do begin
+          DelimiterPair := HighlightSettings.CommentsDelimiters[i];
+          LangProfile.TexerConfig.AddCommentDelimiter(DelimiterPair);
+        end;
+        LangProfile.TexerConfig.StringDelimiter := HighlightSettings.StringDelimiter;
+        //
+        LangProfile.TexerConfig.Keywords.Assign(HighlightSettings.Keywords);
+        LangProfile.TexerConfig.Operators.Assign(HighlightSettings.Operators);
+        LangProfile.TexerConfig.Punctuation.Assign(HighlightSettings.Punctuation);
+        LangProfile.TexerConfig.BooleanLiterals.Assign(HighlightSettings.BooleanLiterals);
+        LangProfile.TexerConfig.NilLiterals.Assign(HighlightSettings.NilLiterals);
+        //
+        LangProfile.TexerConfig.DirectiveKeywords.Assign(HighlightSettings.DirectiveKeywords);
+        LangProfile.TexerConfig.CompilerVariableKeywords.Assign(HighlightSettings.CompilerVariableKeywords);
+        LangProfile.TexerConfig.DirectiveCanContainDash := HighlightSettings.DirectiveCanContainDash;
+        LangProfile.TexerConfig.CompilerVariableCanContainDash := HighlightSettings.CompilerVariableCanContainDash;
+        //LangProfile.TexerConfig.AllowStringDelimiterNesting
+        //LangProfile.TexerConfig.NestedStringDelimiterEscapeing
+        //
+        LangProfile.TexerConfig.HexPrefix := HighlightSettings.HexPrefix;
+        LangProfile.TexerConfig.HexSuffix := HighlightSettings.HexSuffix;
+        LangProfile.TexerConfig.BinaryPrefix := HighlightSettings.BinaryPrefix;
+        LangProfile.TexerConfig.BinarySuffix := HighlightSettings.BinarySuffix;
+        LangProfile.TexerConfig.OctalPrefix := HighlightSettings.OctalPrefix;
+        LangProfile.TexerConfig.OctalSuffix := HighlightSettings.OctalSuffix;
+        LangProfile.TexerConfig.ExtendedSuffix := HighlightSettings.ExtendedSuffix;
+        LangProfile.TexerConfig.DecimalSeparator := HighlightSettings.DecimalSeparator;
+        LangProfile.TexerConfig.AllowUnderscoreNumbers := HighlightSettings.AllowUnderscoreNumbers;
+        LangProfile.TexerConfig.CaseSensitive := HighlightSettings.CaseSensitive;
+        //
+        for i := 0 to HighlightSettings.Keywords.Count - 1 do begin
+          Keyword := HighlightSettings.Keywords.Strings[i];
+          KeywordKind := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Kind;
+          KeywordRole := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Role;
+          KeywordAction := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Action;
+          KeywordExpectation := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).Expectation;
+          KeywordContextFlags := TNEDEditorParserKeyword(HighlightSettings.Keywords.Objects[i]).ContextFlags;
+          //
+          LangProfile.ParserConfig.AddKeyword(Keyword, KeywordKind, KeywordRole, KeywordAction, KeywordExpectation, KeywordContextFlags);
+          Keyword := '';
+        end;
+        LangProfile.ParserConfig.CaseSensitive := HighlightSettings.CaseSensitive;
+        //
+        //LangProfile.HighlightConfig. := HighlightSettings.Name;
+      end
+      else
+        LangProfile.Reset;
       //
       Sender.Assign(LangProfile); // set language profile for editor
     finally
